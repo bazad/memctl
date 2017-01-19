@@ -2,10 +2,10 @@
 
 #include "core.h"
 #include "memctl_error.h"
-#include "mach_vm.h"
 
 #include <assert.h>
 #include <mach/vm_region.h>
+#include <mach/mach_vm.h>
 
 kaddr_t kernel_slide;
 

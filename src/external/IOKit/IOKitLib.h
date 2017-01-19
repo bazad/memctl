@@ -46,7 +46,7 @@
 #include <CoreFoundation/CFDictionary.h>
 #include <CoreFoundation/CFRunLoop.h>
 
-#include "external/IOKit/IOTypes.h" //#include <IOKit/IOTypes.h>
+#include <IOKit/IOTypes.h>
 //#include <IOKit/IOKitKeys.h>
 
 //#include <IOKit/OSMessageNotification.h>

@@ -27,7 +27,7 @@ LIB_DIR = lib
 # Flags.
 
 ERRFLAGS   = -Wall -Wpedantic -Wno-gnu -Werror
-CFLAGS     = -g -O0 -I$(SRC_DIR) $(ERRFLAGS)
+CFLAGS     = -g -O0 -I$(SRC_DIR) -I$(SRC_DIR)/external $(ERRFLAGS)
 LDFLAGS    = -g
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
@@ -46,10 +46,8 @@ LIBMEMCTL_SRCS = core.c \
 
 LIBMEMCTL_HDRS = core.h \
 		 error.h \
-		 iokit.h \
 		 kernel.h \
 		 kernel_slide.h \
-		 mach_vm.h \
 		 macho.h \
 		 memctl_error.h \
 		 memctl_offsets.h \

@@ -1,12 +1,12 @@
 #include "oskext.h"
 
 #include "core.h"
-#include "iokit.h"
 #include "kernel.h"
 #include "kernel_slide.h"
 #include "memctl_error.h"
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
 #include <mach-o/arch.h>
 
 /* ---- START OSKext API ---- */
