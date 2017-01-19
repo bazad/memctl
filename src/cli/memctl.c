@@ -1,6 +1,7 @@
 #include "cli/cli.h"
 #include "cli/error.h"
 #include "cli/format.h"
+#include "cli/vmmap.h"
 
 #include "core.h"
 #include "kernel.h"
@@ -87,14 +88,13 @@ vt_command(const char *classname, const char *bundle_id) {
 
 bool
 vm_command(kaddr_t address, unsigned depth) {
-	printf("vm("KADDR_FMT", %u)\n", address, depth);
+	return memctl_vmmap(address, address, depth);
 	return true;
 }
 
 bool
 vmm_command(kaddr_t start, kaddr_t end, unsigned depth) {
-	printf("vm("KADDR_FMT", "KADDR_FMT", %u)\n", start, end, depth);
-	return true;
+	return memctl_vmmap(start, end, depth);
 }
 
 bool

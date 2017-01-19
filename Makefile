@@ -41,6 +41,7 @@ LIBMEMCTL_SRCS = core.c \
 		 macho.c \
 		 memctl_error.c \
 		 memctl_offsets.c \
+		 memctl_signal.c \
 		 oskext.c \
 		 platform.c
 
@@ -51,6 +52,7 @@ LIBMEMCTL_HDRS = core.h \
 		 macho.h \
 		 memctl_error.h \
 		 memctl_offsets.h \
+		 memctl_signal.h \
 		 memctl_types.h \
 		 offset.h \
 		 oskext.h \
@@ -68,12 +70,14 @@ MEMCTL_DIR = cli
 MEMCTL_SRCS = cli.c \
 	      command.c \
 	      error.c \
-	      memctl.c
+	      memctl.c \
+	      vmmap.c
 
 MEMCTL_HDRS = cli.h \
 	      command.h \
 	      error.h \
-	      format.h
+	      format.h \
+	      vmmap.h
 
 MEMCTL_SRCS := $(MEMCTL_SRCS:%=$(MEMCTL_DIR)/%)
 MEMCTL_HDRS := $(MEMCTL_HDRS:%=$(MEMCTL_DIR)/%)
