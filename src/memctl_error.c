@@ -138,6 +138,14 @@ error_macho(const char *format, ...) {
 }
 
 void
+error_kernelcache(const char *format, ...) {
+	va_list ap;
+	va_start(ap, format);
+	error_push_printf(kernelcache_error, format, ap);
+	va_end(ap);
+}
+
+void
 error_core(const char *format, ...) {
 	va_list ap;
 	va_start(ap, format);

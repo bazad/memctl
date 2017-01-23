@@ -16,6 +16,7 @@ endif
 SYSROOT := $(shell xcrun --sdk $(SDK) --show-sdk-path)
 CC      := $(CLANG) -isysroot $(SYSROOT) -arch $(ARCH)
 endif
+CODESIGN := codesign
 
 # Directories.
 
@@ -37,8 +38,11 @@ ARFLAGS    = r
 LIBMEMCTL_SRCS = core.c \
 		 error.c \
 		 kernel.c \
+		 kernel_memory.c \
 		 kernel_slide.c \
+		 kernelcache.c \
 		 macho.c \
+		 memctl_common.c \
 		 memctl_error.c \
 		 memctl_offsets.c \
 		 memctl_signal.c \
@@ -48,8 +52,11 @@ LIBMEMCTL_SRCS = core.c \
 LIBMEMCTL_HDRS = core.h \
 		 error.h \
 		 kernel.h \
+		 kernel_memory.h \
 		 kernel_slide.h \
+		 kernelcache.h \
 		 macho.h \
+		 memctl_common.h \
 		 memctl_error.h \
 		 memctl_offsets.h \
 		 memctl_signal.h \
@@ -71,12 +78,14 @@ MEMCTL_SRCS = cli.c \
 	      command.c \
 	      error.c \
 	      memctl.c \
+	      read.c \
 	      vmmap.c
 
 MEMCTL_HDRS = cli.h \
 	      command.h \
 	      error.h \
 	      format.h \
+	      read.h \
 	      vmmap.h
 
 MEMCTL_SRCS := $(MEMCTL_SRCS:%=$(MEMCTL_DIR)/%)
@@ -104,6 +113,7 @@ $(OBJ_DIR)/%.o: %.c $(LIBMEMCTL_HDRS)
 $(MEMCTL_BIN): $(MEMCTL_LIB) $(CORE_LIB) $(MEMCTL_OBJS)
 	@mkdir -p $(@D)
 	$(CC) $(LDFLAGS) $(FRAMEWORKS) $(MEMCTL_OBJS) $(CORE_LIB) -force_load $(MEMCTL_LIB) -o $@
+	$(CODESIGN) -s - $@
 
 $(MEMCTL_LIB): $(LIBMEMCTL_OBJS)
 	@mkdir -p $(@D)

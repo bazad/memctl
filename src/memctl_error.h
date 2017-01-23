@@ -19,9 +19,15 @@ enum {
 	kext_not_found_error             = 39,
 	kext_no_symbols_error            = 40,
 	macho_error                      = 41,
+	kernelcache_error                = 42,
 
 	core_error                       = 64,
 };
+
+/*
+ * memctl_warning
+ */
+void memctl_warning(const char *format, ...);
 
 /*
  * out_of_memory_error
@@ -137,6 +143,11 @@ void error_kext_no_symbols(const char *bundle_id);
  * macho_error
  */
 void error_macho(const char *format, ...);
+
+/*
+ * kernelcache_error
+ */
+void error_kernelcache(const char *format, ...);
 
 /*
  * core_error

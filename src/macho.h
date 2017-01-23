@@ -1,39 +1,11 @@
 #ifndef MEMCTL__MACHO_H_
 #define MEMCTL__MACHO_H_
 
-#include "memctl_types.h"
-
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-
-#ifndef MACHO_BITS
-#define MACHO_BITS 64
-#endif
-
-#if MACHO_BITS == 32
-# define macho_header		mach_header
-# define MACHO_MAGIC		MH_MAGIC
-# define MACHO_CIGAM		MH_CIGAM
-# define macho_word		uint32_t
-# define macho_segment_command	segment_command
-# define macho_section		section
-# define MACHO_LC_SEGMENT	LC_SEGMENT
-# define macho_nlist		nlist
-#elif MACHO_BITS == 64
-# define macho_header		mach_header_64
-# define MACHO_MAGIC		MH_MAGIC_64
-# define MACHO_CIGAM		MH_CIGAM_64
-# define macho_word		uint64_t
-# define macho_segment_command	segment_command_64
-# define macho_section		section_64
-# define MACHO_LC_SEGMENT	LC_SEGMENT_64
-# define macho_nlist		nlist_64
-#else
-# error Unsupported Mach-O format.
-#endif
 
 /*
  * struct macho
@@ -42,7 +14,11 @@
  * 	A container for a pointer to a Mach-O file and its size.
  */
 struct macho {
-	struct macho_header *mh;
+	union {
+		void *mh;
+		struct mach_header *mh32;
+		struct mach_header_64 *mh64;
+	};
 	size_t size;
 };
 
@@ -71,7 +47,9 @@ typedef enum macho_result {
  * Returns:
  * 	MACHO_SUCCESS on success, and MACHO_ERROR if validation failed.
  */
-macho_result macho_validate(const void *macho, size_t size);
+macho_result macho_validate(const void *mh, size_t size);
+macho_result macho_validate_32(const struct mach_header *mh, size_t size);
+macho_result macho_validate_64(const struct mach_header_64 *mh, size_t size);
 
 /*
  * macho_next_load_command
@@ -89,6 +67,8 @@ macho_result macho_validate(const void *macho, size_t size);
  * 	MACHO_SUCCESS or MACHO_ERROR.
  */
 macho_result macho_next_load_command(const struct macho *macho, const struct load_command **lc);
+macho_result macho_next_load_command_32(const struct macho *macho, const struct load_command **lc);
+macho_result macho_next_load_command_64(const struct macho *macho, const struct load_command **lc);
 
 /*
  * macho_find_load_command
@@ -108,6 +88,10 @@ macho_result macho_next_load_command(const struct macho *macho, const struct loa
  */
 macho_result macho_find_load_command(const struct macho *macho, const struct load_command **lc,
 		uint32_t cmd);
+macho_result macho_find_load_command_32(const struct macho *macho, const struct load_command **lc,
+		uint32_t cmd);
+macho_result macho_find_load_command_64(const struct macho *macho, const struct load_command **lc,
+		uint32_t cmd);
 
 /*
  * macho_find_base
@@ -122,7 +106,9 @@ macho_result macho_find_load_command(const struct macho *macho, const struct loa
  * Returns:
  * 	A macho_result status code.
  */
-macho_result macho_find_base(struct macho *macho, macho_word *base);
+macho_result macho_find_base(struct macho *macho, uint64_t *base);
+macho_result macho_find_base_32(struct macho *macho, uint32_t *base);
+macho_result macho_find_base_64(struct macho *macho, uint64_t *base);
 
 /*
  * macho_resolve_symbol
@@ -131,7 +117,13 @@ macho_result macho_find_base(struct macho *macho, macho_word *base);
  * 	A macho_result status code.
  */
 macho_result macho_resolve_symbol(const struct macho *macho, const struct symtab_command *symtab,
-		const char *symbol, macho_word *addr, size_t *size);
+		const char *symbol, uint64_t *addr, size_t *size);
+macho_result macho_resolve_symbol_32(const struct macho *macho,
+		const struct symtab_command *symtab, const char *symbol, uint32_t *addr,
+		size_t *size);
+macho_result macho_resolve_symbol_64(const struct macho *macho,
+		const struct symtab_command *symtab, const char *symbol, uint64_t *addr,
+		size_t *size);
 
 /*
  * macho_resolve_address
@@ -140,7 +132,13 @@ macho_result macho_resolve_symbol(const struct macho *macho, const struct symtab
  * 	A macho_result status code.
  */
 macho_result macho_resolve_address(const struct macho *macho, const struct symtab_command *symtab,
-		macho_word addr, const char **name, size_t *size, size_t *offset);
+		uint64_t addr, const char **name, size_t *size, size_t *offset);
+macho_result macho_resolve_address_32(const struct macho *macho,
+		const struct symtab_command *symtab, uint32_t addr, const char **name,
+		size_t *size, size_t *offset);
+macho_result macho_resolve_address_64(const struct macho *macho,
+		const struct symtab_command *symtab, uint64_t addr, const char **name,
+		size_t *size, size_t *offset);
 
 /*
  * macho_search_data
@@ -149,6 +147,10 @@ macho_result macho_resolve_address(const struct macho *macho, const struct symta
  * 	A macho_result status code.
  */
 macho_result macho_search_data(const struct macho *macho, const void *data, size_t size,
-		int minprot, macho_word *addr);
+		int minprot, uint64_t *addr);
+macho_result macho_search_data_32(const struct macho *macho, const void *data, size_t size,
+		int minprot, uint32_t *addr);
+macho_result macho_search_data_64(const struct macho *macho, const void *data, size_t size,
+		int minprot, uint64_t *addr);
 
 #endif

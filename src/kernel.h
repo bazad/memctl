@@ -38,7 +38,7 @@ struct kext {
  */
 #ifndef KERNEL_PATH
 # if KERNELCACHE
-#  define KERNEL_PATH	"/System/Library/Caches/com.apple.kernelcache/kernelcache"
+#  define KERNEL_PATH	"/System/Library/Caches/com.apple.kernelcaches/kernelcache"
 # else
 #  define KERNEL_PATH	"/System/Library/Kernels/kernel"
 # endif

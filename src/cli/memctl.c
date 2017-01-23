@@ -1,6 +1,7 @@
 #include "cli/cli.h"
 #include "cli/error.h"
 #include "cli/format.h"
+#include "cli/read.h"
 #include "cli/vmmap.h"
 
 #include "core.h"
@@ -21,7 +22,7 @@ r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t ac
 	printf("r("KADDR_FMT", %zu, %s, %zu, %zu, %s)\n", address, length,
 			(physical ? "physical" : "virtual"), width, access,
 			(dump ? "dump" : "read"));
-	return true;
+	return memctl_read(address, length, width, access);
 }
 
 bool

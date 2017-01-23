@@ -1,6 +1,7 @@
 #include "kernel.h"
 
 #include "kernel_slide.h"
+#include "memctl_common.h"
 #include "memctl_error.h"
 
 #if !KERNELCACHE
@@ -27,10 +28,6 @@ struct kext kernel;
  */
 static const char *initialized_kernel = NULL;
 
-// Check that kaddr_t and macho_word have the same number of bits.
-static_assert(sizeof(kaddr_t) == sizeof(macho_word),
-		"Kernel and Mach-O word sizes differ.");
-
 /*
  * is_kernel_id
  *
@@ -42,6 +39,7 @@ is_kernel_id(const char *bundle_id) {
 	return (strcmp(bundle_id, KERNEL_ID) == 0);
 }
 
+// TODO: This is different with KERNELCACHE
 bool
 kernel_init(const char *kernel_path) {
 	if (kernel_path == NULL) {
@@ -58,26 +56,8 @@ kernel_init(const char *kernel_path) {
 		kernel_deinit();
 		initialized_kernel = NULL;
 	}
-	// Open the kernel file.
-	int fd = open(kernel_path, O_RDONLY);
-	if (fd < 0) {
-		error_open(kernel_path, errno);
-		return false;
-	}
-	struct stat st;
-	int err = fstat(fd, &st);
-	if (err) {
-		close(fd);
-		error_io(kernel_path);
-		return false;
-	}
-	// Map in the kernel file.
-	kernel.macho.size = st.st_size;
-	kernel.macho.mh = mmap(NULL, kernel.macho.size, PROT_READ, MAP_SHARED, fd, 0);
-	close(fd);
-	if (kernel.macho.mh == MAP_FAILED) {
-		error_out_of_memory();
-		kernel.macho.mh = NULL;
+	// mmap the kernel file.
+	if (!mmap_file(kernel_path, (const void **)&kernel.macho.mh, &kernel.macho.size)) {
 		return false;
 	}
 	macho_result mr = macho_validate(kernel.macho.mh, kernel.macho.size);
@@ -85,10 +65,9 @@ kernel_init(const char *kernel_path) {
 		error_internal("%s is not a valid Mach-O file", kernel_path);
 		goto fail;
 	}
-	// TODO: Some of this might be different with KERNELCACHE
 	// Set the runtime base and slide.
 	kernel.bundle_id = KERNEL_ID;
-	macho_word static_base;
+	uint64_t static_base;
 	mr = macho_find_base(&kernel.macho, &static_base);
 	if (mr != MACHO_SUCCESS) {
 		error_internal("%s does not have a Mach-O base address", kernel_path);
@@ -150,7 +129,7 @@ kext_deinit_macho(struct macho *macho) {
 kext_result
 kext_find_base(struct macho *macho, const char *bundle_id, kaddr_t *base, kword_t *slide) {
 	assert(macho->mh != kernel.macho.mh);
-	macho_word static_base;
+	uint64_t static_base;
 	macho_result mr = macho_find_base(macho, &static_base);
 	if (mr != MACHO_SUCCESS) {
 		error_internal("could not find Mach-O base address for kext %s", bundle_id);
@@ -221,7 +200,7 @@ kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, 
 	if (kext->symtab == NULL) {
 		return KEXT_NO_SYMBOLS;
 	}
-	macho_word static_addr;
+	uint64_t static_addr;
 	macho_result mr = macho_resolve_symbol(&kext->macho, kext->symtab, symbol, &static_addr,
 			size);
 	if (mr != MACHO_SUCCESS) {
@@ -241,7 +220,7 @@ kext_resolve_address(const struct kext *kext, kaddr_t addr, const char **name, s
 	if (kext->symtab == NULL) {
 		return KEXT_NO_SYMBOLS;
 	}
-	macho_word static_addr = addr - kext->slide;
+	uint64_t static_addr = addr - kext->slide;
 	macho_result mr = macho_resolve_address(&kext->macho, kext->symtab, static_addr, name,
 			size, offset);
 	if (mr != MACHO_SUCCESS) {
@@ -259,7 +238,7 @@ kext_resolve_address(const struct kext *kext, kaddr_t addr, const char **name, s
 
 kext_result
 kext_search_data(const struct kext *kext, const void *data, size_t size, int minprot, kaddr_t *addr) {
-	macho_word static_addr;
+	uint64_t static_addr;
 	macho_result mr = macho_search_data(&kext->macho, data, size, minprot, &static_addr);
 	if (mr != MACHO_SUCCESS) {
 		if (mr == MACHO_NOT_FOUND) {

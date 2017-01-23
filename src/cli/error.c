@@ -53,6 +53,19 @@ error_execve(const char *path, const char *reason) {
 
 /* Error printing */
 
+void
+memctl_warning(const char *format, ...) {
+	va_list ap;
+	va_start(ap, format);
+	char *message;
+	vasprintf(&message, format, ap);
+	if (message != NULL) {
+		fprintf(stderr, "warning: %s\n", message);
+		free(message);
+	}
+	va_end(ap);
+}
+
 /*
  * print_error
  *
@@ -117,6 +130,12 @@ print_error(error_handle error) {
 		case kext_no_symbols_error: {
 			struct kext_no_symbols_error *e = error->data;
 			PRINT("kext %s does not contain symbol information", e->bundle_id);
+			} break;
+		case macho_error: {
+			PRINT("%s", (char *)error->data);
+			} break;
+		case kernelcache_error: {
+			PRINT("%s", (char *)error->data);
 			} break;
 		case core_error: {
 			PRINT("%s", (char *)error->data);

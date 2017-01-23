@@ -25,9 +25,6 @@
 # endif
 #endif // KERNEL_BITS
 
-// Define MACHO_BITS for macho.h
-#define MACHO_BITS KERNEL_BITS
-
 /*
  * DYNAMIC_KEXTS
  *
