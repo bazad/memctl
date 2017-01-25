@@ -39,6 +39,17 @@ typedef kernel_io_result (*transfer_range_fn)(
 		bool into_kernel);
 
 /*
+ * mach_unexpected
+ *
+ * Description:
+ * 	Generate an internal error due to the given mach call returning an unexpected error code.
+ */
+static void
+mach_unexpected(const char *function, kern_return_t kr) {
+	error_internal("%s returned %d: %s", function, kr, mach_error_string(kr));
+}
+
+/*
  * transfer_unsafe
  *
  * Description:
@@ -64,6 +75,9 @@ transfer_unsafe(kaddr_t kaddr, size_t size, void *data, size_t access, bool into
 			if (kr == KERN_PROTECTION_FAILURE) {
 				return KERNEL_IO_PROTECTION;
 			} else {
+				const char *fn = (into_kernel ? "mach_vm_write"
+				                              : "mach_vm_read_overwrite");
+				mach_unexpected(fn, kr);
 				return KERNEL_IO_ERROR;
 			}
 		}
@@ -107,6 +121,12 @@ region_is_heap(vm_region_submap_short_info_64_t info) {
 		    || info->user_tag == VM_KERN_MEMORY_KALLOC));
 }
 
+/*
+ * transfer_range_heap
+ *
+ * Description:
+ * 	Find the transfer range for the given transfer, but only consider heap regions.
+ */
 static kernel_io_result
 transfer_range_heap(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, bool into_kernel) {
 	size_t left = *size;
@@ -128,6 +148,7 @@ transfer_range_heap(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, 
 				break;
 			}
 			next_viable = kaddr + page_size - (kaddr & page_mask);
+			mach_unexpected("mach_vm_region_recurse", kr);
 			result = KERNEL_IO_ERROR;
 			break;
 		}
