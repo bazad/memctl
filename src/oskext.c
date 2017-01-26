@@ -172,7 +172,7 @@ oskext_for_each(kext_for_each_callback_fn callback, void *context) {
 				kCFBundleIdentifierKey);
 		char buf[BUNDLE_ID_BUFFER_SIZE];
 		const char *bundle_id = CFStringGetCStringOrConvert(cfbundleid, buf, sizeof(buf));
-		bool halt = callback(context, bundle_id, base, size);
+		bool halt = callback(context, kext_info[i], bundle_id, base, size);
 		if (halt) {
 			break;
 		}
@@ -206,7 +206,8 @@ struct oskext_find_data {
  * 	oskext_for_each_callback_fn for oskext_find_containing_address.
  */
 static bool
-oskext_find_callback(void *context, const char *bundle_id, kaddr_t base, size_t size) {
+oskext_find_callback(void *context, CFDictionaryRef info, const char *bundle_id, kaddr_t base,
+		size_t size) {
 	struct oskext_find_data *c = context;
 	if (c->kaddr < base || base + size <= c->kaddr) {
 		return false;

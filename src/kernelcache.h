@@ -6,6 +6,10 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 
+extern const CFStringRef kCFPrelinkInfoDictionaryKey;
+extern const CFStringRef kCFPrelinkExecutableLoadKey;
+extern const CFStringRef kCFPrelinkExecutableSizeKey;
+
 /*
  * enum kernelcache_result
  *

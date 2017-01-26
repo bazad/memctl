@@ -4,6 +4,8 @@
 #include "macho.h"
 #include "memctl_types.h"
 
+#include <CoreFoundation/CoreFoundation.h>
+
 /*
  * KERNEL_ID
  *
@@ -248,8 +250,8 @@ kext_result kext_search_data(const struct kext *kext, const void *data, size_t s
  * 	parameter will be the size of the first segment (before the split) rather than the true
  * 	binary size. It is recommended to ignore this parameter unless you know that it is correct.
  */
-typedef bool (*kext_for_each_callback_fn)(void *context, const char *bundle_id, kaddr_t base,
-		size_t size);
+typedef bool (*kext_for_each_callback_fn)(void *context, CFDictionaryRef info,
+		const char *bundle_id, kaddr_t base, size_t size);
 
 /*
  * kext_for_each

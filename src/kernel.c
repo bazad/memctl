@@ -289,8 +289,8 @@ struct kernel_and_kexts_resolve_symbol_context {
  * 	kernel extension.
  */
 static bool
-kernel_and_kexts_resolve_symbol_callback(void *context, const char *bundle_id, kaddr_t base0,
-		size_t size0) {
+kernel_and_kexts_resolve_symbol_callback(void *context, CFDictionaryRef info,
+		const char *bundle_id, kaddr_t base0, size_t size0) {
 	if (bundle_id == NULL) {
 		return false;
 	}
@@ -349,8 +349,8 @@ struct kernel_and_kexts_search_data_context {
  * 	kernel extension.
  */
 static bool
-kernel_and_kexts_search_data_callback(void *context, const char *bundle_id, kaddr_t base0,
-		size_t size0) {
+kernel_and_kexts_search_data_callback(void *context, CFDictionaryRef info, const char *bundle_id,
+		kaddr_t base0, size_t size0) {
 	if (bundle_id == NULL) {
 		return false;
 	}

@@ -8,7 +8,9 @@
 #include <string.h>
 #include <sys/mman.h>
 
-static const CFStringRef kCFPrelinkInfoDictionaryKey = CFSTR(kPrelinkInfoDictionaryKey);
+const CFStringRef kCFPrelinkInfoDictionaryKey = CFSTR(kPrelinkInfoDictionaryKey);
+const CFStringRef kCFPrelinkExecutableLoadKey = CFSTR(kPrelinkExecutableLoadKey);
+const CFStringRef kCFPrelinkExecutableSizeKey = CFSTR(kPrelinkExecutableSizeKey);
 
 // TODO: reimplement
 // Source:
@@ -241,7 +243,7 @@ kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn cal
 		char buf[BUNDLE_ID_BUFFER_SIZE];
 		const char *bundle_id = CFStringGetCStringOrConvert(cfbundleid, buf, sizeof(buf));
 		// TODO: Extract more information from info dictionary.
-		bool halt = callback(context, bundle_id, 0, 0);
+		bool halt = callback(context, info, bundle_id, 0, 0);
 		if (halt) {
 			break;
 		}
