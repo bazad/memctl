@@ -64,12 +64,14 @@ oskext_info_get_load_address_and_size(CFDictionaryRef info, kaddr_t *load_addres
 	CFNumberRef number;
 	number = (CFNumberRef)CFDictionaryGetValue(info, kCFBundleLoadAddressKey);
 	assert(number != NULL);
+	assert(CFGetTypeID(number) == CFNumberGetTypeID());
 	bool success = CFNumberGetValue(number, kCFNumberSInt64Type, load_address);
 	assert(success);
 	*load_address += kernel_slide;
 	if (size != NULL) {
 		number = (CFNumberRef)CFDictionaryGetValue(info, kCFBundleLoadSizeKey);
 		assert(number != NULL);
+		assert(CFGetTypeID(number) == CFNumberGetTypeID());
 		success = CFNumberGetValue(number, kCFNumberSInt64Type, size);
 		assert(success);
 	}

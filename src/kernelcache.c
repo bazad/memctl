@@ -1,5 +1,6 @@
 #include "kernelcache.h"
 
+#include "kernel_slide.h"
 #include "memctl_common.h"
 #include "memctl_error.h"
 
@@ -68,6 +69,33 @@ static bool
 decompress_complzss(const void *src, size_t srclen, void *dest, size_t destlen) {
 	// TODO: Use a real implementation that safely decompresses into the buffer.
 	return decompress_lzss(dest, src, srclen) == destlen;
+}
+
+/*
+ * kernelcache_info_get_load_address_and_size
+ *
+ * Description:
+ * 	Retrieve the load address and size of the kext from the kext's info dictionary.
+ *
+ * Dependencies:
+ * 	kernel_slide
+ */
+static bool
+kernelcache_info_get_load_address_and_size(CFDictionaryRef info, kaddr_t *address, size_t *size) {
+	CFNumberRef number = (CFNumberRef)CFDictionaryGetValue(info, kCFPrelinkExecutableLoadKey);
+	if (number == NULL) {
+		return false;
+	}
+	assert(CFGetTypeID(number) == CFNumberGetTypeID());
+	bool success = CFNumberGetValue(number, kCFNumberSInt64Type, address);
+	assert(success);
+	*address += kernel_slide;
+	number = (CFNumberRef)CFDictionaryGetValue(info, kCFPrelinkExecutableSizeKey);
+	assert(number != NULL);
+	assert(CFGetTypeID(number) == CFNumberGetTypeID());
+	success = CFNumberGetValue(number, kCFNumberSInt64Type, size);
+	assert(success);
+	return true;
 }
 
 kernelcache_result
@@ -242,8 +270,10 @@ kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn cal
 				kCFBundleIdentifierKey);
 		char buf[BUNDLE_ID_BUFFER_SIZE];
 		const char *bundle_id = CFStringGetCStringOrConvert(cfbundleid, buf, sizeof(buf));
-		// TODO: Extract more information from info dictionary.
-		bool halt = callback(context, info, bundle_id, 0, 0);
+		kaddr_t base = 0;
+		size_t size = 0;
+		kernelcache_info_get_load_address_and_size(info, &base, &size);
+		bool halt = callback(context, info, bundle_id, base, size);
 		if (halt) {
 			break;
 		}
