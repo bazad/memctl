@@ -1,5 +1,5 @@
 #define KERNEL_PRIVATE 1
-#include "external/mach/vm_statistics.h"
+#include "mach/vm_statistics.h"
 #undef KERNEL_PRIVATE
 
 #include "kernel_memory.h"

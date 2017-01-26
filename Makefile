@@ -24,11 +24,12 @@ SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
 LIB_DIR = lib
+EXTERNAL_HDR_DIR = external
 
 # Flags.
 
 ERRFLAGS   = -Wall -Wpedantic -Wno-gnu -Werror
-CFLAGS     = -g -O0 -I$(SRC_DIR) -I$(SRC_DIR)/external $(ERRFLAGS)
+CFLAGS     = -g -O0 -I$(SRC_DIR) -I$(EXTERNAL_HDR_DIR) $(ERRFLAGS)
 LDFLAGS    = -g
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
