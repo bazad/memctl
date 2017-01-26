@@ -3,6 +3,7 @@
 #include "core.h"
 #include "kernel.h"
 #include "kernel_slide.h"
+#include "memctl_common.h"
 #include "memctl_error.h"
 
 #include <CoreFoundation/CoreFoundation.h>
@@ -35,8 +36,6 @@ extern const NXArchInfo *
 OSKextGetRunningKernelArchitecture(void);
 
 /* ---- END OSKext API ---- */
-
-#define BUNDLE_ID_BUFFER_SIZE	2048
 
 /*
  * cfstring_nocopy
@@ -171,15 +170,8 @@ oskext_for_each(kext_for_each_callback_fn callback, void *context) {
 		oskext_info_get_load_address_and_size(kext_info[i], &base, &size);
 		CFStringRef cfbundleid = (CFStringRef)CFDictionaryGetValue(kext_info[i],
 				kCFBundleIdentifierKey);
-		const char *bundle_id = CFStringGetCStringPtr(cfbundleid, kCFStringEncodingUTF8);
 		char buf[BUNDLE_ID_BUFFER_SIZE];
-		if (bundle_id == NULL) {
-			bool success = CFStringGetCString(cfbundleid, buf, sizeof(buf),
-					kCFStringEncodingUTF8);
-			if (success) {
-				bundle_id = buf;
-			}
-		}
+		const char *bundle_id = CFStringGetCStringOrConvert(cfbundleid, buf, sizeof(buf));
 		bool halt = callback(context, bundle_id, base, size);
 		if (halt) {
 			break;

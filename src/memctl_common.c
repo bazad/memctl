@@ -33,3 +33,17 @@ mmap_file(const char *file, const void **data, size_t *size) {
 	*size = s;
 	return true;
 }
+
+const char *
+CFStringGetCStringOrConvert(CFStringRef string, char *buf, size_t size) {
+	const char *cstr = CFStringGetCStringPtr(string, kCFStringEncodingUTF8);
+	if (cstr != NULL) {
+		return cstr;
+	}
+	bool success = CFStringGetCString(string, buf, size, kCFStringEncodingUTF8);
+	if (success) {
+		return buf;
+	}
+	// TODO: What do we do now?
+	return NULL;
+}

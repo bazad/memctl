@@ -3,13 +3,12 @@
 #include "memctl_common.h"
 #include "memctl_error.h"
 
-#include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOCFUnserialize.h>
+#include <libkern/prelink.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <stdio.h>//TODO
 
-#define kPrelinkInfoSegment                "__PRELINK_INFO"
+static const CFStringRef kCFPrelinkInfoDictionaryKey = CFSTR(kPrelinkInfoDictionaryKey);
 
 // TODO: reimplement
 // Source:
@@ -157,73 +156,17 @@ kernelcache_init(struct kernelcache *kc, const void *data, size_t size) {
 	return kernelcache_init_decompress(kc, data, size);
 }
 
-/*
- * kernelcache_parse_prelink_info
- *
- * Description:
- * 	Try to find and parse the __PRELINK_INFO segment.
- */
-static bool
-kernelcache_parse_prelink_info(const struct kernelcache *kc, CFDictionaryRef *prelink_info) {
-	const struct segment_command_64 *sc;
-	macho_result mr = macho_find_segment_command_64(&kc->kernel, &sc, kPrelinkInfoSegment);
-	if (mr != MACHO_SUCCESS) {
-		if (mr == MACHO_NOT_FOUND) {
-			error_kernelcache("kernelcache parsing without __PRELINK_INFO is not "
-			                  "supported");
-		} else {
-			error_kernelcache("error while locating __PRELINK_INFO");
-		}
-		return false;
-	}
-	const void *prelink_xml = (const void *)((uintptr_t)kc->kernel.mh + sc->fileoff);
-	// TODO: IOCFUnserialize expects the buffer to be NULL-terminated. We don't do this
-	// explicitly. However, there appears to be some zero padding after the text anyway, so it
-	// works in practice.
-	CFStringRef error = NULL;
-	CFTypeRef info = IOCFUnserialize(prelink_xml, NULL, 0, &error);
-	if (info == NULL) {
-		char buf[512];
-		CFStringGetCString(error, buf, sizeof(buf), kCFStringEncodingUTF8);
-		error_internal("IOCFUnserialize: %s", buf);
-		CFRelease(error);
-		return false;
-	}
-	if (CFGetTypeID(info) != CFDictionaryGetTypeID()) {
-		error_internal("__PRELINK_INFO not a dictionary type");
-		return false;
-	}
-	*prelink_info = info;
-	return true;
-}
-
-/*
- * kernelcache_init_kexts
- *
- * Description:
- * 	Initialize kext information for the kernelcache.
- */
-static kernelcache_result
-kernelcache_init_kexts(struct kernelcache *kc) {
-	CFDictionaryRef prelink_info;
-	if (!kernelcache_parse_prelink_info(kc, &prelink_info)) {
-		return KERNELCACHE_ERROR;
-	}
-	return KERNELCACHE_SUCCESS;
-}
-
 kernelcache_result
 kernelcache_init_uncompressed(struct kernelcache *kc, const void *data, size_t size) {
-	kc->kernel.mh   = (void *)data;
-	kc->kernel.size = size;
-	kc->nkexts      = 0;
-	kc->kexts       = NULL;
+	kc->kernel.mh    = (void *)data;
+	kc->kernel.size  = size;
+	kc->prelink_info = NULL;
 	macho_result mr = macho_validate(kc->kernel.mh, kc->kernel.size);
 	if (mr != MACHO_SUCCESS) {
 		error_kernelcache("not a valid kernelcache");
 		goto fail;
 	}
-	kernelcache_result kr = kernelcache_init_kexts(kc);
+	kernelcache_result kr = kernelcache_parse_prelink_info(&kc->kernel, &kc->prelink_info);
 	if (kr != KERNELCACHE_SUCCESS) {
 		goto fail;
 	}
@@ -240,9 +183,69 @@ kernelcache_deinit(struct kernelcache *kc) {
 		kc->kernel.mh = NULL;
 		kc->kernel.size = 0;
 	}
-	if (kc->nkexts > 0) {
-		free(kc->kexts);
-		kc->nkexts = 0;
-		kc->kexts = NULL;
+	if (kc->prelink_info != NULL) {
+		CFRelease(kc->prelink_info);
+		kc->prelink_info = NULL;
 	}
+}
+
+kernelcache_result
+kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prelink_info) {
+	const struct segment_command_64 *sc;
+	macho_result mr = macho_find_segment_command_64(kernel, &sc, kPrelinkInfoSegment);
+	if (mr != MACHO_SUCCESS) {
+		if (mr == MACHO_NOT_FOUND) {
+			error_kernelcache("kernelcache parsing without __PRELINK_INFO is not "
+			                  "supported");
+		} else {
+			error_kernelcache("could not find __PRELINK_INFO segment");
+		}
+		return KERNELCACHE_ERROR;
+	}
+	const void *prelink_xml = (const void *)((uintptr_t)kernel->mh + sc->fileoff);
+	// TODO: IOCFUnserialize expects the buffer to be NULL-terminated. We don't do this
+	// explicitly. However, there appears to be some zero padding after the text anyway, so it
+	// works in practice.
+	CFStringRef error = NULL;
+	CFTypeRef info = IOCFUnserialize(prelink_xml, NULL, 0, &error);
+	if (info == NULL) {
+		char buf[512];
+		CFStringGetCString(error, buf, sizeof(buf), kCFStringEncodingUTF8);
+		error_internal("IOCFUnserialize: %s", buf);
+		CFRelease(error);
+		return KERNELCACHE_ERROR;
+	}
+	if (CFGetTypeID(info) != CFDictionaryGetTypeID()) {
+		error_internal("__PRELINK_INFO not a dictionary type");
+		return KERNELCACHE_ERROR;
+	}
+	*prelink_info = info;
+	return KERNELCACHE_SUCCESS;
+}
+
+bool
+kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
+		void *context) {
+	bool success = false;
+	CFArrayRef prelink_dicts = CFDictionaryGetValue(kc->prelink_info,
+			kCFPrelinkInfoDictionaryKey);
+	assert(prelink_dicts != NULL);
+	assert(CFGetTypeID(prelink_dicts) == CFArrayGetTypeID());
+	CFIndex count = CFArrayGetCount(prelink_dicts);
+	for (CFIndex i = 0; i < count; i++) {
+		CFDictionaryRef info = CFArrayGetValueAtIndex(prelink_dicts, i);
+		assert(info != NULL);
+		assert(CFGetTypeID(info) == CFDictionaryGetTypeID());
+		CFStringRef cfbundleid = (CFStringRef)CFDictionaryGetValue(info,
+				kCFBundleIdentifierKey);
+		char buf[BUNDLE_ID_BUFFER_SIZE];
+		const char *bundle_id = CFStringGetCStringOrConvert(cfbundleid, buf, sizeof(buf));
+		// TODO: Extract more information from info dictionary.
+		bool halt = callback(context, bundle_id, 0, 0);
+		if (halt) {
+			break;
+		}
+	}
+	success = true;
+	return success;
 }

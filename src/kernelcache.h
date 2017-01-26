@@ -1,21 +1,31 @@
 #ifndef MEMCTL__KERNELCACHE_H_
 #define MEMCTL__KERNELCACHE_H_
 
+#include "kernel.h"
 #include "macho.h"
 
+#include <CoreFoundation/CoreFoundation.h>
+
+/*
+ * enum kernelcache_result
+ *
+ * Description:
+ * 	Result codes for kernelcache functions.
+ */
 typedef enum kernelcache_result {
 	KERNELCACHE_SUCCESS,
 	KERNELCACHE_ERROR,
 } kernelcache_result;
 
-struct kernelcache_kext {
-	// TODO
-};
-
+/*
+ * struct kernelcache
+ *
+ * Description:
+ * 	A parsed kernelcache.
+ */
 struct kernelcache {
 	struct macho kernel;
-	size_t nkexts;
-	struct kernelcache_kext *kexts;
+	CFDictionaryRef prelink_info;
 };
 
 /*
@@ -62,7 +72,8 @@ kernelcache_result kernelcache_init(struct kernelcache *kc, const void *data, si
  * Notes:
  * 	See kernelcache_init.
  */
-kernelcache_result kernelcache_init_uncompressed(struct kernelcache *kc, const void *data, size_t size);
+kernelcache_result kernelcache_init_uncompressed(struct kernelcache *kc, const void *data,
+		size_t size);
 
 /*
  * kernelcache_deinit
@@ -71,5 +82,43 @@ kernelcache_result kernelcache_init_uncompressed(struct kernelcache *kc, const v
  * 	Deinitialize the kernelcache.
  */
 void kernelcache_deinit(struct kernelcache *kc);
+
+/*
+ * kernelcache_parse_prelink_info
+ *
+ * Description:
+ * 	Try to find and parse the __PRELINK_INFO segment.
+ *
+ * Parameters:
+ * 		kernel			The kernel Mach-O.
+ * 	out	prelink_info		On return, the parsed contents of the __PRELINK_INFO
+ * 					segment.
+ *
+ * Returns:
+ * 	A kernelcache_result code.
+ */
+kernelcache_result kernelcache_parse_prelink_info(const struct macho *kernel,
+		CFDictionaryRef *prelink_info);
+
+/*
+ * kernelcache_for_each
+ *
+ * Description:
+ * 	Call the given callback function with the specified context for each kernel extension
+ * 	(including pseudoextensions) in the kernelcache.
+ *
+ * Parameters:
+ * 		callback		The callback function.
+ * 		context			A context passed to the callback.
+ *
+ * Returns:
+ * 	true if no errors were encountered.
+ *
+ * Dependencies:
+ * 	kernel_slide
+ * 	TODO
+ */
+bool kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
+		void *context);
 
 #endif
