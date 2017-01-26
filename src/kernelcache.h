@@ -19,6 +19,7 @@ extern const CFStringRef kCFPrelinkExecutableSizeKey;
 typedef enum kernelcache_result {
 	KERNELCACHE_SUCCESS,
 	KERNELCACHE_ERROR,
+	KERNELCACHE_NOT_FOUND,
 } kernelcache_result;
 
 /*
@@ -124,5 +125,26 @@ kernelcache_result kernelcache_parse_prelink_info(const struct macho *kernel,
  */
 bool kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
 		void *context);
+
+/*
+ * kernelcache_find_containing_address
+ *
+ * Description:
+ * 	Find the kext containing the given kernel virtual address, and return a pointer to the
+ * 	kext identifier in `kext`. The caller must free the returned string.
+ *
+ * Parameters:
+ * 		kaddr			The kernel virtual address
+ * 	out	bundle_id		The bundle identifier of the kext. The caller is
+ * 					responsible for freeing this string.
+ *
+ * Returns:
+ * 	A kernelcache_result code indicating success status.
+ *
+ * Dependencies:
+ * 	kernel_slide
+ */
+kernelcache_result kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
+		char **bundle_id);
 
 #endif

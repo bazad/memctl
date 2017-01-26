@@ -4,7 +4,9 @@
 #include "memctl_common.h"
 #include "memctl_error.h"
 
-#if !KERNELCACHE
+#if KERNELCACHE
+#include "kernelcache.h"
+#else
 #include "oskext.h"
 #endif
 
@@ -19,6 +21,9 @@
 const char KERNEL_ID[] = "__kernel__";
 
 struct kext kernel;
+#if KERNELCACHE
+struct kernelcache kernelcache;
+#endif
 
 /*
  * initialized_kernel
@@ -263,7 +268,13 @@ kext_for_each(kext_for_each_callback_fn callback, void *context) {
 kext_result
 kext_containing_address(kaddr_t kaddr, char **bundle_id) {
 #if KERNELCACHE
-	assert(false); // TODO
+	kernelcache_result kr = kernelcache_find_containing_address(&kernelcache, kaddr,
+			bundle_id);
+	switch (kr) {
+		case KERNELCACHE_SUCCESS:	return KEXT_SUCCESS;
+		case KERNELCACHE_ERROR:		return KEXT_ERROR;
+		case KERNELCACHE_NOT_FOUND:	return KEXT_NOT_FOUND;
+	}
 #else
 	return oskext_find_containing_address(kaddr, bundle_id, NULL, NULL);
 #endif

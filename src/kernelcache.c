@@ -281,3 +281,57 @@ kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn cal
 	success = true;
 	return success;
 }
+
+/*
+ * struct kernelcache_find_containing_address_data
+ *
+ * Description:
+ * 	kext_for_each_callback_fn context for kernelcache_find_containing_address.
+ */
+struct kernelcache_find_containing_address_data {
+	kaddr_t kaddr;
+	char *bundle_id;
+	bool error;
+};
+
+/*
+ * kernelcache_find_containing_address_callback
+ *
+ * Description:
+ * 	kext_for_each_callback_fn for kernelcache_find_containing_address.
+ */
+static bool
+kernelcache_find_containing_address_callback(void *context, CFDictionaryRef info,
+		const char *bundle_id, kaddr_t base, size_t size) {
+	struct kernelcache_find_containing_address_data *c = context;
+	kaddr_t address = c->kaddr;
+	if (base <= address && address < base + size) {
+		goto found;
+	}
+	// TODO: Instantiate the Mach-O for this kext, check the regions to see if any contains
+	// this address.
+	return false;
+found:
+	c->bundle_id = strdup(bundle_id);
+	if (c->bundle_id == NULL) {
+		error_out_of_memory();
+		c->error = true;
+	}
+	return true;
+}
+
+kernelcache_result
+kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
+		char **bundle_id) {
+	struct kernelcache_find_containing_address_data context = { kaddr };
+	bool success = kernelcache_for_each(kc, kernelcache_find_containing_address_callback,
+			&context);
+	if (!success || context.error) {
+		return KERNELCACHE_ERROR;
+	}
+	if (context.bundle_id == NULL) {
+		return KERNELCACHE_NOT_FOUND;
+	}
+	*bundle_id = context.bundle_id;
+	return KERNELCACHE_SUCCESS;
+}

@@ -50,10 +50,19 @@ struct kext {
  * kernel
  *
  * Description:
- * 	A kext object representing the kernel. On platforms like iOS with a kernelcache, this is
- * 	also the kernelcache.
+ * 	A kext object representing the kernel.
  */
 extern struct kext kernel;
+
+#if KERNELCACHE
+/*
+ * kernelcache
+ *
+ * Description:
+ * 	The kernelcache.
+ */
+extern struct kernelcache kernelcache;
+#endif
 
 /*
  * kernel_init
@@ -248,7 +257,7 @@ kext_result kext_search_data(const struct kext *kext, const void *data, size_t s
  * Notes:
  * 	On platforms with a kernel cache rather than dynamically loaded kernel extensions, the size
  * 	parameter will be the size of the first segment (before the split) rather than the true
- * 	binary size. It is recommended to ignore this parameter unless you know that it is correct.
+ * 	binary size.
  */
 typedef bool (*kext_for_each_callback_fn)(void *context, CFDictionaryRef info,
 		const char *bundle_id, kaddr_t base, size_t size);

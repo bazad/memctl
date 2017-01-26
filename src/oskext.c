@@ -191,7 +191,7 @@ fail_0:
  * struct oskext_find_data
  *
  * Description:
- * 	oskext_for_each_callback_fn context for oskext_find_containing_address.
+ * 	kext_for_each_callback_fn context for oskext_find_containing_address.
  */
 struct oskext_find_data {
 	kaddr_t kaddr;
@@ -205,7 +205,7 @@ struct oskext_find_data {
  * oskext_find_callback
  *
  * Description:
- * 	oskext_for_each_callback_fn for oskext_find_containing_address.
+ * 	kext_for_each_callback_fn for oskext_find_containing_address.
  */
 static bool
 oskext_find_callback(void *context, CFDictionaryRef info, const char *bundle_id, kaddr_t base,
@@ -241,7 +241,7 @@ oskext_find_containing_address(kaddr_t kaddr, char **bundle_id, kaddr_t *base, s
 }
 
 /*
- * oskext_get_executable
+ * oskext_copy_binary
  *
  * Description:
  * 	Get the binary image for a kext.
