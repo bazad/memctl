@@ -94,6 +94,25 @@ macho_result macho_find_load_command_64(const struct macho *macho, const struct 
 		uint32_t cmd);
 
 /*
+ * macho_find_segment_command
+ *
+ * Description:
+ * 	Find the segment command for the given Mach-O segment.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 	out	lc			On return, a pointer to the segment command.
+ * 		segname			The name of the segment.
+ */
+macho_result macho_find_segment_command(const struct macho *macho, const struct load_command **lc,
+		const char *segname);
+macho_result macho_find_segment_command_32(const struct macho *macho,
+		const struct segment_command **lc, const char *segname);
+macho_result macho_find_segment_command_64(const struct macho *macho,
+		const struct segment_command_64 **lc, const char *segname);
+
+
+/*
  * macho_find_base
  *
  * Description:

@@ -317,6 +317,68 @@ macho_find_load_command(const struct macho *macho, const struct load_command **l
 }
 
 macho_result
+macho_find_segment_command_32(const struct macho *macho, const struct segment_command **lc,
+		const char *segname) {
+	assert(macho_is_32(macho));
+	const struct load_command *lc0 = NULL;
+	for (;;) {
+		macho_result mr = macho_next_load_command_32(macho, &lc0);
+		if (mr != MACHO_SUCCESS) {
+			return mr;
+		}
+		if (lc0 == NULL) {
+			return MACHO_NOT_FOUND;
+		}
+		if (lc0->cmd != LC_SEGMENT) {
+			continue;
+		}
+		const struct segment_command *sc = (const struct segment_command *)lc0;
+		if (strcmp(sc->segname, segname) != 0) {
+			continue;
+		}
+		*lc = sc;
+		return MACHO_SUCCESS;
+	}
+}
+
+macho_result
+macho_find_segment_command_64(const struct macho *macho, const struct segment_command_64 **lc,
+		const char *segname) {
+	assert(macho_is_64(macho));
+	const struct load_command *lc0 = NULL;
+	for (;;) {
+		macho_result mr = macho_next_load_command_64(macho, &lc0);
+		if (mr != MACHO_SUCCESS) {
+			return mr;
+		}
+		if (lc0 == NULL) {
+			return MACHO_NOT_FOUND;
+		}
+		if (lc0->cmd != LC_SEGMENT_64) {
+			continue;
+		}
+		const struct segment_command_64 *sc = (const struct segment_command_64 *)lc0;
+		if (strcmp(sc->segname, segname) != 0) {
+			continue;
+		}
+		*lc = sc;
+		return MACHO_SUCCESS;
+	}
+}
+
+macho_result
+macho_find_segment_command(const struct macho *macho, const struct load_command **lc,
+		const char *segname) {
+	if (macho_is_32(macho)) {
+		return macho_find_segment_command_32(macho, (const struct segment_command **)lc,
+				segname);
+	} else {
+		return macho_find_segment_command_64(macho, (const struct segment_command_64 **)lc,
+				segname);
+	}
+}
+
+macho_result
 macho_find_base_32(struct macho *macho, uint32_t *base) {
 	assert(macho_is_32(macho));
 	const struct segment_command *sc = NULL;
