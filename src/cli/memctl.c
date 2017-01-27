@@ -19,22 +19,21 @@ default_action(void) {
 
 bool
 r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t access, bool dump) {
-	printf("r("KADDR_FMT", %zu, %s, %zu, %zu, %s)\n", address, length,
-			(physical ? "physical" : "virtual"), width, access,
-			(dump ? "dump" : "read"));
-	return memctl_read(address, length, width, access);
+	if (dump) {
+		return memctl_dump(address, length, physical, width, access);
+	} else {
+		return memctl_read(address, length, physical, width, access);
+	}
 }
 
 bool
 rb_command(kaddr_t address, size_t length, bool physical, size_t access) {
-	printf("rb("KADDR_FMT", %zu, %d, %zu)\n", address, length, physical, access);
-	return true;
+	return  memctl_dump_binary(address, length, physical, access);
 }
 
 bool
 rs_command(kaddr_t address, size_t length, bool physical, size_t access) {
-	printf("rs("KADDR_FMT", %zu, %d, %zu)\n", address, length, physical, access);
-	return true;
+	return memctl_read_string(address, length, physical, access);
 }
 
 bool
