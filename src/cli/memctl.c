@@ -140,13 +140,15 @@ initialize() {
 	if (!core_load()) {
 		return false;
 	}
+	if (!kernel_init(NULL)) {
+		return false;
+	}
 	if (!kernel_slide_init()) {
 		return false;
 	}
 	printf("kernel_slide:   0x%016llx\n", kernel_slide);
-	if (!kernel_init(NULL)) {
-		return false;
-	}
+	kernel_init(NULL);
+	printf("kernel __TEXT:  0x%016llx\n", kernel.base);
 	return true;
 }
 

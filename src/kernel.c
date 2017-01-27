@@ -44,7 +44,60 @@ is_kernel_id(const char *bundle_id) {
 	return (strcmp(bundle_id, KERNEL_ID) == 0);
 }
 
-// TODO: This is different with KERNELCACHE
+#if KERNELCACHE
+
+/*
+ * kernel_init_kernelcache
+ *
+ * Description:
+ * 	Initialize kernelcache, kernel.macho, and kernel.base.
+ */
+static bool
+kernel_init_kernelcache(const char *kernelcache_path) {
+	kext_result kr = kernelcache_init_file(&kernelcache, kernelcache_path);
+	if (kr != KEXT_SUCCESS) {
+		assert(kr == KEXT_ERROR);
+		return false;
+	}
+	kernel.macho = kernelcache.kernel;
+	kernel.base = kernelcache.text->vmaddr + kernel_slide;
+	return true;
+}
+
+#else
+
+/*
+ * kernel_init_macos
+ *
+ * Description:
+ * 	Initialize kernel.macho and kernel.base.
+ */
+static bool
+kernel_init_macos(const char *kernel_path) {
+	// mmap the kernel file.
+	if (!mmap_file(kernel_path, (const void **)&kernel.macho.mh, &kernel.macho.size)) {
+		// kernel_deinit will be called.
+		assert(kernel.macho.mh == NULL);
+		return false;
+	}
+	macho_result mr = macho_validate(kernel.macho.mh, kernel.macho.size);
+	if (mr != MACHO_SUCCESS) {
+		error_internal("%s is not a valid Mach-O file", kernel_path);
+		return false;
+	}
+	// Set the runtime base and slide.
+	uint64_t static_base;
+	mr = macho_find_base(&kernel.macho, &static_base);
+	if (mr != MACHO_SUCCESS) {
+		error_internal("%s does not have a Mach-O base address", kernel_path);
+		return false;
+	}
+	kernel.base = static_base + kernel_slide;
+	return true;
+}
+
+#endif
+
 bool
 kernel_init(const char *kernel_path) {
 	if (kernel_path == NULL) {
@@ -54,36 +107,27 @@ kernel_init(const char *kernel_path) {
 		if (strcmp(kernel_path, initialized_kernel) == 0) {
 			// Reset the runtime base and slide based on the new value of kernel_slide.
 			kaddr_t static_base = kernel.base - kernel.slide;
-			kernel.base = static_base + kernel_slide;
+			kernel.base  = static_base + kernel_slide;
 			kernel.slide = kernel_slide;
 			return true;
 		}
 		kernel_deinit();
-		initialized_kernel = NULL;
 	}
-	// mmap the kernel file.
-	if (!mmap_file(kernel_path, (const void **)&kernel.macho.mh, &kernel.macho.size)) {
-		return false;
-	}
-	macho_result mr = macho_validate(kernel.macho.mh, kernel.macho.size);
-	if (mr != MACHO_SUCCESS) {
-		error_internal("%s is not a valid Mach-O file", kernel_path);
+#if KERNELCACHE
+	if (!kernel_init_kernelcache(kernel_path)) {
 		goto fail;
 	}
-	// Set the runtime base and slide.
-	kernel.bundle_id = KERNEL_ID;
-	uint64_t static_base;
-	mr = macho_find_base(&kernel.macho, &static_base);
-	if (mr != MACHO_SUCCESS) {
-		error_internal("%s does not have a Mach-O base address", kernel_path);
+#else
+	if (!kernel_init_macos(kernel_path)) {
 		goto fail;
 	}
-	kernel.base = static_base + kernel_slide;
+#endif
 	kernel.slide = kernel_slide;
+	kernel.bundle_id = KERNEL_ID;
 	// Initialize the symtab.
 	kernel.symtab = NULL;
-	mr = macho_find_load_command(&kernel.macho, (const struct load_command **)&kernel.symtab,
-			LC_SYMTAB);
+	macho_result mr = macho_find_load_command(&kernel.macho,
+			(const struct load_command **)&kernel.symtab, LC_SYMTAB);
 	if (mr != MACHO_SUCCESS) {
 		assert(mr == MACHO_ERROR);
 		goto fail;
@@ -98,10 +142,17 @@ fail:
 void
 kernel_deinit() {
 	initialized_kernel = NULL;
+#if KERNELCACHE
+	if (kernelcache.kernel.mh != NULL) {
+		kernelcache_deinit(&kernelcache);
+		kernel.macho.mh = NULL;
+	}
+#else
 	if (kernel.macho.mh != NULL) {
 		munmap(kernel.macho.mh, kernel.macho.size);
 		kernel.macho.mh = NULL;
 	}
+#endif
 }
 
 

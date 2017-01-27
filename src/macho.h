@@ -52,6 +52,30 @@ macho_result macho_validate_32(const struct mach_header *mh, size_t size);
 macho_result macho_validate_64(const struct mach_header_64 *mh, size_t size);
 
 /*
+ * macho_is_32
+ *
+ * Description:
+ * 	Returns true if the Mach-O file is a 32-bit Mach-O.
+ */
+bool macho_is_32(const struct macho *macho);
+
+/*
+ * macho_is_64
+ *
+ * Description:
+ * 	Returns true if the Mach-O file is a 64-bit Mach-O.
+ */
+bool macho_is_64(const struct macho *macho);
+
+/*
+ * macho_header_size
+ *
+ * Description:
+ * 	Returns the size of the Mach-O's mach header.
+ */
+size_t macho_header_size(const struct macho *macho);
+
+/*
  * macho_next_load_command
  *
  * Description:

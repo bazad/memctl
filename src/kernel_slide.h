@@ -19,6 +19,7 @@ extern kword_t kernel_slide;
  *
  * Dependencies:
  * 	kernel_task
+ * 	kernel
  */
 bool kernel_slide_init(void);
 

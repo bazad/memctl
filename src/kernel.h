@@ -78,6 +78,13 @@ extern struct kernelcache kernelcache;
  *
  * Returns:
  * 	true if the kernel was initialized successfully.
+ *
+ * Notes:
+ * 	This function can be called multiple times. The typical use case is to call this function
+ * 	first when the kernel slide is not known, then initialize the kernel slide, then call this
+ * 	function again to re-initialize the kernel subsystem with the correct kernel_slide. If the
+ * 	kernel subsystem is being re-initialized with the same kernel path, this function always
+ * 	succeeds.
  */
 bool kernel_init(const char *kernel_path);
 

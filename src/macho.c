@@ -5,20 +5,23 @@
 #include <assert.h>
 #include <string.h>
 
-/*
- * macho_is_32
- */
-static bool
+bool
 macho_is_32(const struct macho *macho) {
 	return (macho->mh32->magic == MH_MAGIC);
 }
 
-/*
- * macho_is_64
- */
-static bool
+bool
 macho_is_64(const struct macho *macho) {
 	return (macho->mh32->magic == MH_MAGIC_64);
+}
+
+size_t
+macho_header_size(const struct macho *macho) {
+	if (macho_is_32(macho)) {
+		return sizeof(*macho->mh32);
+	} else {
+		return sizeof(*macho->mh64);
+	}
 }
 
 /*
