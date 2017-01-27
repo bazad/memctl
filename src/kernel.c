@@ -268,13 +268,7 @@ kext_for_each(kext_for_each_callback_fn callback, void *context) {
 kext_result
 kext_containing_address(kaddr_t kaddr, char **bundle_id) {
 #if KERNELCACHE
-	kernelcache_result kr = kernelcache_find_containing_address(&kernelcache, kaddr,
-			bundle_id);
-	switch (kr) {
-		case KERNELCACHE_SUCCESS:	return KEXT_SUCCESS;
-		case KERNELCACHE_ERROR:		return KEXT_ERROR;
-		case KERNELCACHE_NOT_FOUND:	return KEXT_NOT_FOUND;
-	}
+	return kernelcache_find_containing_address(&kernelcache, kaddr, bundle_id);
 #else
 	return oskext_find_containing_address(kaddr, bundle_id, NULL, NULL);
 #endif

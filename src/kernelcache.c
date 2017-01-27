@@ -98,12 +98,12 @@ kernelcache_info_get_load_address_and_size(CFDictionaryRef info, kaddr_t *addres
 	return true;
 }
 
-kernelcache_result
+kext_result
 kernelcache_init_file(struct kernelcache *kc, const char *file) {
 	const void *data;
 	size_t size;
 	if (!mmap_file(file, &data, &size)) {
-		return KERNELCACHE_ERROR;
+		return KEXT_ERROR;
 	}
 	return kernelcache_init(kc, data, size);
 }
@@ -117,7 +117,7 @@ kernelcache_init_file(struct kernelcache *kc, const char *file) {
  * Notes:
  * 	This is quite ad-hoc. In the future this should be implemented by parsing the IM4P file.
  */
-static kernelcache_result
+static kext_result
 kernelcache_init_decompress(struct kernelcache *kc, const void *data, size_t size) {
 	if (size < 0x1000) {
 		error_kernelcache("kernelcache too small");
@@ -174,10 +174,10 @@ fail_1:
 	munmap(decompressed, uncompressed_size);
 fail_0:
 	munmap((void *)data, size);
-	return KERNELCACHE_ERROR;
+	return KEXT_ERROR;
 }
 
-kernelcache_result
+kext_result
 kernelcache_init(struct kernelcache *kc, const void *data, size_t size) {
 	const struct mach_header *mh = data;
 	if (mh->magic == MH_MAGIC || mh->magic == MH_MAGIC_64) {
@@ -186,7 +186,7 @@ kernelcache_init(struct kernelcache *kc, const void *data, size_t size) {
 	return kernelcache_init_decompress(kc, data, size);
 }
 
-kernelcache_result
+kext_result
 kernelcache_init_uncompressed(struct kernelcache *kc, const void *data, size_t size) {
 	kc->kernel.mh    = (void *)data;
 	kc->kernel.size  = size;
@@ -196,14 +196,14 @@ kernelcache_init_uncompressed(struct kernelcache *kc, const void *data, size_t s
 		error_kernelcache("not a valid kernelcache");
 		goto fail;
 	}
-	kernelcache_result kr = kernelcache_parse_prelink_info(&kc->kernel, &kc->prelink_info);
-	if (kr != KERNELCACHE_SUCCESS) {
+	kext_result kr = kernelcache_parse_prelink_info(&kc->kernel, &kc->prelink_info);
+	if (kr != KEXT_SUCCESS) {
 		goto fail;
 	}
-	return KERNELCACHE_SUCCESS;
+	return KEXT_SUCCESS;
 fail:
 	kernelcache_deinit(kc);
-	return KERNELCACHE_ERROR;
+	return KEXT_ERROR;
 }
 
 void
@@ -219,7 +219,7 @@ kernelcache_deinit(struct kernelcache *kc) {
 	}
 }
 
-kernelcache_result
+kext_result
 kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prelink_info) {
 	const struct segment_command_64 *sc;
 	macho_result mr = macho_find_segment_command_64(kernel, &sc, kPrelinkInfoSegment);
@@ -230,7 +230,7 @@ kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prel
 		} else {
 			error_kernelcache("could not find __PRELINK_INFO segment");
 		}
-		return KERNELCACHE_ERROR;
+		return KEXT_ERROR;
 	}
 	const void *prelink_xml = (const void *)((uintptr_t)kernel->mh + sc->fileoff);
 	// TODO: IOCFUnserialize expects the buffer to be NULL-terminated. We don't do this
@@ -243,14 +243,14 @@ kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prel
 		CFStringGetCString(error, buf, sizeof(buf), kCFStringEncodingUTF8);
 		error_internal("IOCFUnserialize: %s", buf);
 		CFRelease(error);
-		return KERNELCACHE_ERROR;
+		return KEXT_ERROR;
 	}
 	if (CFGetTypeID(info) != CFDictionaryGetTypeID()) {
 		error_internal("__PRELINK_INFO not a dictionary type");
-		return KERNELCACHE_ERROR;
+		return KEXT_ERROR;
 	}
 	*prelink_info = info;
-	return KERNELCACHE_SUCCESS;
+	return KEXT_SUCCESS;
 }
 
 bool
@@ -283,12 +283,57 @@ kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn cal
 }
 
 /*
- * struct kernelcache_find_containing_address_data
+ * struct kernelcache_get_address_context
+ *
+ * Description:
+ * 	kext_for_each_callback_fn context for kernelcache_get_address.
+ */
+struct kernelcache_get_address_context {
+	const char *bundle_id;
+	kaddr_t base;
+	size_t size;
+};
+
+/*
+ * kernelcache_get_address_callback
+ *
+ * Description:
+ * 	kext_for_each_callback_fn for kernelcache_get_address.
+ */
+static bool
+kernelcache_get_address_callback(void *context, CFDictionaryRef info,
+		const char *bundle_id, kaddr_t base, size_t size) {
+	struct kernelcache_get_address_context *c = context;
+	if (strcmp(c->bundle_id, bundle_id) != 0) {
+		return false;
+	}
+	c->base = base;
+	c->size = size;
+	return true;
+}
+
+kext_result kernelcache_get_address(const struct kernelcache *kc,
+		const char *bundle_id, kaddr_t *base, size_t *size) {
+	struct kernelcache_get_address_context context = { bundle_id };
+	bool success = kernelcache_for_each(kc, kernelcache_get_address_callback, &context);
+	if (!success) {
+		return KEXT_ERROR;
+	}
+	if (context.base == 0) {
+		return KEXT_NOT_FOUND;
+	}
+	*base = context.base;
+	*size = context.size;
+	return KEXT_SUCCESS;
+}
+
+/*
+ * struct kernelcache_find_containing_address_context
  *
  * Description:
  * 	kext_for_each_callback_fn context for kernelcache_find_containing_address.
  */
-struct kernelcache_find_containing_address_data {
+struct kernelcache_find_containing_address_context {
 	kaddr_t kaddr;
 	char *bundle_id;
 	bool error;
@@ -303,7 +348,7 @@ struct kernelcache_find_containing_address_data {
 static bool
 kernelcache_find_containing_address_callback(void *context, CFDictionaryRef info,
 		const char *bundle_id, kaddr_t base, size_t size) {
-	struct kernelcache_find_containing_address_data *c = context;
+	struct kernelcache_find_containing_address_context *c = context;
 	kaddr_t address = c->kaddr;
 	if (base <= address && address < base + size) {
 		goto found;
@@ -320,18 +365,36 @@ found:
 	return true;
 }
 
-kernelcache_result
+kext_result
 kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
 		char **bundle_id) {
-	struct kernelcache_find_containing_address_data context = { kaddr };
+	struct kernelcache_find_containing_address_context context = { kaddr };
 	bool success = kernelcache_for_each(kc, kernelcache_find_containing_address_callback,
 			&context);
 	if (!success || context.error) {
-		return KERNELCACHE_ERROR;
+		return KEXT_ERROR;
 	}
 	if (context.bundle_id == NULL) {
-		return KERNELCACHE_NOT_FOUND;
+		return KEXT_NOT_FOUND;
 	}
 	*bundle_id = context.bundle_id;
-	return KERNELCACHE_SUCCESS;
+	return KEXT_SUCCESS;
+}
+
+kext_result
+kernelcache_kext_init_macho(const struct kernelcache *kc, struct macho *macho,
+		const char *bundle_id) {
+	kaddr_t base;
+	size_t size;
+	kext_result kr = kernelcache_get_address(kc, bundle_id, &base, &size);
+	if (kr != KEXT_SUCCESS) {
+		return kr;
+	}
+	return kernelcache_kext_init_macho_at_address(kc, macho, base, size);
+}
+
+kext_result
+kernelcache_kext_init_macho_at_address(const struct kernelcache *kc, struct macho *macho,
+		kaddr_t base, size_t size) {
+	assert(false); // TODO
 }

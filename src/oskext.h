@@ -12,15 +12,15 @@
  * oskext_get_address
  *
  * Description:
- * 	Find the runtime load address and size of the given kext in the kernel.
+ * 	Find the runtime base address and size of the given kext in the kernel.
  *
  * Parameters:
- * 		bundle_id		The bundle identifier of the kext
- * 	out	load_addr		On return, the load address of the kext
- * 	out	size			On return, the size of the kext image in memory
+ * 		bundle_id		The bundle identifier of the kext.
+ * 	out	base			On return, the base address of the kext.
+ * 	out	size			On return, the size of the kext image in memory.
  *
  * Returns:
- * 	true if the load address and size were successfully found.
+ * 	A kext_result code.
  *
  * Dependencies:
  * 	kernel_slide
@@ -64,12 +64,14 @@ bool oskext_for_each(kext_for_each_callback_fn callback, void *context);
  * 	kext identifier in `kext`. The caller must free the returned string.
  *
  * Parameters:
- * 		kaddr			The kernel virtual address
+ * 		kaddr			The kernel virtual address.
  * 	out	bundle_id		The bundle identifier of the kext. The caller is
  * 					responsible for freeing this string.
+ * 	out	base			On return, the base address of the kext.
+ * 	out	size			On return, the size of the kext image in memory.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  *
  * Dependencies:
  * 	kernel_slide
@@ -92,7 +94,7 @@ kext_result oskext_find_containing_address(kaddr_t kaddr, char **bundle_id,
  * 		bundle_id		The bundle ID of the kext.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  */
 kext_result oskext_init_macho(struct macho *macho, const char *bundle_id);
 
