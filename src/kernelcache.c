@@ -384,9 +384,11 @@ kext_result kernelcache_get_address(const struct kernelcache *kc,
  * 	kext_for_each_callback_fn context for kernelcache_find_containing_address.
  */
 struct kernelcache_find_containing_address_context {
+	const struct kernelcache *kc;
 	kaddr_t kaddr;
-	char *bundle_id;
-	bool error;
+	char **bundle_id;
+	kaddr_t *base;
+	kext_result status;
 };
 
 /*
@@ -403,32 +405,52 @@ kernelcache_find_containing_address_callback(void *context, CFDictionaryRef info
 	if (base <= address && address < base + size) {
 		goto found;
 	}
-	// TODO: Instantiate the Mach-O for this kext, check the regions to see if any contains
-	// this address.
-	return false;
+	struct macho kext;
+	// We don't need to wrap this call in error_stop() because this function never pushes
+	// errors onto the error stack.
+	kext_result kr = kernelcache_kext_init_macho_at_address(c->kc, &kext, base);
+	if (kr != KEXT_SUCCESS) {
+		return false;
+	}
+	const struct segment_command_64 *sc = NULL;
+	for (;;) {
+		error_stop();
+		macho_result mr = macho_find_load_command_64(&kext,
+				(const struct load_command **)&sc, LC_SEGMENT_64);
+		error_start();
+		if (mr != MACHO_SUCCESS || sc == NULL) {
+			return false;
+		}
+		if (sc->vmaddr <= base && base < sc->vmaddr + sc->vmsize) {
+			goto found;
+		}
+	}
 found:
-	c->bundle_id = strdup(bundle_id);
-	if (c->bundle_id == NULL) {
-		error_out_of_memory();
-		c->error = true;
+	c->status = KEXT_SUCCESS;
+	if (c->bundle_id != NULL) {
+		*c->bundle_id = strdup(bundle_id);
+		if (*c->bundle_id == NULL) {
+			error_out_of_memory();
+			c->status = KEXT_ERROR;
+		}
+	}
+	if (c->base != NULL) {
+		*c->base = base;
 	}
 	return true;
 }
 
 kext_result
 kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
-		char **bundle_id) {
-	struct kernelcache_find_containing_address_context context = { kaddr };
+		char **bundle_id, kaddr_t *base) {
+	struct kernelcache_find_containing_address_context context
+		= { kc, kaddr, bundle_id, base, KEXT_NOT_FOUND };
 	bool success = kernelcache_for_each(kc, kernelcache_find_containing_address_callback,
 			&context);
-	if (!success || context.error) {
+	if (!success) {
 		return KEXT_ERROR;
 	}
-	if (context.bundle_id == NULL) {
-		return KEXT_NOT_FOUND;
-	}
-	*bundle_id = context.bundle_id;
-	return KEXT_SUCCESS;
+	return context.status;
 }
 
 kext_result

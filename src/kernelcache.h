@@ -143,13 +143,14 @@ kext_result kernelcache_get_address(const struct kernelcache *kc,
  * 		kc			The krenelcache.
  * 		kaddr			The kernel virtual address
  * 	out	bundle_id		The bundle identifier of the kext. The caller is
- * 					responsible for freeing this string.
+ * 					responsible for freeing this string. May be NULL.
+ * 	out	base			The base address of the kext. May be NULL.
  *
  * Returns:
  * 	A kext_result code.
  */
 kext_result kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
-		char **bundle_id);
+		char **bundle_id, kaddr_t *base);
 
 /*
  * kernelcache_kext_init_macho
