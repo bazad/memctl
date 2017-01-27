@@ -253,10 +253,42 @@ kext_search_data(const struct kext *kext, const void *data, size_t size, int min
 	return KEXT_SUCCESS;
 }
 
+#if KERNELCACHE
+
+/*
+ * struct kext_for_each_kernelcache_context
+ *
+ * Description:
+ * 	Callback context for kext_for_each.
+ */
+struct kext_for_each_kernelcache_context {
+	kext_for_each_callback_fn callback;
+	void *context;
+};
+
+/*
+ * kext_for_each_kernelcache_callback
+ *
+ * Description:
+ * 	Callback for kext_for_each. This callback only exists in order to add the kernel_slide to
+ * 	the base parameter.
+ */
+static bool
+kext_for_each_kernelcache_callback(void *context, CFDictionaryRef info,
+		const char *bundle_id, kaddr_t base, size_t size) {
+	struct kext_for_each_kernelcache_context *c = context;
+	return c->callback(c->context, info, bundle_id, base + kernel_slide, size);
+}
+
+#endif
+
 bool
 kext_for_each(kext_for_each_callback_fn callback, void *context) {
 #if KERNELCACHE
-	assert(false); // TODO
+	// TODO: This indirection is annoying. I've implemented it this way rather than having
+	// kernelcache_for_each add the kernel_slide automatically because kernelcache is supposed
+	// to handle only static information, it should know nothing about the runtime.
+	return kernelcache_for_each(&kernelcache, kext_for_each_kernelcache_callback, context);
 #else
 	return oskext_for_each(callback, context);
 #endif
