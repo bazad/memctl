@@ -11,6 +11,64 @@
 
 #include <stdio.h>
 
+/*
+ * looks_like_physical_address
+ *
+ * Description:
+ * 	Returns true if the given address looks like it could be a physical address.
+ */
+static bool
+looks_like_physical_address(paddr_t address) {
+#if KERNEL_BITS == 32
+	return true;
+#else
+	return ((address & 0xffff000000000000) == 0);
+#endif
+}
+
+/*
+ * looks_like_kernel_address
+ *
+ * Description:
+ * 	Returns true if the given address looks like it could be a kernel address.
+ */
+static bool
+looks_like_kernel_address(kaddr_t address) {
+#if KERNEL_BITS == 32
+	return (address >= 0xc0000000);
+#else
+	return ((address >> 40) == 0xffffff);
+#endif
+}
+
+/*
+ * check_address
+ *
+ * Description:
+ * 	Checks that the given address looks valid.
+ */
+static bool
+check_address(kaddr_t address, size_t length, bool physical) {
+	if (address + length < address) {
+		error_usage(NULL, NULL, "overflow at address "KADDR_FMT, address);
+		return false;
+	}
+	if (physical) {
+		if (!looks_like_physical_address(address)) {
+			error_usage(NULL, NULL, "address "KADDR_FMT" does not look like a "
+			            "physical address", address);
+			return false;
+		}
+	} else {
+		if (!looks_like_kernel_address(address)) {
+			error_usage(NULL, NULL, "address "KADDR_FMT" does not look like a "
+			            "kernel virtual address", address);
+			return false;
+		}
+	}
+	return true;
+}
+
 bool
 default_action(void) {
 	error_internal("default_action");
@@ -19,6 +77,9 @@ default_action(void) {
 
 bool
 r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t access, bool dump) {
+	if (!check_address(address, length, physical)) {
+		return false;
+	}
 	if (dump) {
 		return memctl_dump(address, length, physical, width, access);
 	} else {
@@ -28,22 +89,34 @@ r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t ac
 
 bool
 rb_command(kaddr_t address, size_t length, bool physical, size_t access) {
+	if (!check_address(address, length, physical)) {
+		return false;
+	}
 	return  memctl_dump_binary(address, length, physical, access);
 }
 
 bool
 rs_command(kaddr_t address, size_t length, bool physical, size_t access) {
+	if (!check_address(address, length, physical)) {
+		return false;
+	}
 	return memctl_read_string(address, length, physical, access);
 }
 
 bool
 w_command(kaddr_t address, kword_t value, bool physical, size_t width, size_t access) {
+	if (!check_address(address, width, physical)) {
+		return false;
+	}
 	printf("w\n");
 	return true;
 }
 
 bool
 wd_command(kaddr_t address, const void *data, size_t length, bool physical, size_t access) {
+	if (!check_address(address, length, physical)) {
+		return false;
+	}
 	printf("wd\n");
 	return true;
 }
@@ -89,7 +162,6 @@ vt_command(const char *classname, const char *bundle_id) {
 bool
 vm_command(kaddr_t address, unsigned depth) {
 	return memctl_vmmap(address, address, depth);
-	return true;
 }
 
 bool
