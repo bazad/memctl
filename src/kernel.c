@@ -113,7 +113,7 @@ kext_init_macho(struct macho *macho, const char *bundle_id) {
 		return KEXT_SUCCESS;
 	}
 #if KERNELCACHE
-	assert(false); // TODO
+	return kernelcache_kext_init_macho(&kernelcache, macho, bundle_id);
 #else
 	return oskext_init_macho(macho, bundle_id);
 #endif
@@ -121,13 +121,10 @@ kext_init_macho(struct macho *macho, const char *bundle_id) {
 
 void
 kext_deinit_macho(struct macho *macho) {
-	if (macho->mh == kernel.macho.mh) {
-		return;
+#if !KERNELCACHE
+	if (macho->mh != kernel.macho.mh) {
+		oskext_deinit_macho(macho);
 	}
-#if KERNELCACHE
-	assert(false); // TODO
-#else
-	oskext_deinit_macho(macho);
 #endif
 }
 
@@ -268,7 +265,7 @@ kext_for_each(kext_for_each_callback_fn callback, void *context) {
 kext_result
 kext_containing_address(kaddr_t kaddr, char **bundle_id) {
 #if KERNELCACHE
-	return kernelcache_find_containing_address(&kernelcache, kaddr, bundle_id);
+	return kernelcache_find_containing_address(&kernelcache, kaddr - kernel_slide, bundle_id);
 #else
 	return oskext_find_containing_address(kaddr, bundle_id, NULL, NULL);
 #endif

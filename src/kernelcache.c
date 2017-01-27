@@ -1,6 +1,5 @@
 #include "kernelcache.h"
 
-#include "kernel_slide.h"
 #include "memctl_common.h"
 #include "memctl_error.h"
 
@@ -72,16 +71,13 @@ decompress_complzss(const void *src, size_t srclen, void *dest, size_t destlen) 
 }
 
 /*
- * kernelcache_info_get_load_address_and_size
+ * kernelcache_info_get_address_and_size
  *
  * Description:
- * 	Retrieve the load address and size of the kext from the kext's info dictionary.
- *
- * Dependencies:
- * 	kernel_slide
+ * 	Retrieve the address and size of the kext from the kext's info dictionary.
  */
 static bool
-kernelcache_info_get_load_address_and_size(CFDictionaryRef info, kaddr_t *address, size_t *size) {
+kernelcache_info_get_address_and_size(CFDictionaryRef info, kaddr_t *address, size_t *size) {
 	CFNumberRef number = (CFNumberRef)CFDictionaryGetValue(info, kCFPrelinkExecutableLoadKey);
 	if (number == NULL) {
 		return false;
@@ -89,7 +85,6 @@ kernelcache_info_get_load_address_and_size(CFDictionaryRef info, kaddr_t *addres
 	assert(CFGetTypeID(number) == CFNumberGetTypeID());
 	bool success = CFNumberGetValue(number, kCFNumberSInt64Type, address);
 	assert(success);
-	*address += kernel_slide;
 	number = (CFNumberRef)CFDictionaryGetValue(info, kCFPrelinkExecutableSizeKey);
 	assert(number != NULL);
 	assert(CFGetTypeID(number) == CFNumberGetTypeID());
@@ -186,8 +181,60 @@ kernelcache_init(struct kernelcache *kc, const void *data, size_t size) {
 	return kernelcache_init_decompress(kc, data, size);
 }
 
+/*
+ * missing_segment
+ *
+ * Description:
+ * 	Generate an error for a missing segment in the kernelcache.
+ */
+static void
+missing_segment(const char *segname) {
+	error_kernelcache("could not find %s segment", segname);
+}
+
+/*
+ * kernelcache_find_text
+ *
+ * Description:
+ * 	Find the __TEXT segment of the kernelcache, which should also include the Mach-O header.
+ *
+ * TODO: There should be a better way of doing this.
+ */
+static kext_result
+kernelcache_find_text(const struct macho *kernel, const struct segment_command_64 **text) {
+	macho_result mr = macho_find_segment_command_64(kernel, text, SEG_TEXT);
+	if (mr != MACHO_SUCCESS) {
+		missing_segment(SEG_TEXT);
+		return KEXT_ERROR;
+	}
+	if ((*text)->fileoff != 0) {
+		error_kernelcache("%s segment does not include Mach-O header", SEG_TEXT);
+		return KEXT_ERROR;
+	}
+	return KEXT_SUCCESS;
+}
+
+/*
+ * kernelcache_find_prelink_text
+ *
+ * Description:
+ * 	Find the __PRELINK_TEXT segment of the kernelcache.
+ */
+static kext_result
+kernelcache_find_prelink_text(const struct macho *kernel,
+		const struct segment_command_64 **prelink_text) {
+	macho_result mr = macho_find_segment_command_64(kernel, prelink_text, kPrelinkTextSegment);
+	if (mr != MACHO_SUCCESS) {
+		missing_segment(kPrelinkTextSegment);
+		return KEXT_ERROR;
+	}
+	assert((*prelink_text)->vmsize == (*prelink_text)->filesize);
+	return KEXT_SUCCESS;
+}
+
 kext_result
 kernelcache_init_uncompressed(struct kernelcache *kc, const void *data, size_t size) {
+	kext_result kr = KEXT_ERROR;
 	kc->kernel.mh    = (void *)data;
 	kc->kernel.size  = size;
 	kc->prelink_info = NULL;
@@ -196,14 +243,22 @@ kernelcache_init_uncompressed(struct kernelcache *kc, const void *data, size_t s
 		error_kernelcache("not a valid kernelcache");
 		goto fail;
 	}
-	kext_result kr = kernelcache_parse_prelink_info(&kc->kernel, &kc->prelink_info);
+	kr = kernelcache_parse_prelink_info(&kc->kernel, &kc->prelink_info);
+	if (kr != KEXT_SUCCESS) {
+		goto fail;
+	}
+	kr = kernelcache_find_text(&kc->kernel, &kc->text);
+	if (kr != KEXT_SUCCESS) {
+		goto fail;
+	}
+	kr = kernelcache_find_prelink_text(&kc->kernel, &kc->prelink_text);
 	if (kr != KEXT_SUCCESS) {
 		goto fail;
 	}
 	return KEXT_SUCCESS;
 fail:
 	kernelcache_deinit(kc);
-	return KEXT_ERROR;
+	return kr;
 }
 
 void
@@ -224,12 +279,7 @@ kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prel
 	const struct segment_command_64 *sc;
 	macho_result mr = macho_find_segment_command_64(kernel, &sc, kPrelinkInfoSegment);
 	if (mr != MACHO_SUCCESS) {
-		if (mr == MACHO_NOT_FOUND) {
-			error_kernelcache("kernelcache parsing without __PRELINK_INFO is not "
-			                  "supported");
-		} else {
-			error_kernelcache("could not find __PRELINK_INFO segment");
-		}
+		missing_segment(kPrelinkInfoSegment);
 		return KEXT_ERROR;
 	}
 	const void *prelink_xml = (const void *)((uintptr_t)kernel->mh + sc->fileoff);
@@ -246,7 +296,7 @@ kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prel
 		return KEXT_ERROR;
 	}
 	if (CFGetTypeID(info) != CFDictionaryGetTypeID()) {
-		error_internal("__PRELINK_INFO not a dictionary type");
+		error_internal("%s not a dictionary type", kPrelinkInfoSegment);
 		return KEXT_ERROR;
 	}
 	*prelink_info = info;
@@ -272,7 +322,7 @@ kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn cal
 		const char *bundle_id = CFStringGetCStringOrConvert(cfbundleid, buf, sizeof(buf));
 		kaddr_t base = 0;
 		size_t size = 0;
-		kernelcache_info_get_load_address_and_size(info, &base, &size);
+		kernelcache_info_get_address_and_size(info, &base, &size);
 		bool halt = callback(context, info, bundle_id, base, size);
 		if (halt) {
 			break;
@@ -390,11 +440,27 @@ kernelcache_kext_init_macho(const struct kernelcache *kc, struct macho *macho,
 	if (kr != KEXT_SUCCESS) {
 		return kr;
 	}
-	return kernelcache_kext_init_macho_at_address(kc, macho, base, size);
+	return kernelcache_kext_init_macho_at_address(kc, macho, base);
 }
 
 kext_result
 kernelcache_kext_init_macho_at_address(const struct kernelcache *kc, struct macho *macho,
-		kaddr_t base, size_t size) {
-	assert(false); // TODO
+		kaddr_t base) {
+	if (base == kc->text->vmaddr) {
+		*macho = kc->kernel;
+		return KEXT_SUCCESS;
+	}
+	if (base < kc->prelink_text->vmaddr
+	    || kc->prelink_text->vmaddr + kc->prelink_text->vmsize <= base) {
+		// All kernel extension Mach-O headers should lie within the __PRELINK_TEXT
+		// segment.
+		return KEXT_NOT_FOUND;
+	}
+	size_t kextoff = kc->prelink_text->fileoff + (base - kc->prelink_text->vmaddr);
+	macho->mh = (void *)((uintptr_t)kc->kernel.mh + kextoff);
+	macho->size = kc->kernel.size - kextoff;
+	if (!macho_validate(macho->mh, macho->size)) {
+		return KEXT_NOT_FOUND;
+	}
+	return KEXT_SUCCESS;
 }

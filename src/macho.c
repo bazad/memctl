@@ -391,7 +391,7 @@ macho_find_base_32(struct macho *macho, uint32_t *base) {
 		if (sc == NULL) {
 			return MACHO_NOT_FOUND;
 		}
-		if (sc->fileoff != 0) {
+		if (sc->fileoff != 0 || sc->filesize == 0) {
 			continue;
 		}
 		*base = sc->vmaddr;
@@ -412,7 +412,7 @@ macho_find_base_64(struct macho *macho, uint64_t *base) {
 		if (sc == NULL) {
 			return MACHO_NOT_FOUND;
 		}
-		if (sc->fileoff != 0) {
+		if (sc->fileoff != 0 || sc->filesize == 0) {
 			continue;
 		}
 		*base = sc->vmaddr;

@@ -19,6 +19,8 @@ extern const CFStringRef kCFPrelinkExecutableSizeKey;
 struct kernelcache {
 	struct macho kernel;
 	CFDictionaryRef prelink_info;
+	const struct segment_command_64 *text;
+	const struct segment_command_64 *prelink_text;
 };
 
 /*
@@ -107,10 +109,6 @@ kext_result kernelcache_parse_prelink_info(const struct macho *kernel,
  *
  * Returns:
  * 	true if no errors were encountered.
- *
- * Dependencies:
- * 	kernel_slide
- * 	TODO
  */
 bool kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
 		void *context);
@@ -119,24 +117,17 @@ bool kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_f
  * kernelcache_get_address
  *
  * Description:
- * 	Find the runtime base address and size of the given kext in the kernelcache.
+ * 	Find the static base address and size of the given kext in the kernelcache.
  *
  * Parameters:
  * 		kc			The krenelcache.
  * 		bundle_id		The bundle identifier of the kext.
- * 	out	base			On return, the base address of the kext.
+ * 	out	base			On return, the unslid base address of the kext.
  * 	out	size			On return, the size of the initial segment of the kext.
  * 					This may be less than the full size if the kext is split.
  *
  * Returns:
  * 	A kext_result code.
- *
- * Dependencies:
- * 	kernel_slide
- *
- * Notes:
- * 	If kernel_slide has not yet been initialized, the returned base address will be the unslid
- * 	address, rather than the true runtime address.
  */
 kext_result kernelcache_get_address(const struct kernelcache *kc,
 		const char *bundle_id, kaddr_t *base, size_t *size);
@@ -145,8 +136,8 @@ kext_result kernelcache_get_address(const struct kernelcache *kc,
  * kernelcache_find_containing_address
  *
  * Description:
- * 	Find the kext containing the given kernel virtual address, and return a pointer to the
- * 	kext identifier in `kext`. The caller must free the returned string.
+ * 	Find the kext containing the given unslid kernel virtual address, and return a pointer to
+ * 	the kext identifier in `kext`. The caller must free the returned string.
  *
  * Parameters:
  * 		kc			The krenelcache.
@@ -155,10 +146,7 @@ kext_result kernelcache_get_address(const struct kernelcache *kc,
  * 					responsible for freeing this string.
  *
  * Returns:
- * 	A kext_result code indicating success status.
- *
- * Dependencies:
- * 	kernel_slide
+ * 	A kext_result code.
  */
 kext_result kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
 		char **bundle_id);
@@ -176,7 +164,10 @@ kext_result kernelcache_find_containing_address(const struct kernelcache *kc, ka
  * 		bundle_id		The bundle ID of the kext.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
+ *
+ * Notes:
+ * 	This function is less efficient than kernelcache_kext_init_macho_at_address.
  */
 kext_result kernelcache_kext_init_macho(const struct kernelcache *kc, struct macho *macho,
 		const char *bundle_id);
@@ -185,10 +176,22 @@ kext_result kernelcache_kext_init_macho(const struct kernelcache *kc, struct mac
  * kernelcache_kext_init_macho_at_address
  *
  * Description:
- * 	TODO
+ * 	Initialize a macho struct with the contents of the Mach-O file at the given binary address.
+ *
+ * Parameters:
  * 		kc			The krenelcache.
+ * 	out	macho			The macho struct to initialize.
+ * 		base			The static address of the Mach-O header.
+ *
+ * Returns:
+ * 	A kext_result code.
+ *
+ * Notes:
+ * 	Because kexts in the kernelcache are split, the returned macho struct will describe a
+ * 	region of memory that also encompasses many more kernel extensions. The size will be an
+ * 	overestimate of the true size of the Mach-O describing the kernel extension.
  */
 kext_result kernelcache_kext_init_macho_at_address(const struct kernelcache *kc,
-		struct macho *macho, kaddr_t base, size_t size);
+		struct macho *macho, kaddr_t base);
 
 #endif
