@@ -11,6 +11,7 @@ bool rb_command(kaddr_t address, size_t length, bool physical, size_t access);
 bool rs_command(kaddr_t address, size_t length, bool physical, size_t access);
 bool w_command(kaddr_t address, kword_t value, bool physical, size_t width, size_t access);
 bool wd_command(kaddr_t address, const void *data, size_t length, bool physical, size_t access);
+bool ws_command(kaddr_t address, const char *string, bool physical, size_t access);
 bool f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical,
 		size_t access, size_t alignment);
 bool fpr_command(pid_t pid);

@@ -122,6 +122,14 @@ static bool wd_handler(const struct argument *arguments) {
 	return wd_command(address, data.data, data.length, physical, access);
 }
 
+static bool ws_handler(const struct argument *arguments) {
+	bool physical      = OPT_PRESENT(0, "p");
+	size_t access      = OPT_GET_WIDTH_OR(1, "x", "access", 0);
+	kaddr_t address    = ARG_GET_ADDRESS(2, "address");
+	const char *string = ARG_GET_STRING(3, "string");
+	return ws_command(address, string, physical, access);
+}
+
 static bool f_handler(const struct argument *arguments) {
 	size_t width          = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
 	bool physical         = OPT_PRESENT(1, "p");
@@ -264,6 +272,15 @@ static struct command commands[] = {
 			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
 			{ ARGUMENT, "address", ARG_ADDRESS, "the address to write"  },
 			{ ARGUMENT, "data",    ARG_DATA,    "the data to write"     },
+		},
+	}, {
+		"ws", "w", ws_handler,
+		"write string to memory",
+		4, (struct argspec *) &(struct argspec[4]) {
+			{ "p",      NULL,      ARG_NONE,    "write physical memory" },
+			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
+			{ ARGUMENT, "address", ARG_ADDRESS, "the address to write"  },
+			{ ARGUMENT, "string",  ARG_STRING,  "the string to write"   },
 		},
 	}, {
 		"f", NULL, f_handler,

@@ -1,6 +1,7 @@
 #include "cli/cli.h"
 #include "cli/error.h"
 #include "cli/format.h"
+#include "cli/memory.h"
 #include "cli/read.h"
 #include "cli/vmmap.h"
 
@@ -72,8 +73,7 @@ check_address(kaddr_t address, size_t length, bool physical) {
 
 bool
 default_action(void) {
-	error_internal("default_action");
-	return false;
+	return command_print_help(NULL);
 }
 
 bool
@@ -106,11 +106,7 @@ rs_command(kaddr_t address, size_t length, bool physical, size_t access) {
 
 bool
 w_command(kaddr_t address, kword_t value, bool physical, size_t width, size_t access) {
-	if (!check_address(address, width, physical)) {
-		return false;
-	}
-	printf("w\n");
-	return true;
+	return wd_command(address, &value, width, physical, access);
 }
 
 bool
@@ -118,8 +114,13 @@ wd_command(kaddr_t address, const void *data, size_t length, bool physical, size
 	if (!check_address(address, length, physical)) {
 		return false;
 	}
-	printf("wd\n");
-	return true;
+	return write_memory(address, &length, data, physical, access);
+}
+
+bool
+ws_command(kaddr_t address, const char *string, bool physical, size_t access) {
+	size_t length = strlen(string) + 1;
+	return wd_command(address, string, length, physical, access);
 }
 
 bool

@@ -1,7 +1,6 @@
 #ifndef MEMCTL__CLI__READ_H_
 #define MEMCTL__CLI__READ_H_
 
-#include "kernel_memory.h"
 #include "memctl_types.h"
 #include "cli/error.h"
 
