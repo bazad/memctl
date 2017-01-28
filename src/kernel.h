@@ -118,7 +118,7 @@ typedef enum kext_result {
  * 		bundle_id		The bundle ID of the kernel extension.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  */
 kext_result kext_init_macho(struct macho *macho, const char *bundle_id);
 
@@ -146,7 +146,7 @@ void kext_deinit_macho(struct macho *macho);
  * 	out	slide			The slide between the static addresses in the Mach-O file
  * 					and the runtime addresses.
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  *
  * Dependencies:
  * 	kernel_slide
@@ -165,7 +165,7 @@ kext_result kext_find_base(struct macho *macho, const char *bundle_id, kaddr_t *
  * 		bundle_id		The bundle ID of the kernel extension.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  *
  * Dependencies:
  * 	kernel_slide
@@ -196,7 +196,7 @@ void kext_deinit(struct kext *kext);
  * 	out	size			A guess of the size of the symbol.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  */
 kext_result kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr,
 		size_t *size);
@@ -217,7 +217,7 @@ kext_result kext_resolve_symbol(const struct kext *kext, const char *symbol, kad
  * 					address.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  */
 kext_result kext_resolve_address(const struct kext *kext, kaddr_t addr, const char **name,
 		size_t *size, size_t *offset);
@@ -237,7 +237,7 @@ kext_result kext_resolve_address(const struct kext *kext, kaddr_t addr, const ch
  * 	out	addr			The runtime address corresponding to the static address of
  * 					the data in the kernel extension's binary.
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  *
  * Notes:
  * 	It is possible that the runtime data will be different from the static data in the binary.
@@ -300,12 +300,33 @@ bool kext_for_each(kext_for_each_callback_fn callback, void *context);
  * 					The bundle ID should be freed when no longer needed.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  *
  * Dependencies:
  * 	kernel_slide
  */
 kext_result kext_containing_address(kaddr_t kaddr, char **bundle_id);
+
+/*
+ * kext_id_resolve_symbol
+ *
+ * Description:
+ * 	Resolve the symbol in the kext with the given bundle identifier.
+ *
+ * Parameters:
+ * 		bundle_id		The bundle ID of the kext.
+ * 		symbol			The (mangled) symbol name.
+ * 	out	addr			The address of the symbol.
+ * 	out	size			A guess of the size of the symbol.
+ *
+ * Returns:
+ * 	A kext_result code.
+ *
+ * Dependencies:
+ * 	kernel_slide
+ */
+kext_result kext_id_resolve_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr,
+		size_t *size);
 
 /*
  * kernel_and_kexts_resolve_symbol
@@ -319,7 +340,7 @@ kext_result kext_containing_address(kaddr_t kaddr, char **bundle_id);
  * 	out	size			A guess of the size of the symbol.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  *
  * Dependencies:
  * 	kernel_slide
@@ -344,7 +365,7 @@ kext_result kernel_and_kexts_resolve_symbol(const char *symbol, kaddr_t *addr, s
  * 					the data in the kernel extension's binary.
  *
  * Returns:
- * 	A kext_result code indicating success status.
+ * 	A kext_result code.
  *
  * Dependencies:
  * 	kernel_slide
@@ -356,5 +377,29 @@ kext_result kernel_and_kexts_resolve_symbol(const char *symbol, kaddr_t *addr, s
  */
 kext_result kernel_and_kexts_search_data(const void *data, size_t size, int minprot,
 		kaddr_t *addr);
+
+/*
+ * resolve_symbol
+ *
+ * Description:
+ * 	Search for the given symbol.
+ *
+ * Parameters:
+ * 		bundle_id		The bundle ID of the kext to search in, or NULL to search
+ * 					through all kernel extensions.
+ * 		symbol			The (mangled) symbol name.
+ * 	out	addr			The address of the symbol.
+ * 	out	size			A guess of the size of the symbol.
+ *
+ * Returns:
+ * 	A kext_result code.
+ *
+ * Dependencies:
+ * 	kernel_slide
+ *
+ * Notes:
+ * 	See kernel_and_kexts_resolve_symbol.
+ */
+kext_result resolve_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr, size_t *size);
 
 #endif

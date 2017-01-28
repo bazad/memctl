@@ -359,6 +359,17 @@ kext_containing_address(kaddr_t kaddr, char **bundle_id) {
 #endif
 }
 
+kext_result
+kext_id_resolve_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr, size_t *size) {
+	struct kext kext;
+	kext_result kr = kext_init(&kext, bundle_id);
+	if (kr == KEXT_SUCCESS) {
+		kr = kext_resolve_symbol(&kext, symbol, addr, size);
+		kext_deinit(&kext);
+	}
+	return kr;
+}
+
 /*
  * struct kernel_and_kexts_resolve_symbol_context
  *
@@ -385,22 +396,10 @@ kernel_and_kexts_resolve_symbol_callback(void *context, CFDictionaryRef info,
 		return false;
 	}
 	struct kernel_and_kexts_resolve_symbol_context *c = context;
-	struct kext kext;
 	error_stop();
-	kext_result kr = kext_init(&kext, bundle_id);
-	if (kr != KEXT_SUCCESS) {
-		goto fail;
-	}
-	kr = kext_resolve_symbol(&kext, c->symbol, &c->addr, &c->size);
-	kext_deinit(&kext);
-	if (kr != KEXT_SUCCESS) {
-		goto fail;
-	}
+	kext_result kr = kext_id_resolve_symbol(bundle_id, c->symbol, &c->addr, &c->size);
 	error_start();
-	return true;
-fail:
-	error_start();
-	return false;
+	return (kr == KEXT_SUCCESS);
 }
 
 kext_result
@@ -476,4 +475,13 @@ kernel_and_kexts_search_data(const void *data, size_t size, int minprot, kaddr_t
 	}
 	*addr = context.addr;
 	return KEXT_SUCCESS;
+}
+
+kext_result
+resolve_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr, size_t *size) {
+	if (bundle_id == NULL) {
+		return kernel_and_kexts_resolve_symbol(symbol, addr, size);
+	} else {
+		return kext_id_resolve_symbol(bundle_id, symbol, addr, size);
+	}
 }
