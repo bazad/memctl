@@ -115,7 +115,7 @@ oskext_get_load_address_and_size_info(const char *kext, CFDictionaryRef *kext_in
 	size_t count = (size_t)CFDictionaryGetCount(info);
 	if (count == 0) {
 		CFRelease(info);
-		return KEXT_NOT_FOUND;
+		return KEXT_NO_KEXT;
 	}
 	assert(count == 1);
 	CFDictionaryGetKeysAndValues(info, NULL, (const void **)kext_info);
@@ -232,7 +232,7 @@ oskext_find_containing_address(kaddr_t kaddr, char **bundle_id, kaddr_t *base, s
 		return KEXT_ERROR;
 	}
 	if (context.bundle_id == NULL) {
-		return KEXT_NOT_FOUND;
+		return KEXT_NO_KEXT;
 	}
 	*bundle_id = context.bundle_id;
 	*base = context.base;
@@ -256,13 +256,13 @@ oskext_copy_binary(const char *bundle_id, void **binary, size_t *size) {
 	OSKextRef kext = OSKextCreateWithIdentifier(kCFAllocatorDefault, cf_bundle_id);
 	CFRelease(cf_bundle_id);
 	if (kext == NULL) {
-		return KEXT_NOT_FOUND;
+		return KEXT_NO_KEXT;
 	}
 	CFDataRef executable = OSKextCopyExecutableForArchitecture(kext,
 			OSKextGetRunningKernelArchitecture());
 	CFRelease(kext);
 	if (executable == NULL) {
-		return KEXT_NOT_FOUND;
+		return KEXT_NO_KEXT;
 	}
 	size_t data_size = CFDataGetLength(executable);
 	const void *data = CFDataGetBytePtr(executable);

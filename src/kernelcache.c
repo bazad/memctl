@@ -381,7 +381,7 @@ kext_result kernelcache_get_address(const struct kernelcache *kc,
 		return KEXT_ERROR;
 	}
 	if (context.base == 0) {
-		return KEXT_NOT_FOUND;
+		return KEXT_NO_KEXT;
 	}
 	*base = context.base;
 	*size = context.size;
@@ -454,8 +454,8 @@ found:
 kext_result
 kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
 		char **bundle_id, kaddr_t *base) {
-	struct kernelcache_find_containing_address_context context
-		= { kc, kaddr, bundle_id, base, KEXT_NOT_FOUND };
+	struct kernelcache_find_containing_address_context context =
+		{ kc, kaddr, bundle_id, base, KEXT_NO_KEXT };
 	bool success = kernelcache_for_each(kc, kernelcache_find_containing_address_callback,
 			&context);
 	if (!success) {
@@ -487,13 +487,13 @@ kernelcache_kext_init_macho_at_address(const struct kernelcache *kc, struct mach
 	    || kc->prelink_text->vmaddr + kc->prelink_text->vmsize <= base) {
 		// All kernel extension Mach-O headers should lie within the __PRELINK_TEXT
 		// segment.
-		return KEXT_NOT_FOUND;
+		return KEXT_NO_KEXT;
 	}
 	size_t kextoff = kc->prelink_text->fileoff + (base - kc->prelink_text->vmaddr);
 	macho->mh = (void *)((uintptr_t)kc->kernel.mh + kextoff);
 	macho->size = kc->kernel.size - kextoff;
 	if (!macho_validate(macho->mh, macho->size)) {
-		return KEXT_NOT_FOUND;
+		return KEXT_NO_KEXT;
 	}
 	return KEXT_SUCCESS;
 }

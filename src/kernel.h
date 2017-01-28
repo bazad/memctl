@@ -103,6 +103,7 @@ void kernel_deinit(void);
 typedef enum kext_result {
 	KEXT_SUCCESS,
 	KEXT_ERROR,
+	KEXT_NO_KEXT,
 	KEXT_NOT_FOUND,
 	KEXT_NO_SYMBOLS,
 } kext_result;
