@@ -71,6 +71,23 @@ check_address(kaddr_t address, size_t length, bool physical) {
 	return true;
 }
 
+/*
+ * kext_error
+ *
+ * Description:
+ * 	Propagate a kext_result code into an error.
+ */
+static bool
+kext_error(kext_result kr, const char *bundle_id, const char *symbol) {
+	switch (kr) {
+		case KEXT_SUCCESS:                                                    return false;
+		case KEXT_ERROR:                                                      return true;
+		case KEXT_NO_KEXT:    error_kext_not_found(bundle_id);                return true;
+		case KEXT_NO_SYMBOLS: error_kext_no_symbols(bundle_id);               return true;
+		case KEXT_NOT_FOUND:  error_kext_symbol_not_found(bundle_id, symbol); return true;
+	}
+}
+
 bool
 default_action(void) {
 	return command_print_help(NULL);
@@ -198,12 +215,8 @@ a_command(const char *symbol, const char *kext) {
 	kaddr_t address;
 	size_t size;
 	kext_result kr = resolve_symbol(kext, symbol, &address, &size);
-	switch (kr) {
-		case KEXT_SUCCESS:                                                 break;
-		case KEXT_ERROR:                                                   return false;
-		case KEXT_NO_KEXT:      error_kext_not_found(kext);                return false;
-		case KEXT_NO_SYMBOLS:   error_kext_no_symbols(kext);               return false;
-		case KEXT_NOT_FOUND:    error_kext_symbol_not_found(kext, symbol); return false;
+	if (kext_error(kr, kext, symbol)) {
+		return false;
 	}
 	printf(KADDR_FMT"  (%zu)\n", address, size);
 	return true;
@@ -211,7 +224,21 @@ a_command(const char *symbol, const char *kext) {
 
 bool
 ap_command(kaddr_t address, bool unpermute) {
-	printf("ap("KADDR_FMT", %d)\n", address, unpermute);
+	static kword_t kernel_addrperm = 0;
+	if (kernel_addrperm == 0) {
+		kword_t _vm_kernel_addrperm;
+		kext_result kr = kext_resolve_symbol(&kernel, "_vm_kernel_addrperm",
+				&_vm_kernel_addrperm, NULL);
+		if (kext_error(kr, KERNEL_ID, "_vm_kernel_addrperm")) {
+			return false;
+		}
+		size_t size = sizeof(kernel_addrperm);
+		bool read = read_memory(_vm_kernel_addrperm, &size, &kernel_addrperm, false, 0);
+		if (!read) {
+			return false;
+		}
+	}
+	printf(KADDR_FMT"\n", address + (unpermute ? -1 : 1) * kernel_addrperm);
 	return true;
 }
 
