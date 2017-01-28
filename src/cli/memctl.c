@@ -195,7 +195,17 @@ ks_command(kaddr_t address, bool unslide) {
 
 bool
 a_command(const char *symbol, const char *kext) {
-	printf("a(%s, %s)\n", symbol, kext);
+	kaddr_t address;
+	size_t size;
+	kext_result kr = resolve_symbol(kext, symbol, &address, &size);
+	switch (kr) {
+		case KEXT_SUCCESS:                                                 break;
+		case KEXT_ERROR:                                                   return false;
+		case KEXT_NO_KEXT:      error_kext_not_found(kext);                return false;
+		case KEXT_NO_SYMBOLS:   error_kext_no_symbols(kext);               return false;
+		case KEXT_NOT_FOUND:    error_kext_symbol_not_found(kext, symbol); return false;
+	}
+	printf(KADDR_FMT"  (%zu)\n", address, size);
 	return true;
 }
 

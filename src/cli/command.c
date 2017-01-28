@@ -434,7 +434,7 @@ parse_symbol(struct state *s) {
 		return false;
 	}
 	char *str = strdup(s->arg);
-	char *sep = strchr(s->arg, ':');
+	char *sep = strchr(str, ':');
 	if (sep == NULL) {
 		s->argument->symbol.kext = KERNEL_ID;
 		s->argument->symbol.symbol = str;

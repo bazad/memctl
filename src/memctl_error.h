@@ -18,8 +18,9 @@ enum {
 	address_inaccessible_error       = 38,
 	kext_not_found_error             = 39,
 	kext_no_symbols_error            = 40,
-	macho_error                      = 41,
-	kernelcache_error                = 42,
+	kext_symbol_not_found_error      = 41,
+	macho_error                      = 42,
+	kernelcache_error                = 43,
 
 	core_error                       = 64,
 };
@@ -138,6 +139,16 @@ struct kext_no_symbols_error {
 };
 
 void error_kext_no_symbols(const char *bundle_id);
+
+/*
+ * kext_symbol_not_found_error
+ */
+struct kext_symbol_not_found_error {
+	const char *bundle_id;
+	const char *symbol;
+};
+
+void error_kext_symbol_not_found(const char *bundle_id, const char *symbol);
 
 /*
  * macho_error

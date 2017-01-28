@@ -139,6 +139,16 @@ print_error(error_handle error) {
 			struct kext_no_symbols_error *e = error->data;
 			PRINT("kext %s does not contain symbol information", e->bundle_id);
 			} break;
+		case kext_symbol_not_found_error: {
+			struct kext_symbol_not_found_error *e = error->data;
+			if (e->bundle_id == NULL) {
+				PRINT("no kext defines symbol '%s'", e->symbol);
+			} else if (strcmp(e->bundle_id, KERNEL_ID) == 0) {
+				PRINT("kernel symbol '%s' not found", e->symbol);
+			} else {
+				PRINT("symbol '%s' not found in kext %s", e->symbol, e->bundle_id);
+			}
+			} break;
 		case macho_error: {
 			PRINT("%s", (char *)error->data);
 			} break;

@@ -130,6 +130,23 @@ error_kext_no_symbols(const char *bundle_id) {
 }
 
 void
+error_kext_symbol_not_found(const char *bundle_id, const char *symbol) {
+	assert(symbol != NULL);
+	size_t bundle_id_len = len(bundle_id);
+	size_t symbol_len = len(symbol);
+	struct kext_symbol_not_found_error *e = error_push_data(kext_symbol_not_found_error,
+			sizeof(*e) + bundle_id_len + symbol_len, NULL);
+	if (e != NULL) {
+		char *ebundle_id = (char *)(e + 1);
+		char *esymbol = ebundle_id + bundle_id_len;
+		memcpy(ebundle_id, bundle_id, bundle_id_len);
+		memcpy(esymbol, symbol, symbol_len);
+		e->bundle_id = (bundle_id == NULL ? NULL : ebundle_id);
+		e->symbol = esymbol;
+	}
+}
+
+void
 error_macho(const char *format, ...) {
 	va_list ap;
 	va_start(ap, format);
