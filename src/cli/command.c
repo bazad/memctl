@@ -325,6 +325,7 @@ parse_string(struct state *s) {
 		return false;
 	}
 	s->argument->string = s->arg;
+	s->argument->type = ARG_STRING;
 	s->arg += strlen(s->arg);
 	assert(*s->arg == 0);
 	return true;
