@@ -304,7 +304,7 @@ kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prel
 }
 
 bool
-kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
+kernelcache_kext_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
 		void *context) {
 	bool success = false;
 	CFArrayRef prelink_dicts = CFDictionaryGetValue(kc->prelink_info,
@@ -330,6 +330,17 @@ kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn cal
 	}
 	success = true;
 	return success;
+}
+
+bool
+kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
+		void *context) {
+	// TODO: We don't have the info dictionary for the kernel itself. :(
+	bool halt = callback(context, NULL, KERNEL_ID, kc->text->vmaddr, kc->text->vmsize);
+	if (halt) {
+		return true;
+	}
+	return kernelcache_kext_for_each(kc, callback, context);
 }
 
 /*

@@ -328,7 +328,10 @@ static bool
 kext_for_each_kernelcache_callback(void *context, CFDictionaryRef info,
 		const char *bundle_id, kaddr_t base, size_t size) {
 	struct kext_for_each_kernelcache_context *c = context;
-	return c->callback(c->context, info, bundle_id, base + kernel_slide, size);
+	if (base != 0) {
+		base += kernel_slide;
+	}
+	return c->callback(c->context, info, bundle_id, base, size);
 }
 
 #endif
@@ -339,7 +342,8 @@ kext_for_each(kext_for_each_callback_fn callback, void *context) {
 	// TODO: This indirection is annoying. I've implemented it this way rather than having
 	// kernelcache_for_each add the kernel_slide automatically because kernelcache is supposed
 	// to handle only static information, it should know nothing about the runtime.
-	return kernelcache_for_each(&kernelcache, kext_for_each_kernelcache_callback, context);
+	struct kext_for_each_kernelcache_context context0 = { callback, context };
+	return kernelcache_for_each(&kernelcache, kext_for_each_kernelcache_callback, &context0);
 #else
 	return oskext_for_each(callback, context);
 #endif

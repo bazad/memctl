@@ -96,14 +96,32 @@ kext_result kernelcache_parse_prelink_info(const struct macho *kernel,
 		CFDictionaryRef *prelink_info);
 
 /*
+ * kernelcache_kext_for_each
+ *
+ * Description:
+ * 	Call the given callback function with the specified context for each kernel extension
+ * 	(including pseudoextensions) in the kernelcache. This does not include the kernel itself.
+ *
+ * Parameters:
+ * 		kc			The kernelcache.
+ * 		callback		The callback function.
+ * 		context			A context passed to the callback.
+ *
+ * Returns:
+ * 	true if no errors were encountered.
+ */
+bool kernelcache_kext_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
+		void *context);
+
+/*
  * kernelcache_for_each
  *
  * Description:
  * 	Call the given callback function with the specified context for each kernel extension
- * 	(including pseudoextensions) in the kernelcache.
+ * 	(including pseudoextensions and the kernel itself) in the kernelcache.
  *
  * Parameters:
- * 		kc			The krenelcache.
+ * 		kc			The kernelcache.
  * 		callback		The callback function.
  * 		context			A context passed to the callback.
  *
@@ -120,7 +138,7 @@ bool kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_f
  * 	Find the static base address and size of the given kext in the kernelcache.
  *
  * Parameters:
- * 		kc			The krenelcache.
+ * 		kc			The kernelcache.
  * 		bundle_id		The bundle identifier of the kext.
  * 	out	base			On return, the unslid base address of the kext.
  * 	out	size			On return, the size of the initial segment of the kext.
@@ -140,7 +158,7 @@ kext_result kernelcache_get_address(const struct kernelcache *kc,
  * 	the kext identifier in `kext`. The caller must free the returned string.
  *
  * Parameters:
- * 		kc			The krenelcache.
+ * 		kc			The kenelcache.
  * 		kaddr			The kernel virtual address
  * 	out	bundle_id		The bundle identifier of the kext. The caller is
  * 					responsible for freeing this string. May be NULL.
@@ -160,7 +178,7 @@ kext_result kernelcache_find_containing_address(const struct kernelcache *kc, ka
  * 	the kernelcache.
  *
  * Parameters:
- * 		kc			The krenelcache.
+ * 		kc			The kernelcache.
  * 	out	macho			The macho struct to initialize.
  * 		bundle_id		The bundle ID of the kext.
  *
@@ -180,7 +198,7 @@ kext_result kernelcache_kext_init_macho(const struct kernelcache *kc, struct mac
  * 	Initialize a macho struct with the contents of the Mach-O file at the given binary address.
  *
  * Parameters:
- * 		kc			The krenelcache.
+ * 		kc			The kernelcache.
  * 	out	macho			The macho struct to initialize.
  * 		base			The static address of the Mach-O header.
  *
