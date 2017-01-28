@@ -193,9 +193,6 @@ static kernel_io_result
 kernel_io(kaddr_t kaddr, size_t *size, void *data, size_t access, kaddr_t *next,
 		transfer_range_fn transfer_range, transfer_fn transfer, bool write) {
 	kernel_io_result result = KERNEL_IO_SUCCESS;
-	if (size == 0) {
-		return result;
-	}
 	size_t left = *size;
 	size_t total = 0;
 	uint8_t *p = (uint8_t *)data;

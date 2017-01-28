@@ -79,6 +79,7 @@ MEMCTL_SRCS = cli.c \
 	      command.c \
 	      error.c \
 	      memctl.c \
+	      memory.c \
 	      read.c \
 	      vmmap.c
 
@@ -86,6 +87,7 @@ MEMCTL_HDRS = cli.h \
 	      command.h \
 	      error.h \
 	      format.h \
+	      memory.h \
 	      read.h \
 	      vmmap.h
 

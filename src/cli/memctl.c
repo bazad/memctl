@@ -171,7 +171,7 @@ vmm_command(kaddr_t start, kaddr_t end, unsigned depth) {
 
 bool
 ks_command(kaddr_t address, bool unslide) {
-	printf("ks("KADDR_FMT", %d)\n", address, unslide);
+	printf(KADDR_FMT"\n", address + (unslide ? -1 : 1) * kernel_slide);
 	return true;
 }
 

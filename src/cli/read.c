@@ -1,8 +1,8 @@
 #include "cli/read.h"
 
-#include "memctl_signal.h"
+#include "cli/memory.h"
 
-#include "kernel_memory.h"
+#include "memctl_signal.h"
 #include "utility.h"
 
 #include <assert.h>
@@ -14,17 +14,11 @@ bool
 memctl_read(kaddr_t address, size_t size, bool physical, size_t width, size_t access) {
 	assert(ispow2(width) && 0 < width && width <= 8);
 	assert(ispow2(access) && access <= 8);
-	if (physical) {
-		error_internal("physical memory reading not yet supported");
-		return false;
-	}
 	uint8_t data[page_size];
 	unsigned n = min(16 / width,  8);
 	while (size > 0) {
 		size_t readsize = min(size, sizeof(data));
-		// TODO: use a safer kernel_read.
-		kernel_io_result result = kernel_read_unsafe(address, &readsize, data, access,
-				NULL);
+		bool read_success = read_memory(address, &readsize, physical, access, data);
 		size_t end = readsize / width;
 		for (size_t i = 0; i < end; i++) {
 			if (interrupted) {
@@ -39,7 +33,7 @@ memctl_read(kaddr_t address, size_t size, bool physical, size_t width, size_t ac
 			printf("%0*llx%c", (int)(2 * width), value, (newline ? '\n' : ' '));
 			address += width;
 		}
-		if (result != KERNEL_IO_SUCCESS) {
+		if (!read_success) {
 			return false;
 		}
 		size -= readsize;
@@ -51,15 +45,11 @@ bool
 memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size_t access) {
 	assert(ispow2(width) && 0 < width && width <= 8);
 	assert(ispow2(access) && access <= 8);
-	if (physical) {
-		error_internal("physical memory reading not yet supported");
-		return false;
-	}
 	uint8_t data[page_size];
 	uint8_t *p = data;
 	uint8_t *end = p;
 	width--;
-	kernel_io_result result = KERNEL_IO_SUCCESS;
+	bool read_success = true;
 	/* Iterate one line of output at a time. */
 	while (size > 0) {
 		char hex[64];
@@ -82,13 +72,13 @@ memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size_t ac
 			if (p == end) {
 				/* If the last time we grabbed data there was an error, report it
 				   now. */
-				if (result != KERNEL_IO_SUCCESS) {
+				if (!read_success) {
 					return false;
 				}
 				/* Grab more data from the kernel. */
 				size_t readsize = min(size, sizeof(data));
-				result = kernel_read_unsafe(address + i, &readsize, data, access,
-						NULL);
+				read_success = read_memory(address + i, &readsize, physical,
+						access, data);
 				if (interrupted) {
 					error_interrupt();
 					return false;
@@ -125,46 +115,35 @@ memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size_t ac
 bool
 memctl_read_string(kaddr_t address, size_t size, bool physical, size_t access) {
 	assert(ispow2(access) && access <= 8);
-	if (physical) {
-		error_internal("physical memory reading not yet supported");
-		return false;
-	}
 	uint8_t data[page_size + 1];
 	bool have_printed = false;
-	bool success = true;
+	bool read_success = true;
 	bool end = false;
 	while (!end) {
 		size_t readsize = min(size, sizeof(data) - 1);
-		kernel_io_result result = kernel_read_unsafe(address, &readsize, data, access,
-				NULL);
+		read_success = read_memory(address, &readsize, physical, access, data);
 		if (interrupted) {
 			error_interrupt();
 			return false;
 		}
-		success = (result == KERNEL_IO_SUCCESS);
 		data[readsize] = 0;
 		size_t len = strlen((char *)data);
 		size -= readsize;
 		address += readsize;
-		end = (len < readsize || size == 0 || !success);
+		end = (len < readsize || size == 0 || !read_success);
 		printf("%s%s", (char *)data, (end && (have_printed || len > 0) ? "\n" : ""));
 		have_printed = true;
 	}
-	return success;
+	return read_success;
 }
 
 bool
 memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t access) {
 	assert(ispow2(access) && access <= 8);
-	if (physical) {
-		error_internal("physical memory reading not yet supported");
-		return false;
-	}
 	uint8_t data[page_size];
 	while (size > 0) {
 		size_t readsize = min(size, sizeof(data));
-		kernel_io_result result = kernel_read_unsafe(address, &readsize, data, access,
-				NULL);
+		bool read_success = read_memory(address, &readsize, physical, access, data);
 		uint8_t *p = data;
 		size_t left = readsize;
 		while (left > 0) {
@@ -180,7 +159,7 @@ memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t access) {
 			p += written;
 			left -= written;
 		}
-		if (result != KERNEL_IO_SUCCESS) {
+		if (!read_success) {
 			return false;
 		}
 		size -= readsize;
