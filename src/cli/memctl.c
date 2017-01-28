@@ -8,6 +8,7 @@
 #include "kernel.h"
 #include "kernel_slide.h"
 #include "platform.h"
+#include "vtable.h"
 
 #include <stdio.h>
 
@@ -155,7 +156,23 @@ kpm_command(kaddr_t start, kaddr_t end) {
 
 bool
 vt_command(const char *classname, const char *bundle_id) {
-	printf("vt(%s, %s)\n", classname, bundle_id);
+	kaddr_t address;
+	size_t size;
+	if (!vtable_for_class(classname, bundle_id, &address, &size)) {
+		return false;
+	}
+	if (address == 0) {
+		if (bundle_id == NULL) {
+			error_message("class %s not found", classname);
+		} else if (strcmp(bundle_id, KERNEL_ID) == 0) {
+			error_message("class %s not found in kernel", classname);
+		} else {
+			error_message("class %s not found in kernel extension %s", classname,
+			              bundle_id);
+		}
+		return true;
+	}
+	printf(KADDR_FMT"  (%zu)\n", address, size);
 	return true;
 }
 
@@ -202,12 +219,6 @@ s_command(kaddr_t address) {
 static bool
 initialize() {
 	platform_init();
-	printf("release:        %d.%d.%d\n"
-	       "version:        %s\n"
-	       "machine:        %s\n",
-	       platform.release.major, platform.release.minor, platform.release.patch,
-	       platform.version,
-	       platform.machine);
 	if (!core_load()) {
 		return false;
 	}
@@ -217,9 +228,7 @@ initialize() {
 	if (!kernel_slide_init()) {
 		return false;
 	}
-	printf("kernel_slide:   0x%016llx\n", kernel_slide);
 	kernel_init(NULL);
-	printf("kernel __TEXT:  0x%016llx\n", kernel.base);
 	return true;
 }
 

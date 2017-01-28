@@ -48,7 +48,8 @@ LIBMEMCTL_SRCS = core.c \
 		 memctl_offsets.c \
 		 memctl_signal.c \
 		 oskext.c \
-		 platform.c
+		 platform.c \
+		 vtable.c
 
 LIBMEMCTL_HDRS = core.h \
 		 error.h \
@@ -65,7 +66,8 @@ LIBMEMCTL_HDRS = core.h \
 		 offset.h \
 		 oskext.h \
 		 platform.h \
-		 utility.h
+		 utility.h \
+		 vtable.h
 
 LIBMEMCTL_OBJS := $(LIBMEMCTL_SRCS:%.c=$(OBJ_DIR)/%.o)
 

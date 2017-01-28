@@ -14,6 +14,14 @@ len(const char *str) {
 }
 
 void
+error_message(const char *format, ...) {
+	va_list ap;
+	va_start(ap, format);
+	error_push_printf(message_error, format, ap);
+	va_end(ap);
+}
+
+void
 error_usage(const char *command, const char *option, const char *format, ...) {
 	assert(format != NULL);
 	va_list ap;
@@ -138,6 +146,9 @@ print_error(error_handle error) {
 			PRINT("%s", (char *)error->data);
 			} break;
 		case core_error: {
+			PRINT("%s", (char *)error->data);
+			} break;
+		case message_error: {
 			PRINT("%s", (char *)error->data);
 			} break;
 		case usage_error: {

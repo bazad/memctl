@@ -8,9 +8,15 @@
  * 	Error codes for the memctl tool.
  */
 enum {
-	usage_error     = 128,
-	execve_error    = 129,
+	message_error   = 128,
+	usage_error     = 129,
+	execve_error    = 130,
 };
+
+/*
+ * error_message
+ */
+void error_message(const char *format, ...);
 
 /*
  * usage_error
