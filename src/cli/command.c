@@ -96,6 +96,102 @@ static parse_fn parse_fns[] = {
 	   error_usage(s0->command->command, opt, fmt, ##__VA_ARGS__); })
 
 /*
+ * spec_is_option
+ *
+ * Description:
+ * 	Returns true if the given argspec represents an option instead of an argument.
+ */
+static bool
+spec_is_option(const struct argspec *spec) {
+	return !(spec->option == ARGUMENT || spec->option == OPTIONAL);
+}
+
+/*
+ * write_command_usage_oneline
+ *
+ * Description:
+ * 	TODO
+ */
+static size_t
+write_command_usage_oneline(const struct command *command, char *buf, size_t size) {
+	size_t written = 0;
+#define WRITE(...)										\
+	written += snprintf(buf + written, (buf == NULL ? 0 : size - written), __VA_ARGS__);	\
+	if (buf != NULL && written >= size) {							\
+		goto fail;									\
+	}
+	WRITE("%s", command->command);
+	for (size_t i = 0; i < command->argspecc; i++) {
+		const struct argspec *s = &command->argspecv[i];
+		if (spec_is_option(s) && s->option[0] == 0) {
+			assert(s->type != ARG_NONE);
+			WRITE("[%s]", s->argument);
+			continue;
+		}
+		WRITE(" ");
+		if (s->option == ARGUMENT) {
+			WRITE("<%s>", s->argument);
+		} else if (s->option == OPTIONAL) {
+			WRITE("[<%s>]", s->argument);
+		} else {
+			if (s->type == ARG_NONE) {
+				WRITE("[-%s]", s->option);
+			} else {
+				assert(s->option[0] != 0);
+				WRITE("[-%s %s]", s->option, s->argument);
+			}
+		}
+	}
+	return written;
+fail:
+	return 0;
+}
+
+/*
+ * help_all
+ *
+ * Description:
+ * 	Generate a general help message.
+ */
+static bool
+help_all() {
+	const struct command *c = cli.commands;
+	const struct command *end = c + cli.command_count;
+	// Get the length of the usage string.
+	size_t usage_length = 4;
+	for (; c < end; c++) {
+		size_t length = write_command_usage_oneline(c, NULL, 0) + 1;
+		if (length > usage_length) {
+			usage_length = length;
+		}
+	}
+	// Print teh usage strings.
+	char *buf = malloc(usage_length + 1);
+	if (buf == NULL) {
+		error_out_of_memory();
+		return false;
+	}
+	for (c = cli.commands; c < end; c++) {
+		write_command_usage_oneline(c, buf, usage_length + 1);
+		fprintf(stderr, "%-*s%s\n", (int)usage_length, buf, c->description);
+	}
+	free(buf);
+	return true;
+}
+
+/*
+ * help_command
+ *
+ * Description:
+ * 	Generate a help message for the given command.
+ */
+static bool
+help_command(const struct command *command) {
+	error_internal("help_command(%s)", command->command);
+	return false;
+}
+
+/*
  * state_save
  *
  * Description:
@@ -119,17 +215,6 @@ state_restore(struct state *s, const struct savepoint *save) {
 	s->arg  = save->arg;
 	s->argc = save->argc;
 	s->argv = save->argv;
-}
-
-/*
- * spec_is_option
- *
- * Description:
- * 	Returns true if the given argspec represents an option instead of an argument.
- */
-static bool
-spec_is_option(const struct argspec *spec) {
-	return !(spec->option == ARGUMENT || spec->option == OPTIONAL);
 }
 
 /*
@@ -460,24 +545,37 @@ cleanup_argument(struct argument *argument) {
  * find_command
  *
  * Description:
- * 	Find which command best matches the given first argument.
+ * 	Find which command best matches the given first argument. If no command matches, generates
+ * 	a usage error. If help is indicated, prints a help message. Returns true if no errors were
+ * 	generated.
  */
-static const struct command *
-find_command(const char *cmd) {
+static bool
+find_command(const char *str, const struct command **command) {
+	if (strcmp(str, "?") == 0) {
+		return help_all();
+	}
 	const struct command *c = cli.commands;
 	const struct command *end = c + cli.command_count;
 	const struct command *best = NULL;
 	size_t match = 0;
 	for (; c < end; c++) {
 		size_t len = strlen(c->command);
-		if (strncmp(c->command, cmd, len) == 0) {
+		if (strncmp(c->command, str, len) == 0) {
 			if (len > match) {
 				best = c;
 				match = len;
 			}
 		}
 	}
-	return best;
+	if (best == NULL) {
+		ERROR_USAGE("unknown command '%s'", str);
+		return false;
+	}
+	if (strcmp(str + match, "?") == 0) {
+		return help_command(best);
+	}
+	*command = best;
+	return true;
 }
 
 /*
@@ -702,9 +800,12 @@ run_command(const struct command *command, struct argument *arguments) {
 }
 
 bool
-command_print_help(const char *command) {
-	error_internal("command_print_help");//TODO
-	return false;
+command_print_help(const struct command *command) {
+	if (command == NULL) {
+		return help_all();
+	} else {
+		return help_command(command);
+	}
 }
 
 bool
@@ -713,10 +814,12 @@ command_run_argv(int argc, const char *argv[]) {
 	if (argc < 1) {
 		return cli.default_action();
 	}
-	const struct command *c = find_command(argv[0]);
-	if (c == NULL) {
-		ERROR_USAGE("unknown command '%s'", argv[0]);
+	const struct command *c = NULL;
+	if (!find_command(argv[0], &c)) {
 		return false;
+	}
+	if (c == NULL) {
+		return true;
 	}
 	struct argument arguments[c->argspecc];
 	bool success = false;

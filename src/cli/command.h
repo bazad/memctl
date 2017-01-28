@@ -172,14 +172,8 @@ extern struct cli cli;
  * Parameters
  * 		command			The command to print specific help for. If NULL, then a
  * 					generic help message is printed.
- *
- * Returns:
- * 	true if command is a valid command.
- *
- * Errors:
- * 	usage_error
  */
-bool command_print_help(const char *command);
+bool command_print_help(const struct command *command);
 
 /*
  * command_run_argv
