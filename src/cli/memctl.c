@@ -273,17 +273,17 @@ s_command(kaddr_t address) {
 	size_t size = 0;
 	size_t offset = 0;
 	kr = kext_resolve_address(&kext, address, &name, &size, &offset);
-	if (kr == KEXT_SUCCESS) {
-		if (offset == 0) {
-			printf("%s: %s  (%zu)\n", kext.bundle_id, name, size);
-		} else {
-			printf("%s: %s+%zu  (%zu)\n", kext.bundle_id, name, offset, size);
-		}
-	} else if (kr == KEXT_NOT_FOUND) {
+	if (kr == KEXT_NOT_FOUND || (kr == KEXT_SUCCESS && strlen(name) == 0)) {
 		if (offset == 0) {
 			printf("%s\n", kext.bundle_id);
 		} else {
 			printf("%s+%zu\n", kext.bundle_id, offset);
+		}
+	} else if (kr == KEXT_SUCCESS) {
+		if (offset == 0) {
+			printf("%s: %s  (%zu)\n", kext.bundle_id, name, size);
+		} else {
+			printf("%s: %s+%zu  (%zu)\n", kext.bundle_id, name, offset, size);
 		}
 	} else {
 		is_error = kext_error(kr, kext.bundle_id, NULL, 0);
