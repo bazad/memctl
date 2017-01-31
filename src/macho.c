@@ -128,7 +128,7 @@ guess_symbol_size_32(const struct macho *macho, const struct symtab_command *sym
 
 static size_t
 guess_symbol_size_64(const struct macho *macho, const struct symtab_command *symtab,
-		uint64_t idx, uint32_t next) {
+		uint32_t idx, uint64_t next) {
 	assert(macho_is_64(macho));
 	const struct nlist_64 *nl = macho_get_nlist_64(macho, symtab) + idx;
 	size_t size = -1;
