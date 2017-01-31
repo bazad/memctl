@@ -188,56 +188,57 @@ fail_0:
 }
 
 /*
- * struct oskext_find_data
+ * struct oskext_find_containing_address_context
  *
  * Description:
  * 	kext_for_each_callback_fn context for oskext_find_containing_address.
  */
-struct oskext_find_data {
+struct oskext_find_containing_address_context {
 	kaddr_t kaddr;
-	char *bundle_id;
-	kaddr_t base;
-	size_t size;
-	bool error;
+	char **bundle_id;
+	kaddr_t *base;
+	size_t *size;
+	kext_result status;
 };
 
 /*
- * oskext_find_callback
+ * oskext_find_containing_address_callback
  *
  * Description:
  * 	kext_for_each_callback_fn for oskext_find_containing_address.
  */
 static bool
-oskext_find_callback(void *context, CFDictionaryRef info, const char *bundle_id, kaddr_t base,
-		size_t size) {
-	struct oskext_find_data *c = context;
+oskext_find_containing_address_callback(void *context, CFDictionaryRef info, const char *bundle_id,
+		kaddr_t base, size_t size) {
+	struct oskext_find_containing_address_context *c = context;
 	if (c->kaddr < base || base + size <= c->kaddr) {
 		return false;
 	}
-	c->bundle_id = strdup(bundle_id);
-	if (c->bundle_id == NULL) {
+	*c->bundle_id = strdup(bundle_id);
+	if (*c->bundle_id == NULL) {
 		error_out_of_memory();
-		c->error = true;
+		c->status = KEXT_ERROR;
+	} else {
+		c->status = KEXT_SUCCESS;
+		if (c->base != NULL) {
+			*c->base = base;
+		}
+		if (c->size != NULL) {
+			*c->size = size;
+		}
 	}
-	c->base = base;
-	c->size = size;
 	return true;
 }
 
 kext_result
 oskext_find_containing_address(kaddr_t kaddr, char **bundle_id, kaddr_t *base, size_t *size) {
-	struct oskext_find_data context = { kaddr };
-	bool success = oskext_for_each(oskext_find_callback, &context);
-	if (!success || context.error) {
+	struct oskext_find_containing_address_context context =
+		{ kaddr, bundle_id, base, size, KEXT_NO_KEXT };
+	bool success = oskext_for_each(oskext_find_containing_address_callback, &context);
+	if (!success) {
 		return KEXT_ERROR;
 	}
-	if (context.bundle_id == NULL) {
-		return KEXT_NO_KEXT;
-	}
-	*bundle_id = context.bundle_id;
-	*base = context.base;
-	*size = context.size;
-	return KEXT_SUCCESS;
+	return context.status;
 }
 
 /*
