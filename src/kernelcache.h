@@ -106,11 +106,8 @@ kext_result kernelcache_parse_prelink_info(const struct macho *kernel,
  * 		kc			The kernelcache.
  * 		callback		The callback function.
  * 		context			A context passed to the callback.
- *
- * Returns:
- * 	true if no errors were encountered.
  */
-bool kernelcache_kext_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
+void kernelcache_kext_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
 		void *context);
 
 /*
@@ -124,11 +121,8 @@ bool kernelcache_kext_for_each(const struct kernelcache *kc, kext_for_each_callb
  * 		kc			The kernelcache.
  * 		callback		The callback function.
  * 		context			A context passed to the callback.
- *
- * Returns:
- * 	true if no errors were encountered.
  */
-bool kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
+void kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
 		void *context);
 
 /*

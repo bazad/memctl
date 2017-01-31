@@ -303,10 +303,9 @@ kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prel
 	return KEXT_SUCCESS;
 }
 
-bool
+void
 kernelcache_kext_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
 		void *context) {
-	bool success = false;
 	CFArrayRef prelink_dicts = CFDictionaryGetValue(kc->prelink_info,
 			kCFPrelinkInfoDictionaryKey);
 	assert(prelink_dicts != NULL);
@@ -328,19 +327,16 @@ kernelcache_kext_for_each(const struct kernelcache *kc, kext_for_each_callback_f
 			break;
 		}
 	}
-	success = true;
-	return success;
 }
 
-bool
+void
 kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_fn callback,
 		void *context) {
 	// TODO: We don't have the info dictionary for the kernel itself. :(
 	bool halt = callback(context, NULL, KERNEL_ID, kc->text->vmaddr, kc->text->vmsize);
-	if (halt) {
-		return true;
+	if (!halt) {
+		kernelcache_kext_for_each(kc, callback, context);
 	}
-	return kernelcache_kext_for_each(kc, callback, context);
 }
 
 /*
@@ -376,10 +372,7 @@ kernelcache_get_address_callback(void *context, CFDictionaryRef info,
 kext_result kernelcache_get_address(const struct kernelcache *kc,
 		const char *bundle_id, kaddr_t *base, size_t *size) {
 	struct kernelcache_get_address_context context = { bundle_id };
-	bool success = kernelcache_for_each(kc, kernelcache_get_address_callback, &context);
-	if (!success) {
-		return KEXT_ERROR;
-	}
+	kernelcache_for_each(kc, kernelcache_get_address_callback, &context);
 	if (context.base == 0) {
 		return KEXT_NO_KEXT;
 	}
@@ -456,11 +449,7 @@ kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
 		char **bundle_id, kaddr_t *base) {
 	struct kernelcache_find_containing_address_context context =
 		{ kc, kaddr, bundle_id, base, KEXT_NO_KEXT };
-	bool success = kernelcache_for_each(kc, kernelcache_find_containing_address_callback,
-			&context);
-	if (!success) {
-		return KEXT_ERROR;
-	}
+	kernelcache_for_each(kc, kernelcache_find_containing_address_callback, &context);
 	return context.status;
 }
 
