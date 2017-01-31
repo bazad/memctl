@@ -343,7 +343,8 @@ kext_for_each(kext_for_each_callback_fn callback, void *context) {
 	// kernelcache_for_each add the kernel_slide automatically because kernelcache is supposed
 	// to handle only static information, it should know nothing about the runtime.
 	struct kext_for_each_kernelcache_context context0 = { callback, context };
-	return kernelcache_for_each(&kernelcache, kext_for_each_kernelcache_callback, &context0);
+	kernelcache_for_each(&kernelcache, kext_for_each_kernelcache_callback, &context0);
+	return true;
 #else
 	return oskext_for_each(callback, context);
 #endif
