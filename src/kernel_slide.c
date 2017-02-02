@@ -88,10 +88,10 @@ kernel_slide_init_ios_unsafe() {
 			}
 			kword_t value;
 			error_stop();
-			kernel_io_result kior = kernel_read_word(kernel_read_unsafe,
+			kernel_io_result ior = kernel_read_word(kernel_read_unsafe,
 					base + i * sizeof(value), &value, sizeof(value), 0);
 			error_start();
-			if (kior != KERNEL_IO_SUCCESS) {
+			if (ior != KERNEL_IO_SUCCESS) {
 				break;
 			}
 			if (value != kernel_header[i]) {
@@ -122,7 +122,7 @@ static bool
 kernel_slide_init_macos() {
 	// Get the binary address of _last_kernel_symbol.
 	kaddr_t last;
-	kext_result kxr = kext_resolve_symbol(&kernel, "_last_kernel_symbol", &last, NULL);
+	kext_result kxr = kernel_symbol("_last_kernel_symbol", &last, NULL);
 	if (kxr != KEXT_SUCCESS) {
 		error_internal("could not find _last_kernel_symbol");
 		return false;

@@ -162,6 +162,13 @@ f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical
 
 bool
 fpr_command(pid_t pid) {
+	static kword_t _proc_find = 0;
+	if (_proc_find == 0) {
+		kext_result kr = kernel_symbol("_proc_find", &_proc_find, NULL);
+		if (kext_error(kr, KERNEL_ID, "_proc_find", 0)) {
+			return false;
+		}
+	}
 	printf("fpr\n");
 	return true;
 }
@@ -240,8 +247,7 @@ ap_command(kaddr_t address, bool unpermute) {
 	static kword_t kernel_addrperm = 0;
 	if (kernel_addrperm == 0) {
 		kword_t _vm_kernel_addrperm;
-		kext_result kr = kext_resolve_symbol(&kernel, "_vm_kernel_addrperm",
-				&_vm_kernel_addrperm, NULL);
+		kext_result kr = kernel_symbol("_vm_kernel_addrperm", &_vm_kernel_addrperm, NULL);
 		if (kext_error(kr, KERNEL_ID, "_vm_kernel_addrperm", 0)) {
 			return false;
 		}

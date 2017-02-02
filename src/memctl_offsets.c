@@ -20,7 +20,7 @@ offsets_default_init() {
 #define RESOLVE_KERNEL(symbol)								\
 	if (ADDRESS(kernel, symbol).valid == 0) {					\
 		kaddr_t address;							\
-		kext_result kr = kext_resolve_symbol(&kernel, #symbol, &address, NULL);	\
+		kext_result kr = kernel_symbol(#symbol, &address, NULL);		\
 		if (kr == KEXT_ERROR) {							\
 			error_clear();							\
 		} else if (kr == KEXT_SUCCESS) {					\

@@ -26,7 +26,7 @@ vtable_for_class(const char *class_name, const char *bundle_id, kaddr_t *vtable,
 		}
 		return false;
 	}
-	*vtable += 0x10;
+	*vtable += 2 * sizeof(kword_t);
 	if (size != NULL) {
 		*size -= 0x10;
 	}

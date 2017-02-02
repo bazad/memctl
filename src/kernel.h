@@ -330,6 +330,20 @@ kext_result kext_id_resolve_symbol(const char *bundle_id, const char *symbol, ka
 		size_t *size);
 
 /*
+ * kernel_symbol
+ *
+ * Description:
+ * 	Resolve a kernel symbol, returning the address and size.
+ *
+ * Returns:
+ * 	True if the symbol was successfully resolved.
+ */
+static inline kext_result
+kernel_symbol(const char *symbol, kaddr_t *addr, size_t *size) {
+	return kext_resolve_symbol(&kernel, symbol, addr, size);
+}
+
+/*
  * kernel_and_kexts_resolve_symbol
  *
  * Description:

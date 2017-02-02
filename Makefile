@@ -39,6 +39,7 @@ ARFLAGS    = r
 LIBMEMCTL_SRCS = core.c \
 		 error.c \
 		 kernel.c \
+		 kernel_call.c \
 		 kernel_memory.c \
 		 kernel_slide.c \
 		 kernelcache.c \
@@ -54,6 +55,7 @@ LIBMEMCTL_SRCS = core.c \
 LIBMEMCTL_HDRS = core.h \
 		 error.h \
 		 kernel.h \
+		 kernel_call.h \
 		 kernel_memory.h \
 		 kernel_slide.h \
 		 kernelcache.h \
