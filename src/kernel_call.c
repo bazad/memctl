@@ -14,11 +14,8 @@
 #include <mach/vm_region.h>
 #include <mach/mach_vm.h>
 
-#include "kernel_slide.h" // TODO: This is a temporary hack until we can implement vtable discovery
-                          // on iOS.
 
-
-unsigned (*kernel_call_7)(kaddr_t func,
+bool (*kernel_call_7)(unsigned *result, kaddr_t func,
 		kword_t arg1, kword_t arg2, kword_t arg3, kword_t arg4,
 		kword_t arg5, kword_t arg6, kword_t arg7);
 
@@ -234,9 +231,6 @@ find_registry_entry_with_id(kaddr_t vtable, uint64_t id, kaddr_t *object, kaddr_
  */
 static bool
 get_user_client_vtable() {
-#if KERNELCACHE
-	// TODO: Scan the kernel image looking for the vtable
-#else
 	bool success = vtable_for_class(user_client_name, kext_name, &hook.vtable,
 			&hook.vtable_size);
 	if (!success || hook.vtable == 0) {
@@ -244,7 +238,6 @@ get_user_client_vtable() {
 		return false;
 	}
 	return true;
-#endif
 }
 
 /*
@@ -428,21 +421,20 @@ fail:
 	return false;
 }
 
-static unsigned
-kernel_call_7_impl(kaddr_t func,
+static bool
+kernel_call_7_impl(unsigned *result, kaddr_t func,
 		kword_t arg1, kword_t arg2, kword_t arg3, kword_t arg4,
 		kword_t arg5, kword_t arg6, kword_t arg7) {
-	// TODO: assert(arg1 != 0);
+	assert(arg1 != 0);
 	IOExternalTrap trap = { arg1, func };
 	size_t size = 2 * sizeof(kword_t);
 	kernel_io_result ior = kernel_write_unsafe(hook.trap, &size, &trap, 0, NULL);
-	// TODO: How to handle errors?
 	if (ior != KERNEL_IO_SUCCESS) {
-		return 0;
+		error_internal("could not write trap to kernel memory");
+		return false;
 	}
-	unsigned result = IOConnectTrap6(hook.connection, 0, arg2, arg3, arg4, arg5, arg6, arg7);
-	// TODO: What if it returns the failure code?
-	return result;
+	*result = IOConnectTrap6(hook.connection, 0, arg2, arg3, arg4, arg5, arg6, arg7);
+	return true;
 }
 
 bool

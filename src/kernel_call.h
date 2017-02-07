@@ -13,7 +13,7 @@
  * 	arg1 must be nonzero.
  * 	The return value is truncated to 32 bits.
  */
-extern unsigned (*kernel_call_7)(kaddr_t func,
+extern bool (*kernel_call_7)(uint32_t *result, kaddr_t func,
 		kword_t arg1, kword_t arg2, kword_t arg3, kword_t arg4,
 		kword_t arg5, kword_t arg6, kword_t arg7);
 
