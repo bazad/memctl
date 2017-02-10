@@ -2,12 +2,17 @@
 #define MEMCTL_CLI__CLI_H_
 
 #include "cli/command.h"
+#include "cli/disassemble.h"
 
 bool default_action(void);
 
 bool r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t access,
 		bool dump);
 bool rb_command(kaddr_t address, size_t length, bool physical, size_t access);
+#if MEMCTL_DISASSEMBLY
+bool ri_command(kaddr_t address, size_t length, bool physical, size_t access);
+bool rif_command(const char *function, const char *kext, size_t access);
+#endif
 bool rs_command(kaddr_t address, size_t length, bool physical, size_t access);
 bool w_command(kaddr_t address, kword_t value, bool physical, size_t width, size_t access);
 bool wd_command(kaddr_t address, const void *data, size_t length, bool physical, size_t access);

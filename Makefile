@@ -34,9 +34,21 @@ LDFLAGS    = -g
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
 
+# libmemctl aarch64 sources.
+
+LIBMEMCTL_AARCH64_SRCS = aarch64/disasm.c
+
+LIBMEMCTL_AARCH64_HDRS = aarch64/disasm.h
+
 # libmemctl sources.
 
-LIBMEMCTL_SRCS = core.c \
+ifeq ($(ARCH),arm64)
+LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_AARCH64_SRCS)
+LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_AARCH64_HDRS)
+endif
+
+LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
+		 core.c \
 		 error.c \
 		 kernel.c \
 		 kernel_call.c \
@@ -52,7 +64,8 @@ LIBMEMCTL_SRCS = core.c \
 		 platform.c \
 		 vtable.c
 
-LIBMEMCTL_HDRS = core.h \
+LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
+		 core.h \
 		 error.h \
 		 kernel.h \
 		 kernel_call.h \
@@ -79,7 +92,14 @@ MEMCTL_LIB := $(LIB_DIR)/libmemctl.a
 
 MEMCTL_DIR = cli
 
-MEMCTL_SRCS = cli.c \
+MEMCTL_AARCH64_SRCS = aarch64/disassemble.c
+
+ifeq ($(ARCH),arm64)
+MEMCTL_ARCH_SRCS = $(MEMCTL_AARCH64_SRCS)
+endif
+
+MEMCTL_SRCS = $(MEMCTL_ARCH_SRCS) \
+	      cli.c \
 	      command.c \
 	      error.c \
 	      memctl.c \
@@ -87,8 +107,10 @@ MEMCTL_SRCS = cli.c \
 	      read.c \
 	      vmmap.c
 
-MEMCTL_HDRS = cli.h \
+MEMCTL_HDRS = $(MEMCTL_ARCH_HDRS) \
+	      cli.h \
 	      command.h \
+	      disassemble.h \
 	      error.h \
 	      format.h \
 	      memory.h \

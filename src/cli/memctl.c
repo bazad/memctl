@@ -1,4 +1,5 @@
 #include "cli/cli.h"
+#include "cli/disassemble.h"
 #include "cli/error.h"
 #include "cli/format.h"
 #include "cli/memory.h"
@@ -125,6 +126,29 @@ rb_command(kaddr_t address, size_t length, bool physical, size_t access) {
 	}
 	return  memctl_dump_binary(address, length, physical, access);
 }
+
+#if MEMCTL_DISASSEMBLY
+
+bool
+ri_command(kaddr_t address, size_t length, bool physical, size_t access) {
+	if (!check_address(address, length, physical)) {
+		return false;
+	}
+	return memctl_disassemble(address, length, physical, access);
+}
+
+bool
+rif_command(const char *function, const char *kext, size_t access) {
+	kaddr_t address;
+	size_t size;
+	kext_result kr = resolve_symbol(kext, function, &address, &size);
+	if (kext_error(kr, kext, function, 0)) {
+		return false;
+	}
+	return memctl_disassemble(address, size, false, access);
+}
+
+#endif // MEMCTL_DISASSEMBLY
 
 bool
 rs_command(kaddr_t address, size_t length, bool physical, size_t access) {

@@ -166,3 +166,32 @@ memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t access) {
 	}
 	return true;
 }
+
+#if MEMCTL_DISASSEMBLY
+
+bool
+memctl_disassemble(kaddr_t address, size_t length, bool physical, size_t access) {
+	uint8_t data[page_size];
+	for (;;) {
+		size_t size = min(length, sizeof(data));
+		bool read_success = read_memory(address, &size, data, physical, access);
+		if (interrupted) {
+			error_interrupt();
+			return false;
+		}
+		size_t count = -1;
+		size_t left = size;
+		disassemble(data, &left, &count, address);
+		if (!read_success) {
+			return false;
+		}
+		// If this is the last data read, we are done.
+		if (size == length) {
+			return true;
+		}
+		address += size - left;
+		length  -= size - left;
+	}
+}
+
+#endif // MEMCTL_DISASSEMBLY

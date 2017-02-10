@@ -2,7 +2,8 @@
 #define MEMCTL__CLI__READ_H_
 
 #include "memctl_types.h"
-#include "cli/error.h"
+
+#include "cli/disassemble.h"
 
 /*
  * memctl_read
@@ -56,6 +57,27 @@ bool memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size
  * 	true if the read was successful.
  */
 bool memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t access);
+
+#if MEMCTL_DISASSEMBLY
+
+/*
+ * memctl_disassemble
+ *
+ * Description:
+ * 	Disassemble kernel memory to stdout.
+ *
+ * Parameters:
+ * 		address			The kernel address to start disassembling at.
+ * 		length			The number of bytes to read.
+ * 		physical		Read physical rather than virtual memory.
+ * 		access			The access width while reading.
+ *
+ * Returns:
+ * 	true if the read was successful.
+ */
+bool memctl_disassemble(kaddr_t address, size_t length, bool physical, size_t access);
+
+#endif // MEMCTL_DISASSEMBLY
 
 /*
  * memctl_read_string

@@ -1,6 +1,7 @@
 #include "cli/cli.h"
 
 #include "cli/error.h"
+#include "cli/format.h"
 
 #include "kernel.h"
 
@@ -97,6 +98,30 @@ static bool rb_handler(const struct argument *arguments) {
 	return rb_command(address, length, physical, access);
 }
 
+#if MEMCTL_DISASSEMBLY
+
+static bool ri_handler(const struct argument *arguments) {
+	bool physical   = OPT_PRESENT(0, "p");
+	size_t access   = OPT_GET_WIDTH_OR(1, "x", "access", 0);
+	kaddr_t address = ARG_GET_ADDRESS(2, "address");
+	size_t length   = ARG_GET_UINT(3, "length");
+#if __arm__ || __arm64__
+	if (address & 3) {
+		error_usage("ri", NULL, "address "KADDR_FMT" is unaligned", address);
+		return false;
+	}
+#endif
+	return ri_command(address, length, physical, access);
+}
+
+static bool rif_handler(const struct argument *arguments) {
+	size_t access             = OPT_GET_WIDTH_OR(0, "x", "access", 0);
+	struct argsymbol function = ARG_GET_SYMBOL(1, "function");
+	return rif_command(function.symbol, function.kext, access);
+}
+
+#endif // MEMCTL_DISASSEMBLY
+
 static bool rs_handler(const struct argument *arguments) {
 	bool physical   = OPT_PRESENT(0, "p");
 	size_t access   = OPT_GET_WIDTH_OR(1, "x", "access", 0);
@@ -144,7 +169,7 @@ static bool fpr_handler(const struct argument *arguments) {
 	intmax_t ipid = ARG_GET_INT(0, "pid");
 	pid_t pid = ipid;
 	if ((intmax_t)pid != ipid) {
-		error_usage("fpr", NULL, "invalid PID %lld\n", ipid);
+		error_usage("fpr", NULL, "invalid PID %lld", ipid);
 		return false;
 	}
 	return fpr_command(pid);
@@ -245,6 +270,24 @@ static struct command commands[] = {
 			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"         },
 			{ ARGUMENT, "length",  ARG_UINT,    "the number of bytes to read" },
 		},
+#if MEMCTL_DISASSEMBLY
+	}, {
+		"ri", "r", ri_handler,
+		"read instructions (disassemble)",
+		4, (struct argspec *) &(struct argspec[4]) {
+			{ "p",      NULL,      ARG_NONE,    "read physical memory"               },
+			{ "x",      "access",  ARG_WIDTH,   "memory access width"                },
+			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"                },
+			{ ARGUMENT, "length",  ARG_UINT,    "the number of bytes to disassemble" },
+		},
+	}, {
+		"rif", "ri", rif_handler,
+		"disassemble function",
+		2, (struct argspec *) &(struct argspec[2]) {
+			{ "x",      "access",   ARG_WIDTH,  "memory access width"         },
+			{ ARGUMENT, "function", ARG_SYMBOL, "the function to disassemble" },
+		},
+#endif // MEMCTL_DISASSEMBLY
 	}, {
 		"rs", "r", rs_handler,
 		"read string",
