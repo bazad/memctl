@@ -10,13 +10,13 @@
 #include <stdint.h>
 
 /*
- * AARCH64_SP_INS
+ * AARCH64_ZR_INS
  *
  * Description:
  * 	When this flag is set in an aarch64_reg, it indicates that the register should be
- * 	interpreted as SP rather than ZR in the context of the decoded instruction.
+ * 	interpreted as ZR rather than SP in the context of the decoded instruction.
  */
-#define AARCH64_SP_INS 0x80
+#define AARCH64_ZR_INS 0x80
 
 /*
  * aarch64_reg
@@ -58,8 +58,8 @@ enum {
 	AARCH64_R28 =                       28,
 	AARCH64_R29 =                       29,
 	AARCH64_R30 =                       30,
-	AARCH64_RZR =                       31,
-	AARCH64_RSP = AARCH64_SP_INS |      31,
+	AARCH64_RZR = AARCH64_ZR_INS |      31,
+	AARCH64_RSP =                       31,
 	AARCH64_W0  =                  32 |  0,
 	AARCH64_W1  =                  32 |  1,
 	AARCH64_W2  =                  32 |  2,
@@ -91,8 +91,8 @@ enum {
 	AARCH64_W28 =                  32 | 28,
 	AARCH64_W29 =                  32 | 29,
 	AARCH64_W30 =                  32 | 30,
-	AARCH64_WZR =                  32 | 31,
-	AARCH64_WSP = AARCH64_SP_INS | 32 | 31,
+	AARCH64_WZR = AARCH64_ZR_INS | 32 | 31,
+	AARCH64_WSP =                  32 | 31,
 	AARCH64_X0  =                  64 |  0,
 	AARCH64_X1  =                  64 |  1,
 	AARCH64_X2  =                  64 |  2,
@@ -124,8 +124,8 @@ enum {
 	AARCH64_X28 =                  64 | 28,
 	AARCH64_X29 =                  64 | 29,
 	AARCH64_X30 =                  64 | 30,
-	AARCH64_XZR =                  64 | 31,
-	AARCH64_SP  = AARCH64_SP_INS | 64 | 31,
+	AARCH64_XZR = AARCH64_ZR_INS | 64 | 31,
+	AARCH64_SP  =                  64 | 31,
 };
 
 /*
@@ -145,13 +145,13 @@ enum {
 #define AARCH64_REGNAME(reg)	((reg) & 0x1f)
 
 /*
- * macro AARCH64_REGSP
+ * macro AARCH64_REGZR
  *
  * Description:
- * 	Return nonozero if the given register should be interpreted as SP in the context of the
+ * 	Return nonozero if the given register should be interpreted as ZR in the context of the
  * 	decoded instruction.
  */
-#define AARCH64_REGSP(reg)	((reg) & AARCH64_SP_INS)
+#define AARCH64_REGZR(reg)	((reg) & AARCH64_ZR_INS)
 
 /*
  * aarch64_shift
@@ -212,7 +212,6 @@ enum {
  */
 #define AARCH64_INS_TYPE(ins, type) \
 	(((ins) & AARCH64_##type##_MASK) == AARCH64_##type##_BITS)
-
 
 // ADC
 //   ADC <Wd>, <Wn>, <Wm>

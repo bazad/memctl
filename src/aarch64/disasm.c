@@ -88,8 +88,8 @@ extract(uint64_t x, unsigned sign, unsigned hi, unsigned lo, unsigned shift) {
 
 // Instruction routines
 
-#define USE_ZR	0
-#define USE_SP	AARCH64_SP_INS
+#define USE_ZR	AARCH64_ZR_INS
+#define USE_SP	0
 
 /*
  * get_reg
@@ -98,13 +98,13 @@ extract(uint64_t x, unsigned sign, unsigned hi, unsigned lo, unsigned shift) {
  * 	Returns the register number at the given index in the instruction.
  */
 static inline aarch64_reg
-get_reg(uint32_t ins, unsigned sf, unsigned sp, unsigned lo) {
+get_reg(uint32_t ins, unsigned sf, unsigned zrsp, unsigned lo) {
 	assert(sf == 0 || sf == 1);
-	assert(sp == USE_ZR || sp == USE_SP);
+	assert(zrsp == USE_ZR || zrsp == USE_SP);
 	aarch64_reg reg     = ((ins >> lo) & 0x1f);
 	aarch64_reg size    = (32 * (sf + 1));
-	aarch64_reg sp_hint = sp * (reg == AARCH64_RZR);
-	return sp_hint | size | reg;
+	aarch64_reg zr_hint = zrsp * (reg == AARCH64_RSP);
+	return zr_hint | size | reg;
 }
 
 /*
@@ -115,7 +115,7 @@ get_reg(uint32_t ins, unsigned sf, unsigned sp, unsigned lo) {
  */
 static inline bool
 reg_is_zrsp(aarch64_reg reg) {
-	return AARCH64_REGNAME(reg) == AARCH64_REGNAME(AARCH64_RZR);
+	return AARCH64_REGNAME(reg) == AARCH64_RSP;
 }
 
 /*
@@ -436,7 +436,7 @@ decode_ldr_str_r(uint32_t ins, struct aarch64_ldr_str_r *ldr_str_r) {
 	//  31 30 29   27 26  25 24 23 22 21  20       16 15    13 12  11 10 9         5 4         0
 	// +-----+-------+---+-----+-----+---+-----------+--------+---+-----+-----------+-----------+
 	// | 1 x | 1 1 1 | 0 | 0 0 | 0 1 | 1 |    Rm     | option | S | 1 0 |    Rn     |    Rt     | LDR register
-	// | 1 x | 1 1 1 | 0 | 0 0 | 0 0 | 1 |    Rm     | option | S | 1 0 |    Rn     |    Rt     | LDR register
+	// | 1 x | 1 1 1 | 0 | 0 0 | 0 0 | 1 |    Rm     | option | S | 1 0 |    Rn     |    Rt     | STR register
 	// +-----+-------+---+-----+-----+---+-----------+--------+---+-----+-----------+-----------+
 	//  size                     opc
 	aarch64_extend extend = get_extend(ins, 13);

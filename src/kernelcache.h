@@ -139,7 +139,8 @@ void kernelcache_for_each(const struct kernelcache *kc, kext_for_each_callback_f
  * 					This may be less than the full size if the kext is split.
  *
  * Returns:
- * 	A kext_result code.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_NO_KEXT			The kext was not found.
  */
 kext_result kernelcache_get_address(const struct kernelcache *kc,
 		const char *bundle_id, kaddr_t *base, size_t *size);
@@ -177,7 +178,9 @@ kext_result kernelcache_find_containing_address(const struct kernelcache *kc, ka
  * 		bundle_id		The bundle ID of the kext.
  *
  * Returns:
- * 	A kext_result code.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_ERROR			An error was encountered.
+ * 	KEXT_NO_KEXT			The kext was not found.
  *
  * Notes:
  * 	This function is less efficient than kernelcache_kext_init_macho_at_address.

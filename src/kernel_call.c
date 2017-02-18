@@ -231,9 +231,9 @@ find_registry_entry_with_id(kaddr_t vtable, uint64_t id, kaddr_t *object, kaddr_
  */
 static bool
 get_user_client_vtable() {
-	bool success = vtable_for_class(user_client_name, kext_name, &hook.vtable,
-			&hook.vtable_size);
-	if (!success || hook.vtable == 0) {
+	kext_result kr = vtable_for_class(user_client_name, kext_name, &hook.vtable,
+	                                  &hook.vtable_size);
+	if (kr != KEXT_SUCCESS) {
 		error_internal("could not locate vtable for class %s", user_client_name);
 		return false;
 	}

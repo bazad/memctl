@@ -82,6 +82,70 @@
 	   ((x0 & (x0 - 1)) == 0); })
 
 /*
+ * lsl
+ *
+ * Description:
+ * 	Logical shift left.
+ *
+ * Parameters:
+ * 		x			The value to shift.
+ * 		shift			The amount to shift.
+ * 		width			The width of x in bits. Cannot be 0.
+ */
+static inline uint64_t
+lsl(uint64_t x, unsigned shift, unsigned width) {
+	return (x << shift) & ((2 << (width - 1)) - 1);
+}
+
+/*
+ * lsr
+ *
+ * Description:
+ * 	Logical shift right.
+ *
+ * Parameters:
+ * 		x			The value to shift.
+ * 		shift			The amount to shift.
+ */
+static inline uint64_t
+lsr(uint64_t x, unsigned shift) {
+	return (x >> shift);
+}
+
+/*
+ * asr
+ *
+ * Description:
+ * 	Arithmetic shift right.
+ *
+ * Parameters:
+ * 		x			The value to shift.
+ * 		shift			The amount to shift.
+ * 		width			The width of x in bits. Cannot be 0.
+ */
+static inline uint64_t
+asr(uint64_t x, unsigned shift, unsigned width) {
+	return ((int64_t)x << (64 - width)) >> (64 - width + shift);
+}
+
+/*
+ * ror
+ *
+ * Description:
+ * 	Rotate right.
+ *
+ * Parameters:
+ * 		x			The value to rotate.
+ * 		shift			The amount to shift.
+ * 		width			The width of x in bits. Cannot be 0.
+ */
+static inline uint64_t
+ror(uint64_t x, unsigned shift, unsigned width) {
+	unsigned s = shift % width;
+	return lsl(x, width - s, width) | lsr(x, s);
+}
+
+/*
  * pack_uint
  *
  * Description:
@@ -93,7 +157,8 @@
  * 		width			The width of the integer to store. `width` must be 1, 2,
  * 					4, or 8.
  */
-static inline void pack_uint(void *dest, uint64_t value, unsigned width) {
+static inline void
+pack_uint(void *dest, uint64_t value, unsigned width) {
 	switch (width) {
 		case 1: *(uint8_t  *)dest = value; break;
 		case 2: *(uint16_t *)dest = value; break;
@@ -116,7 +181,8 @@ static inline void pack_uint(void *dest, uint64_t value, unsigned width) {
  * Returns:
  * 	The `width`-byte integer in `src` as a uint64_t.
  */
-static inline uint64_t unpack_uint(const void *src, unsigned width) {
+static inline uint64_t
+unpack_uint(const void *src, unsigned width) {
 	switch (width) {
 		case 1:  return *(uint8_t  *)src;
 		case 2:  return *(uint16_t *)src;

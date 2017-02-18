@@ -1,7 +1,7 @@
 #ifndef MEMCTL__VTABLE_H_
 #define MEMCTL__VTABLE_H_
 
-#include "memctl_types.h"
+#include "kernel.h"
 
 /*
  * vtable
@@ -17,12 +17,15 @@
  * 	out	size			On return, the size of the vtable. May be NULL.
  *
  * Returns:
- * 	true if no errors were encountered.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_ERROR			An error was encountered.
+ * 	KEXT_NO_KEXT			No kext with the given bundle ID was found.
+ * 	KEXT_NOT_FOUND			The vtable for the given class could not be found.
  *
  * Dependencies:
  * 	kernel subsystem
  */
-bool vtable_for_class(const char *class_name, const char *bundle_id, kaddr_t *vtable,
+kext_result vtable_for_class(const char *class_name, const char *bundle_id, kaddr_t *vtable,
 		size_t *size);
 
 #endif

@@ -126,12 +126,8 @@ kernel_init(const char *kernel_path) {
 	kernel.bundle_id = KERNEL_ID;
 	// Initialize the symtab.
 	kernel.symtab = NULL;
-	macho_result mr = macho_find_load_command(&kernel.macho,
-			(const struct load_command **)&kernel.symtab, LC_SYMTAB);
-	if (mr != MACHO_SUCCESS) {
-		assert(mr == MACHO_ERROR);
-		goto fail;
-	}
+	macho_find_load_command(&kernel.macho, (const struct load_command **)&kernel.symtab,
+			LC_SYMTAB);
 	initialized_kernel = kernel_path;
 	return true;
 fail:
@@ -226,13 +222,8 @@ kext_init(struct kext *kext, const char *bundle_id) {
 		goto fail;
 	}
 	kext->symtab = NULL;
-	macho_result mr = macho_find_load_command(&kext->macho,
-			(const struct load_command **)&kext->symtab, LC_SYMTAB);
-	if (mr != MACHO_SUCCESS) {
-		assert(mr == MACHO_ERROR);
-		kr = KEXT_ERROR;
-		goto fail;
-	}
+	macho_find_load_command(&kext->macho, (const struct load_command **)&kext->symtab,
+			LC_SYMTAB);
 	return KEXT_SUCCESS;
 fail:
 	kext_deinit_macho(&kext->macho);

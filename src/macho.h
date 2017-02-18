@@ -87,12 +87,13 @@ size_t macho_header_size(const struct macho *macho);
  * 					iterating. If lc is NULL on return, then all load commands
  * 					have been processed.
  *
- * Returns:
- * 	MACHO_SUCCESS or MACHO_ERROR.
+ * TODO:
+ * 	This should just return the new load command directly, this extra indirection is
+ * 	unnecessary. The same goes for the similar functions below.
  */
-macho_result macho_next_load_command(const struct macho *macho, const struct load_command **lc);
-macho_result macho_next_load_command_32(const struct macho *macho, const struct load_command **lc);
-macho_result macho_next_load_command_64(const struct macho *macho, const struct load_command **lc);
+void macho_next_load_command(const struct macho *macho, const struct load_command **lc);
+void macho_next_load_command_32(const struct macho *macho, const struct load_command **lc);
+void macho_next_load_command_64(const struct macho *macho, const struct load_command **lc);
 
 /*
  * macho_find_load_command
@@ -108,7 +109,7 @@ macho_result macho_next_load_command_64(const struct macho *macho, const struct 
  * 		cmd			The load command type to iterate over.
  *
  * Returns:
- * 	MACHO_SUCCESS or MACHO_ERROR.
+ * 	MACHO_SUCCESS or MACHO_NOT_FOUND.
  */
 macho_result macho_find_load_command(const struct macho *macho, const struct load_command **lc,
 		uint32_t cmd);
@@ -125,16 +126,81 @@ macho_result macho_find_load_command_64(const struct macho *macho, const struct 
  *
  * Parameters:
  * 		macho			The macho struct.
- * 	out	lc			On return, a pointer to the segment command.
  * 		segname			The name of the segment.
+ *
+ * Returns:
+ * 	The segment command or NULL.
  */
-macho_result macho_find_segment_command(const struct macho *macho, const struct load_command **lc,
+const struct load_command *macho_find_segment_command(const struct macho *macho,
 		const char *segname);
-macho_result macho_find_segment_command_32(const struct macho *macho,
-		const struct segment_command **lc, const char *segname);
-macho_result macho_find_segment_command_64(const struct macho *macho,
-		const struct segment_command_64 **lc, const char *segname);
+const struct segment_command *macho_find_segment_command_32(const struct macho *macho,
+		const char *segname);
+const struct segment_command_64 *macho_find_segment_command_64(const struct macho *macho,
+		const char *segname);
 
+/*
+ * macho_find_section
+ *
+ * Description:
+ * 	Find the named section of the given segment of the Mach-O.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		segment			The segment command.
+ * 		sectname		The section name.
+ *
+ * Returns:
+ * 	The section or NULL.
+ */
+const void *macho_find_section(const struct macho *macho,
+		const struct load_command *segment, const char *sectname);
+const struct section *macho_find_section_32(const struct macho *macho,
+		const struct segment_command *segment, const char *sectname);
+const struct section_64 *macho_find_section_64(const struct macho *macho,
+		const struct segment_command_64 *segment, const char *sectname);
+
+/*
+ * macho_segment_data
+ *
+ * Description:
+ * 	Return the data contents of the given segment, including the virtual memory address and
+ * 	size.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		segment			The segment command.
+ * 	out	data			On return, a pointer to the contents of the segment.
+ * 	out	addr			On return, the runtime address of the segment contents.
+ * 	out	size			On return, the size of the segment contents.
+ */
+void macho_segment_data(const struct macho *macho, const struct load_command *segment,
+		const void **data, uint64_t *addr, size_t *size);
+void macho_segment_data_32(const struct macho *macho, const struct segment_command *segment,
+		const void **data, uint32_t *addr, size_t *size);
+void macho_segment_data_64(const struct macho *macho, const struct segment_command_64 *segment,
+		const void **data, uint64_t *addr, size_t *size);
+
+/*
+ * macho_section_data
+ *
+ * Description:
+ * 	Return the data contents of the given section, including the virtual memory address and
+ * 	size.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		segment			The segment command.
+ * 		section			The section.
+ * 	out	data			On return, a pointer to the contents of the section.
+ * 	out	addr			On return, the runtime address of the section contents.
+ * 	out	size			On return, the size of the section contents.
+ */
+void macho_section_data(const struct macho *macho, const struct load_command *segment,
+		const void *section, const void **data, uint64_t *addr, size_t *size);
+void macho_section_data_32(const struct macho *macho, const struct segment_command *segment,
+		const struct section *section, const void **data, uint32_t *addr, size_t *size);
+void macho_section_data_64(const struct macho *macho, const struct segment_command_64 *segment,
+		const struct section_64 *section, const void **data, uint64_t *addr, size_t *size);
 
 /*
  * macho_find_base

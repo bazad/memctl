@@ -152,7 +152,9 @@ rif_command(const char *function, const char *kext, size_t access) {
 
 bool
 rs_command(kaddr_t address, size_t length, bool physical, size_t access) {
-	if (!check_address(address, length, physical)) {
+	// If the user didn't specify a length, then length is -1, which will result in an overflow
+	// error. Instead we check for one page of validity.
+	if (!check_address(address, page_size, physical)) {
 		return false;
 	}
 	return memctl_read_string(address, length, physical, access);
@@ -220,10 +222,8 @@ bool
 vt_command(const char *classname, const char *bundle_id) {
 	kaddr_t address;
 	size_t size;
-	if (!vtable_for_class(classname, bundle_id, &address, &size)) {
-		return false;
-	}
-	if (address == 0) {
+	kext_result kr = vtable_for_class(classname, bundle_id, &address, &size);
+	if (kr == KEXT_NOT_FOUND) {
 		if (bundle_id == NULL) {
 			error_message("class %s not found", classname);
 		} else if (strcmp(bundle_id, KERNEL_ID) == 0) {
@@ -232,7 +232,9 @@ vt_command(const char *classname, const char *bundle_id) {
 			error_message("class %s not found in kernel extension %s", classname,
 			              bundle_id);
 		}
-		return true;
+		return false;
+	} else if (kext_error(kr, bundle_id, NULL, 0)) {
+		return false;
 	}
 	printf(KADDR_FMT"  (%zu)\n", address, size);
 	return true;

@@ -197,7 +197,7 @@ void kext_deinit(struct kext *kext);
  * 	out	size			A guess of the size of the symbol.
  *
  * Returns:
- * 	A kext_result code.
+ * 	KEXT_SUCCESS, KEXT_ERROR, KEXT_NOT_FOUND, or KEXT_NO_SYMBOLS.
  */
 kext_result kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr,
 		size_t *size);

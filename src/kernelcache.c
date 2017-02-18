@@ -202,15 +202,16 @@ missing_segment(const char *segname) {
  */
 static kext_result
 kernelcache_find_text(const struct macho *kernel, const struct segment_command_64 **text) {
-	macho_result mr = macho_find_segment_command_64(kernel, text, SEG_TEXT);
-	if (mr != MACHO_SUCCESS) {
+	const struct segment_command_64 *sc = macho_find_segment_command_64(kernel, SEG_TEXT);
+	if (sc == NULL) {
 		missing_segment(SEG_TEXT);
 		return KEXT_ERROR;
 	}
-	if ((*text)->fileoff != 0) {
+	if (sc->fileoff != 0) {
 		error_kernelcache("%s segment does not include Mach-O header", SEG_TEXT);
 		return KEXT_ERROR;
 	}
+	*text = sc;
 	return KEXT_SUCCESS;
 }
 
@@ -223,12 +224,14 @@ kernelcache_find_text(const struct macho *kernel, const struct segment_command_6
 static kext_result
 kernelcache_find_prelink_text(const struct macho *kernel,
 		const struct segment_command_64 **prelink_text) {
-	macho_result mr = macho_find_segment_command_64(kernel, prelink_text, kPrelinkTextSegment);
-	if (mr != MACHO_SUCCESS) {
+	const struct segment_command_64 *sc = macho_find_segment_command_64(kernel,
+			kPrelinkTextSegment);
+	if (sc == NULL) {
 		missing_segment(kPrelinkTextSegment);
 		return KEXT_ERROR;
 	}
-	assert((*prelink_text)->vmsize == (*prelink_text)->filesize);
+	assert(sc->vmsize == sc->filesize);
+	*prelink_text = sc;
 	return KEXT_SUCCESS;
 }
 
@@ -276,9 +279,9 @@ kernelcache_deinit(struct kernelcache *kc) {
 
 kext_result
 kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prelink_info) {
-	const struct segment_command_64 *sc;
-	macho_result mr = macho_find_segment_command_64(kernel, &sc, kPrelinkInfoSegment);
-	if (mr != MACHO_SUCCESS) {
+	const struct segment_command_64 *sc = macho_find_segment_command_64(kernel,
+			kPrelinkInfoSegment);
+	if (sc == NULL) {
 		missing_segment(kPrelinkInfoSegment);
 		return KEXT_ERROR;
 	}
@@ -418,11 +421,9 @@ kernelcache_find_containing_address_callback(void *context, CFDictionaryRef info
 	}
 	const struct segment_command_64 *sc = NULL;
 	for (;;) {
-		error_stop();
 		macho_result mr = macho_find_load_command_64(&kext,
 				(const struct load_command **)&sc, LC_SEGMENT_64);
-		error_start();
-		if (mr != MACHO_SUCCESS || sc == NULL) {
+		if (mr != MACHO_SUCCESS) {
 			return false;
 		}
 		if (sc->vmaddr <= base && base < sc->vmaddr + sc->vmsize) {
@@ -462,7 +463,13 @@ kernelcache_kext_init_macho(const struct kernelcache *kc, struct macho *macho,
 	if (kr != KEXT_SUCCESS) {
 		return kr;
 	}
-	return kernelcache_kext_init_macho_at_address(kc, macho, base);
+	kr = kernelcache_kext_init_macho_at_address(kc, macho, base);
+	if (kr != KEXT_SUCCESS) {
+		error_kernelcache("prelink info error: could not initialize kext %s at base "
+		                  "address %llx", bundle_id, (unsigned long long)base);
+		return KEXT_ERROR;
+	}
+	return KEXT_SUCCESS;
 }
 
 kext_result
@@ -481,7 +488,11 @@ kernelcache_kext_init_macho_at_address(const struct kernelcache *kc, struct mach
 	size_t kextoff = kc->prelink_text->fileoff + (base - kc->prelink_text->vmaddr);
 	macho->mh = (void *)((uintptr_t)kc->kernel.mh + kextoff);
 	macho->size = kc->kernel.size - kextoff;
-	if (!macho_validate(macho->mh, macho->size)) {
+	error_stop();
+	macho_result mr = macho_validate(macho->mh, macho->size);
+	error_start();
+	if (mr != MACHO_SUCCESS) {
+		assert(mr == MACHO_ERROR);
 		return KEXT_NO_KEXT;
 	}
 	return KEXT_SUCCESS;
