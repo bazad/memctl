@@ -6,6 +6,7 @@ ARCH     ?= x86_64
 SDK      ?= macosx
 CORE_DIR ?= core
 CORE_LIB ?= $(CORE_DIR)/libmemctl_core.a
+CORE_ENTITLEMENTS ?= $(CORE_DIR)/entitlements.plist
 
 ifneq ($(ARCH),x86_64)
 CLANG   := $(shell xcrun --sdk $(SDK) --find clang)
@@ -131,6 +132,10 @@ vpath % $(SRC_DIR)
 
 all: $(MEMCTL_BIN)
 
+ifneq ($(wildcard $(CORE_ENTITLEMENTS)),)
+CODESIGN_FLAGS = --entitlements "$(CORE_ENTITLEMENTS)"
+endif
+
 $(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBMEMCTL_HDRS)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -141,8 +146,8 @@ $(OBJ_DIR)/%.o: %.c $(LIBMEMCTL_HDRS)
 
 $(MEMCTL_BIN): $(MEMCTL_LIB) $(CORE_LIB) $(MEMCTL_OBJS)
 	@mkdir -p $(@D)
-	$(CC) $(LDFLAGS) $(FRAMEWORKS) $(MEMCTL_OBJS) $(CORE_LIB) -force_load $(MEMCTL_LIB) -o $@
-	$(CODESIGN) -s - $@
+	$(CC) $(LDFLAGS) $(FRAMEWORKS) $(MEMCTL_OBJS) "$(CORE_LIB)" -force_load $(MEMCTL_LIB) -o $@
+	$(CODESIGN) $(CODESIGN_FLAGS) -s - $@
 
 $(MEMCTL_LIB): $(LIBMEMCTL_OBJS)
 	@mkdir -p $(@D)
