@@ -46,7 +46,7 @@ format_display_size(char *buf, uint64_t size) {
 		scale_index++;
 	}
 	int precision = 0;
-	if (display_size < 10.0 && display_size - (float)((int)display_size) > 0) {
+	if (display_size < 9.95 && display_size - (float)((int)display_size) > 0) {
 		precision = 1;
 	}
 	snprintf(buf, 5, "%.*f%c", precision, display_size, scale[scale_index]);
