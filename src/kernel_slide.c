@@ -47,6 +47,8 @@ validate_kernel_slide() {
 
 static const uint64_t kernel_region_size_min = 0x0000000100000000;
 static const uint64_t kernel_region_size_max = 0x0000000104000000;
+static const uint64_t kernel_region_static_min = 0xfffffff000000000;
+static const uint64_t kernel_region_static_max = 0xfffffff27fffc000;
 static const int kernel_region_protection    = 0;
 
 static const kword_t slide_increment = 0x200000;
@@ -61,28 +63,37 @@ static const kword_t max_slide       = 0x200000 * 0x200;
 static bool
 find_kernel_region(kaddr_t *region_base, kaddr_t *region_end) {
 	// Get the region containing the kernel.
-	*region_base = 0;
+	mach_vm_address_t address = 0;
 	for (;;) {
 		mach_vm_size_t size = 0;
 		struct vm_region_basic_info_64 info;
 		mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
 		mach_port_t object_name = MACH_PORT_NULL;
-		kern_return_t kr = mach_vm_region(kernel_task, region_base, &size,
+		kern_return_t kr = mach_vm_region(kernel_task, &address, &size,
 				VM_REGION_BASIC_INFO_64, (vm_region_recurse_info_t) &info, &count,
 				&object_name);
 		if (kr != KERN_SUCCESS) {
-			error_internal("mach_vm_region(%p) failed: %s", *region_base,
+			error_internal("mach_vm_region(%p) failed: %s", address,
 					mach_error_string(kr));
 			error_internal("could not find kernel region");
 			return false;
 		}
-		if (kernel_region_size_min <= size
-		    && size <= kernel_region_size_max
-		    && info.protection == kernel_region_protection) {
-			*region_end = *region_base + size;
+		// There are 2 different virtual memory layouts on iOS:
+		//   - On the iPhone 5s and iPhone 6s, the kernel lives inside a 4GB region mapped
+		//     somewhere at or above 0xfffffff000000000.
+		//   - On the iPhone 7, the kernel lives inside a ~10GB region from
+		//     0xfffffff000000000 to 0xfffffff27fffc000.
+		// The kernel is always mapped with ---/--- permissions and SHRMOD=NUL.
+		if (info.protection == kernel_region_protection
+		    && (   (kernel_region_size_min <= size
+		            && size <= kernel_region_size_max)
+		        || (address == kernel_region_static_min
+		            && address + size == kernel_region_static_max))) {
+			*region_base = address;
+			*region_end  = address + size;
 			return true;
 		}
-		*region_base += size;
+		address += size;
 	}
 }
 
