@@ -23,7 +23,7 @@ mmap_file(const char *file, const void **data, size_t *size) {
 		return false;
 	}
 	size_t s = st.st_size;
-	const void *d = mmap(NULL, s, PROT_READ, MAP_SHARED, fd, 0);
+	const void *d = mmap(NULL, s, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (d == MAP_FAILED) {
 		error_out_of_memory();

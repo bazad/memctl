@@ -17,6 +17,8 @@ extern const CFStringRef kCFPrelinkExecutableSizeKey;
  * 	A parsed kernelcache.
  */
 struct kernelcache {
+	const void *data;
+	size_t size;
 	struct macho kernel;
 	CFDictionaryRef prelink_info;
 	const struct segment_command_64 *text;

@@ -31,7 +31,7 @@ EXTERNAL_HDR_DIR = external
 
 ERRFLAGS   = -Wall -Wpedantic -Wno-gnu -Werror
 CFLAGS     = -g -O0 -I$(SRC_DIR) -I$(EXTERNAL_HDR_DIR) $(ERRFLAGS)
-LDFLAGS    = -g
+LDFLAGS    = -g -lcompression
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
 

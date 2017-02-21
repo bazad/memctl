@@ -1,6 +1,7 @@
 #ifndef MEMCTL__MACHO_H_
 #define MEMCTL__MACHO_H_
 
+#include <mach-o/fat.h>
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
 #include <stdbool.h>

@@ -3,6 +3,7 @@
 #include "memctl_common.h"
 #include "memctl_error.h"
 
+#include <compression.h>
 #include <IOKit/IOCFUnserialize.h>
 #include <libkern/prelink.h>
 #include <string.h>
@@ -104,25 +105,17 @@ kernelcache_init_file(struct kernelcache *kc, const char *file) {
 }
 
 /*
- * kernelcache_init_decompress
+ * kernelcache_decompress_complzss
  *
  * Description:
- * 	Decompress the kernelcache data and initialize.
+ * 	Try to decompress an LZSS-compressed kernelcache.
  *
  * Notes:
- * 	This is quite ad-hoc. In the future this should be implemented by parsing the IM4P file.
+ * 	This function is a giant hack and definitely is not robust or secure.
  */
-static kext_result
-kernelcache_init_decompress(struct kernelcache *kc, const void *data, size_t size) {
-	if (size < 0x1000) {
-		error_kernelcache("kernelcache too small");
-		goto fail_0;
-	}
-	uint8_t im4p[4] = "IM4P";
-	if (memmem(data, 128, im4p, sizeof(im4p)) == NULL) {
-		error_kernelcache("compressed kernelcache not IMG4");
-		goto fail_0;
-	}
+static bool
+kernelcache_decompress_complzss(const void *data, size_t size,
+		const void **decompressed, size_t *decompressed_size) {
 	// Find the complzss header.
 	struct compression_header {
 		uint8_t compression_type[8];
@@ -131,19 +124,10 @@ kernelcache_init_decompress(struct kernelcache *kc, const void *data, size_t siz
 		uint32_t compressed_size;
 		uint32_t reserved2;
 	} *h;
-	uint8_t complzss[8] = "complzss";
-	h = memmem(data, size, complzss, sizeof(complzss));
+	const uint8_t complzss[8] = "complzss";
+	h = memmem(data, 0x200, complzss, sizeof(complzss));
 	if (h == NULL) {
-		error_kernelcache("unknown IMG4 format");
-		goto fail_0;
-	}
-	// Allocate memory to decompress the kernelcache.
-	size_t uncompressed_size = ntohl(h->uncompressed_size);
-	size_t compressed_size   = ntohl(h->compressed_size);
-	void *decompressed = mmap(NULL, uncompressed_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-	if (decompressed == MAP_FAILED) {
-		error_out_of_memory();
-		goto fail_0;
+		return false;
 	}
 	// Find the start of the compressed data.
 	const uint8_t *end = (const uint8_t *)data + size;
@@ -151,34 +135,119 @@ kernelcache_init_decompress(struct kernelcache *kc, const void *data, size_t siz
 	for (;;) {
 		if (p >= end) {
 			error_internal("could not find compressed data");
-			goto fail_1;
+			goto fail;
 		}
 		if (*p != 0) {
 			break;
 		}
 		p++;
 	}
-	// Decompress the kernelcache.
-	if (!decompress_complzss(p, compressed_size, decompressed, uncompressed_size)) {
-		error_internal("decompression failed");
-		goto fail_1;
+	// Allocate memory to decompress the kernelcache.
+	size_t dsize = ntohl(h->uncompressed_size);
+	size_t csize = ntohl(h->compressed_size);
+	void *ddata = mmap(NULL, dsize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
+	if (ddata == MAP_FAILED) {
+		error_out_of_memory();
+		goto fail;
 	}
-	munmap((void *)data, size);
-	return kernelcache_init_uncompressed(kc, decompressed, uncompressed_size);
-fail_1:
-	munmap(decompressed, uncompressed_size);
-fail_0:
-	munmap((void *)data, size);
-	return KEXT_ERROR;
+	// Decompress the kernelcache.
+	if (!decompress_complzss(p, csize, ddata, dsize)) {
+		error_internal("decompression failed");
+		munmap(ddata, dsize);
+		goto fail;
+	}
+	*decompressed      = ddata;
+	*decompressed_size = dsize;
+fail:
+	return true;
+}
+
+/*
+ * kernelcache_decompress_lzfse
+ *
+ * Description:
+ * 	Try to decompress an lzfse-compressed kernelcache.
+ */
+static bool
+kernelcache_init_decompress_lzfse(const void *data, size_t size,
+		const void **decompressed, size_t *decompressed_size) {
+	const uint8_t lzfse_sig[4] = "bvx2";
+	const void *lzfse = memmem(data, 0x200, lzfse_sig, sizeof(lzfse_sig));
+	if (lzfse == NULL) {
+		return false;
+	}
+	// Try to decompress the data.
+	size_t dalloc = 4 * size;
+	void *ddata;
+	size_t dsize;
+	size_t csize = size - ((uintptr_t)lzfse - (uintptr_t)data);
+	uint8_t dbuf[compression_decode_scratch_buffer_size(COMPRESSION_LZFSE)];
+	for (;;) {
+		ddata = mmap(NULL, dalloc, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0,
+				0);
+		if (ddata == MAP_FAILED) {
+			error_out_of_memory();
+			goto fail;
+		}
+		dsize = compression_decode_buffer(ddata, dalloc, lzfse, csize, dbuf,
+				COMPRESSION_LZFSE);
+		if (dsize < dalloc) {
+			break;
+		}
+		munmap(ddata, dalloc);
+		dalloc *= 2;
+		memctl_warning("decompress_lzfse: reallocating decompression buffer");
+	}
+	*decompressed      = ddata;
+	*decompressed_size = dsize;
+fail:
+	return true;
+}
+
+/*
+ * kernelcache_decompress
+ *
+ * Description:
+ * 	Try to decompress the kernelcache data using all known compression schemes.
+ *
+ * Notes:
+ * 	This is quite ad-hoc. In the future this should be implemented by parsing the IM4P file.
+ */
+static bool
+kernelcache_decompress(const void *data, size_t size,
+		const void **decompressed, size_t *decompressed_size) {
+	// Sanity checks.
+	const uint8_t im4p[4] = "IM4P";
+	if (size < 0x1000 || memmem(data, 0x80, im4p, sizeof(im4p)) == NULL) {
+		return false;
+	}
+	// Try to decompress the kernelcache data.
+	return kernelcache_decompress_complzss(data, size, decompressed, decompressed_size)
+		|| kernelcache_init_decompress_lzfse(data, size, decompressed, decompressed_size);
 }
 
 kext_result
 kernelcache_init(struct kernelcache *kc, const void *data, size_t size) {
-	const struct mach_header *mh = data;
-	if (mh->magic == MH_MAGIC || mh->magic == MH_MAGIC_64) {
-		return kernelcache_init_uncompressed(kc, data, size);
+	const void *decompressed = NULL;
+	size_t decompressed_size;
+	bool is_compressed = kernelcache_decompress(data, size, &decompressed, &decompressed_size);
+	if (is_compressed) {
+		munmap((void *)data, size);
+		if (decompressed == NULL) {
+			// This is a compressed kernelcache but there was an error during the
+			// decompression.
+			error_kernelcache("could not decompress kernelcache");
+			return KEXT_ERROR;
+		}
+		data = decompressed;
+		size = decompressed_size;
 	}
-	return kernelcache_init_decompress(kc, data, size);
+	if (size < 0x1000) {
+		error_kernelcache("kernelcache too small");
+		munmap((void *)data, size);
+		return KEXT_ERROR;
+	}
+	return kernelcache_init_uncompressed(kc, data, size);
 }
 
 /*
@@ -197,8 +266,6 @@ missing_segment(const char *segname) {
  *
  * Description:
  * 	Find the __TEXT segment of the kernelcache, which should also include the Mach-O header.
- *
- * TODO: There should be a better way of doing this.
  */
 static kext_result
 kernelcache_find_text(const struct macho *kernel, const struct segment_command_64 **text) {
@@ -235,15 +302,84 @@ kernelcache_find_prelink_text(const struct macho *kernel,
 	return KEXT_SUCCESS;
 }
 
+/*
+ * kernelcache_extract_fat
+ *
+ * Description:
+ * 	Extract the appropriate architecture from a FAT Mach-O.
+ *
+ * TODO:
+ * 	Some of this functionality should be provided by macho.h.
+ */
+static bool
+kernelcache_extract_fat(const void *data, size_t size, void **macho_data, size_t *macho_size) {
+	const struct fat_header *fh = (const struct fat_header *)data;
+	bool swap;
+	if (fh->magic == FAT_MAGIC) {
+		swap = false;
+	} else if (fh->magic == FAT_CIGAM) {
+		swap = true;
+	} else {
+		return false;
+	}
+	uint32_t nfat_arch = fh->nfat_arch;
+	if (swap) {
+		nfat_arch = ntohl(nfat_arch);
+	}
+	if (nfat_arch != 1) {
+		goto fail;
+	}
+	const struct fat_arch *fa = (const struct fat_arch *)(fh + 1);
+	uint32_t arch_offset = fa->offset;
+	uint32_t arch_size   = fa->size;
+	if (swap) {
+		arch_offset = ntohl(arch_offset);
+		arch_size   = ntohl(arch_size);
+	}
+	*macho_data = (void *)((uintptr_t)data + arch_offset);
+	*macho_size = arch_size;
+fail:
+	return true;
+}
+
+/*
+ * kernelcache_get_kernel
+ *
+ * Description:
+ * 	Initialize the kernel from the kernelcache data, unwrapping a FAT binary if necessary.
+ */
+static bool
+kernelcache_get_kernel(struct macho *kernel, const void *data, size_t size) {
+	bool is_fat = kernelcache_extract_fat(data, size, &kernel->mh, &kernel->size);
+	if (is_fat) {
+		if (kernel->mh == NULL) {
+			// This is a FAT binary, but there was an error extracting the appropriate
+			// slice.
+			error_kernelcache("could not extract kernelcache from FAT binary");
+			return false;
+		}
+	} else {
+		// Assume the data is a Mach-O file.
+		macho_result mr = macho_validate(data, size);
+		if (mr != MACHO_SUCCESS) {
+			error_kernelcache("not a valid kernelcache");
+			return false;
+		}
+		kernel->mh   = (void *)data;
+		kernel->size = size;
+	}
+	return true;
+}
+
 kext_result
 kernelcache_init_uncompressed(struct kernelcache *kc, const void *data, size_t size) {
 	kext_result kr = KEXT_ERROR;
-	kc->kernel.mh    = (void *)data;
-	kc->kernel.size  = size;
+	kc->data         = data;
+	kc->size         = size;
+	kc->kernel.mh    = NULL;
 	kc->prelink_info = NULL;
-	macho_result mr = macho_validate(kc->kernel.mh, kc->kernel.size);
-	if (mr != MACHO_SUCCESS) {
-		error_kernelcache("not a valid kernelcache");
+	bool success = kernelcache_get_kernel(&kc->kernel, data, size);
+	if (!success) {
 		goto fail;
 	}
 	kr = kernelcache_parse_prelink_info(&kc->kernel, &kc->prelink_info);
@@ -266,8 +402,10 @@ fail:
 
 void
 kernelcache_deinit(struct kernelcache *kc) {
-	if (kc->kernel.mh != NULL) {
-		munmap(kc->kernel.mh, kc->kernel.size);
+	if (kc->data != NULL) {
+		munmap((void *)kc->data, kc->size);
+		kc->data = NULL;
+		kc->size = 0;
 		kc->kernel.mh = NULL;
 		kc->kernel.size = 0;
 	}
