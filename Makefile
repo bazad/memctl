@@ -2,8 +2,8 @@
 
 # Compilation options.
 
-ARCH     ?= x86_64
-SDK      ?= macosx
+ARCH     ?= arm64
+SDK      ?= iphoneos
 CORE_DIR ?= core
 CORE_LIB ?= $(CORE_DIR)/libmemctl_core.a
 CORE_ENTITLEMENTS ?= $(CORE_DIR)/entitlements.plist
