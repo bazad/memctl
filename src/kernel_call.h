@@ -18,6 +18,32 @@ extern bool (*kernel_call_7)(uint32_t *result, kaddr_t func,
 		kword_t arg5, kword_t arg6, kword_t arg7);
 
 /*
+ * kernel_call
+ *
+ * Description:
+ * 	Call a kernel function with the given arguments.
+ *
+ * Parameters:
+ * 	out	result			The return value of the kernel function.
+ * 		result_size		The size of the return value in bytes. Must be 1, 2, 4, or
+ * 					8.
+ * 		arg_count		The number of arguments to the function. There can be no
+ * 					more than 8 arguments, and on some platforms, the true
+ * 					maximum number of supported arguments may be even smaller.
+ * 		func			The function to call, or 0 to test if the given function
+ * 					call is possible given the available functionality.
+ * 		args			The arguments to the function.
+ *
+ * Returns:
+ * 	true if the function call succeeded, false if there was an error.
+ *
+ * 	If func was 0, then this function returns true if the given call is supported and false
+ * 	otherwise, with no errors produced.
+ */
+extern bool (*kernel_call)(void *result, unsigned result_size, unsigned arg_count,
+		kaddr_t func, kword_t args[]);
+
+/*
  * kernel_call_init
  *
  * Description:

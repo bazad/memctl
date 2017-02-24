@@ -15,9 +15,12 @@
 #include <mach/mach_vm.h>
 
 
-bool (*kernel_call_7)(unsigned *result, kaddr_t func,
+bool (*kernel_call_7)(uint32_t *result, kaddr_t func,
 		kword_t arg1, kword_t arg2, kword_t arg3, kword_t arg4,
 		kword_t arg5, kword_t arg6, kword_t arg7);
+
+bool (*kernel_call)(void *result, unsigned result_size, unsigned arg_count,
+		kaddr_t func, kword_t args[]);
 
 static const char *service_name     = "AppleKeyStore";
 static const char *user_client_name = "AppleKeyStoreUserClient";
@@ -422,7 +425,7 @@ fail:
 }
 
 static bool
-kernel_call_7_impl(unsigned *result, kaddr_t func,
+kernel_call_7_impl(uint32_t *result, kaddr_t func,
 		kword_t arg1, kword_t arg2, kword_t arg3, kword_t arg4,
 		kword_t arg5, kword_t arg6, kword_t arg7) {
 	assert(arg1 != 0);
@@ -434,6 +437,50 @@ kernel_call_7_impl(unsigned *result, kaddr_t func,
 		return false;
 	}
 	*result = IOConnectTrap6(hook.connection, 0, arg2, arg3, arg4, arg5, arg6, arg7);
+	return true;
+}
+
+static bool
+kernel_call_impl(void *result, unsigned result_size, unsigned arg_count,
+		kaddr_t func, kword_t args[]) {
+	assert(result != NULL || func == 0);
+	assert(result_size > 0 && ispow2(result_size) && result_size < sizeof(uint64_t));
+	if (arg_count > 7) {
+		if (func != 0) {
+			error_functionality_unavailable(
+					"kernel_call: a maximum of 7 arguments are supported");
+		}
+		return false;
+	}
+	if (arg_count > 0 && args[0] == 0) {
+		if (func != 0) {
+			error_functionality_unavailable(
+					"kernel_call: the first argument must be nonzero");
+		}
+		return false;
+	}
+	if (result_size > sizeof(uint32_t)) {
+		if (func != 0) {
+			error_functionality_unavailable(
+					"kernel_call: only 32-bit results can be returned");
+		}
+		return false;
+	}
+	if (func == 0) {
+		return true;
+	}
+	// Initialize the first argument to 1 in case there are no arguments to the function.
+	kword_t a[7] = { 1 };
+	for (unsigned i = 0; i < arg_count; i++) {
+		a[i] = args[i];
+	}
+	uint32_t result32;
+	bool success = kernel_call_7(&result32, func, a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
+	if (!success) {
+		assert(error_count() > 0);
+		return false;
+	}
+	pack_uint(result, result32, result_size);
 	return true;
 }
 
@@ -458,6 +505,7 @@ kernel_call_init() {
 		goto fail;
 	}
 	kernel_call_7 = kernel_call_7_impl;
+	kernel_call   = kernel_call_impl;
 	return true;
 fail:
 	kernel_call_deinit();
@@ -466,6 +514,7 @@ fail:
 
 void
 kernel_call_deinit() {
+	kernel_call   = NULL;
 	kernel_call_7 = NULL;
 	if (hook.hooked) {
 		error_stop();

@@ -86,6 +86,14 @@ error_api_unavailable(const char *function) {
 }
 
 void
+error_functionality_unavailable(const char *message, ...) {
+	va_list ap;
+	va_start(ap, message);
+	error_push_printf(functionality_unavailable_error, message, ap);
+	va_end(ap);
+}
+
+void
 error_address_unmapped(kaddr_t address) {
 	struct address_unmapped_error *e = error_push_data(address_unmapped_error, sizeof(*e),
 			NULL);

@@ -12,15 +12,16 @@ enum {
 	internal_error                   = 32,
 	initialization_error             = 33,
 	api_unavailable_error            = 34,
-	kernel_io_error                  = 35,
-	address_protection_error         = 36,
-	address_unmapped_error           = 37,
-	address_inaccessible_error       = 38,
-	kext_not_found_error             = 39,
-	kext_no_symbols_error            = 40,
-	kext_symbol_not_found_error      = 41,
-	macho_error                      = 42,
-	kernelcache_error                = 43,
+	functionality_unavailable_error  = 35,
+	kernel_io_error                  = 36,
+	address_protection_error         = 37,
+	address_unmapped_error           = 38,
+	address_inaccessible_error       = 39,
+	kext_not_found_error             = 40,
+	kext_no_symbols_error            = 41,
+	kext_symbol_not_found_error      = 42,
+	macho_error                      = 43,
+	kernelcache_error                = 44,
 
 	core_error                       = 64,
 };
@@ -85,6 +86,13 @@ struct api_unavailable_error {
 };
 
 void error_api_unavailable(const char *function);
+
+/*
+ * functionality_unavailable_error
+ *
+ * TODO: error_functionality_unavailable should take a function string argument as well.
+ */
+void error_functionality_unavailable(const char *message, ...);
 
 /*
  * kernel_io_error
