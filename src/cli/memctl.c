@@ -8,11 +8,119 @@
 
 #include "core.h"
 #include "kernel.h"
+#include "kernel_call.h"
 #include "kernel_slide.h"
+#include "memctl_offsets.h"
 #include "platform.h"
 #include "vtable.h"
 
 #include <stdio.h>
+
+/*
+ * feature_t
+ *
+ * Description:
+ * 	Flags for libmemctl and memctl features.
+ */
+typedef enum {
+	KERNEL_TASK    = 0x01,
+	KERNEL_IMAGE   = 0x02,
+	KERNEL_SLIDE   = 0x04 | KERNEL_TASK | KERNEL_IMAGE,
+	KERNEL_SYMBOLS = KERNEL_IMAGE | KERNEL_SLIDE,
+	KERNEL_MEMORY  = KERNEL_TASK | KERNEL_SYMBOLS,
+	OFFSETS        = 0x08,
+	KERNEL_CALL    = 0x10 | KERNEL_MEMORY | OFFSETS,
+} feature_t;
+
+/*
+ * loaded_features
+ *
+ * Description:
+ * 	The libmemctl or memctl features that have already been loaded.
+ */
+static feature_t loaded_features;
+
+/*
+ * default_initialize
+ *
+ * Description:
+ * 	Initialize the basic set of features that should always be present.
+ */
+static void
+default_initialize() {
+	platform_init();
+}
+
+// Test if all bits set in x are also set in y.
+#define ALL_SET(x,y)	(((x) & (y)) == (x))
+
+/*
+ * initialize
+ *
+ * Description:
+ * 	Initialize the required functionality from libmemctl or memctl.
+ */
+static bool
+initialize(feature_t features) {
+#define NEED(feature)	(ALL_SET(feature, features) && !ALL_SET(features, loaded_features))
+#define LOADED(feature)	loaded_features |= feature
+	if (NEED(KERNEL_TASK)) {
+		if (!core_load()) {
+			error_message("could not load libmemctl core");
+			return false;
+		}
+		LOADED(KERNEL_TASK);
+	}
+	if (NEED(KERNEL_IMAGE)) {
+		if (!kernel_init(NULL)) {
+			error_message("could not initialize kernel image");
+			return false;
+		}
+		LOADED(KERNEL_IMAGE);
+	}
+	if (NEED(KERNEL_SLIDE)) {
+		if (!kernel_slide_init()) {
+			error_message("could not find the kASLR slide");
+			return false;
+		}
+		// Re-initialize the kernel image.
+		kernel_init(NULL);
+		LOADED(KERNEL_SLIDE);
+	}
+	if (NEED(OFFSETS)) {
+		offsets_default_init();
+		LOADED(OFFSETS);
+	}
+	if (NEED(KERNEL_CALL)) {
+		if (!kernel_call_init()) {
+			error_message("could not set up kernel function call system");
+			return false;
+		}
+		LOADED(KERNEL_CALL);
+	}
+	return true;
+#undef NEED
+#undef LOADED
+}
+
+/*
+ * deinitialize
+ *
+ * Description:
+ * 	Unload all loaded features.
+ */
+static void
+deinitialize() {
+#define LOADED(feature)	(ALL_SET(feature, loaded_features))
+	if (LOADED(KERNEL_CALL)) {
+		kernel_call_deinit();
+	}
+	if (LOADED(KERNEL_IMAGE)) {
+		kernel_deinit();
+	}
+	loaded_features = 0;
+#undef LOADED
+}
 
 /*
  * looks_like_physical_address
@@ -109,6 +217,9 @@ default_action(void) {
 
 bool
 r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t access, bool dump) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	if (!check_address(address, length, physical)) {
 		return false;
 	}
@@ -121,6 +232,9 @@ r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t ac
 
 bool
 rb_command(kaddr_t address, size_t length, bool physical, size_t access) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	if (!check_address(address, length, physical)) {
 		return false;
 	}
@@ -131,6 +245,9 @@ rb_command(kaddr_t address, size_t length, bool physical, size_t access) {
 
 bool
 ri_command(kaddr_t address, size_t length, bool physical, size_t access) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	if (!check_address(address, length, physical)) {
 		return false;
 	}
@@ -139,6 +256,9 @@ ri_command(kaddr_t address, size_t length, bool physical, size_t access) {
 
 bool
 rif_command(const char *function, const char *kext, size_t access) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	kaddr_t address;
 	size_t size;
 	kext_result kr = resolve_symbol(kext, function, &address, &size);
@@ -152,6 +272,9 @@ rif_command(const char *function, const char *kext, size_t access) {
 
 bool
 rs_command(kaddr_t address, size_t length, bool physical, size_t access) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	// If the user didn't specify a length, then length is -1, which will result in an overflow
 	// error. Instead we check for one page of validity.
 	if (!check_address(address, page_size, physical)) {
@@ -162,11 +285,17 @@ rs_command(kaddr_t address, size_t length, bool physical, size_t access) {
 
 bool
 w_command(kaddr_t address, kword_t value, bool physical, size_t width, size_t access) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	return wd_command(address, &value, width, physical, access);
 }
 
 bool
 wd_command(kaddr_t address, const void *data, size_t length, bool physical, size_t access) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	if (!check_address(address, length, physical)) {
 		return false;
 	}
@@ -175,6 +304,9 @@ wd_command(kaddr_t address, const void *data, size_t length, bool physical, size
 
 bool
 ws_command(kaddr_t address, const char *string, bool physical, size_t access) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	size_t length = strlen(string) + 1;
 	return wd_command(address, string, length, physical, access);
 }
@@ -182,12 +314,18 @@ ws_command(kaddr_t address, const char *string, bool physical, size_t access) {
 bool
 f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical,
 		size_t access, size_t alignment) {
+	if (!initialize(KERNEL_CALL)) {
+		return false;
+	}
 	printf("f\n");
 	return true;
 }
 
 bool
 fpr_command(pid_t pid) {
+	if (!initialize(KERNEL_CALL)) {
+		return false;
+	}
 	static kword_t _proc_find = 0;
 	if (_proc_find == 0) {
 		kext_result kr = kernel_symbol("_proc_find", &_proc_find, NULL);
@@ -195,31 +333,50 @@ fpr_command(pid_t pid) {
 			return false;
 		}
 	}
-	printf("fpr\n");
+	kword_t args[] = { pid };
+	kaddr_t address;
+	bool success = kernel_call(&address, sizeof(address), 1, _proc_find, args);
+	if (!success) {
+		error_message("proc_find(%d) failed", pid);
+		return false;
+	}
+	printf(KADDR_FMT"\n", address);
 	return true;
 }
 
 bool
 fi_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle_id,
 		size_t access) {
+	if (!initialize(KERNEL_CALL)) {
+		return false;
+	}
 	printf("fi\n");
 	return true;
 }
 
 bool
 kp_command(kaddr_t address) {
+	if (!initialize(KERNEL_CALL)) {
+		return false;
+	}
 	printf("kp("KADDR_FMT")\n", address);
 	return true;
 }
 
 bool
 kpm_command(kaddr_t start, kaddr_t end) {
+	if (!initialize(KERNEL_CALL)) {
+		return false;
+	}
 	printf("kpm("KADDR_FMT", "KADDR_FMT")\n", start, end);
 	return true;
 }
 
 bool
 vt_command(const char *classname, const char *bundle_id) {
+	if (!initialize(KERNEL_SYMBOLS)) {
+		return false;
+	}
 	kaddr_t address;
 	size_t size;
 	kext_result kr = vtable_for_class(classname, bundle_id, &address, &size);
@@ -242,22 +399,34 @@ vt_command(const char *classname, const char *bundle_id) {
 
 bool
 vm_command(kaddr_t address, unsigned depth) {
+	if (!initialize(KERNEL_TASK)) {
+		return false;
+	}
 	return memctl_vmmap(address, address, depth);
 }
 
 bool
 vmm_command(kaddr_t start, kaddr_t end, unsigned depth) {
+	if (!initialize(KERNEL_TASK)) {
+		return false;
+	}
 	return memctl_vmmap(start, end, depth);
 }
 
 bool
 ks_command(kaddr_t address, bool unslide) {
+	if (!initialize(KERNEL_SLIDE)) {
+		return false;
+	}
 	printf(KADDR_FMT"\n", address + (unslide ? -1 : 1) * kernel_slide);
 	return true;
 }
 
 bool
 a_command(const char *symbol, const char *kext) {
+	if (!initialize(KERNEL_SYMBOLS)) {
+		return false;
+	}
 	kaddr_t address;
 	size_t size;
 	kext_result kr = resolve_symbol(kext, symbol, &address, &size);
@@ -270,6 +439,9 @@ a_command(const char *symbol, const char *kext) {
 
 bool
 ap_command(kaddr_t address, bool unpermute) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	static kword_t kernel_addrperm = 0;
 	if (kernel_addrperm == 0) {
 		kword_t _vm_kernel_addrperm;
@@ -289,6 +461,9 @@ ap_command(kaddr_t address, bool unpermute) {
 
 bool
 s_command(kaddr_t address) {
+	if (!initialize(KERNEL_SYMBOLS)) {
+		return false;
+	}
 	char *bundle_id = NULL;
 	kext_result kr = kext_containing_address(address, &bundle_id);
 	if (kext_error(kr, NULL, NULL, address)) {
@@ -324,38 +499,10 @@ s_command(kaddr_t address) {
 	return !is_error;
 }
 
-/*
- * initialize
- *
- * Description:
- * 	Initialize libmemctl.
- */
-static bool
-initialize() {
-	platform_init();
-	if (!core_load()) {
-		return false;
-	}
-	if (!kernel_init(NULL)) {
-		return false;
-	}
-	if (!kernel_slide_init()) {
-		return false;
-	}
-	kernel_init(NULL);
-	return true;
-}
-
-static void
-deinitialize() {
-	kernel_deinit();
-}
-
-int main(int argc, const char *argv[]) {
-	bool success = false;
-	if (initialize()) {
-		success = command_run_argv(argc - 1, argv + 1);
-	}
+int
+main(int argc, const char *argv[]) {
+	default_initialize();
+	bool success = command_run_argv(argc - 1, argv + 1);
 	deinitialize();
 	print_errors();
 	return (success ? 0 : 1);
