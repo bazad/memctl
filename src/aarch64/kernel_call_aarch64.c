@@ -511,6 +511,9 @@ find_gadgets_in_data(const void *data, uint64_t address, size_t size) {
 static bool
 find_gadgets_in_kext(void *context, CFDictionaryRef info,
 		const char *bundle_id, kaddr_t base, size_t size0) {
+	if (base == 0) {
+		return false;
+	}
 	bool *success = (bool *)context;
 	struct macho kext;
 	kext_result kr = kernelcache_kext_init_macho_at_address(&kernelcache, &kext, base);

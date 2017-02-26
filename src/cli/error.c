@@ -115,6 +115,9 @@ print_error(error_handle error) {
 			struct api_unavailable_error *e = error->data;
 			PRINT("%s not available", e->function);
 			} break;
+		case functionality_unavailable_error: {
+			PRINT("%s", (char *)error->data);
+			} break;
 		case kernel_io_error: {
 			struct kernel_io_error *e = error->data;
 			PRINT("kernel I/O error at address " KADDR_FMT, e->address);
