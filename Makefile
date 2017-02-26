@@ -37,9 +37,11 @@ ARFLAGS    = r
 
 # libmemctl aarch64 sources.
 
-LIBMEMCTL_AARCH64_SRCS = aarch64/disasm.c
+LIBMEMCTL_AARCH64_SRCS = aarch64/disasm.c \
+			 aarch64/kernel_call_aarch64.c
 
-LIBMEMCTL_AARCH64_HDRS = aarch64/disasm.h
+LIBMEMCTL_AARCH64_HDRS = aarch64/disasm.h \
+			 aarch64/kernel_call_aarch64.h
 
 # libmemctl sources.
 

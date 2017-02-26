@@ -202,7 +202,7 @@ kext_result kernelcache_kext_init_macho(const struct kernelcache *kc, struct mac
  * 		base			The static address of the Mach-O header.
  *
  * Returns:
- * 	A kext_result code.
+ * 	KEXT_SUCCESS or KEXT_NO_KEXT.
  *
  * Notes:
  * 	Because kexts in the kernelcache are split, the returned macho struct will describe a

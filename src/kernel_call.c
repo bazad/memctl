@@ -11,16 +11,12 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
-#include <mach/vm_region.h>
 #include <mach/mach_vm.h>
+#include <mach/vm_region.h>
 
-
-bool (*kernel_call_7)(uint32_t *result, kaddr_t func,
-		kword_t arg1, kword_t arg2, kword_t arg3, kword_t arg4,
-		kword_t arg5, kword_t arg6, kword_t arg7);
-
-bool (*kernel_call)(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, kword_t args[]);
+#if __arm64__
+#include "aarch64/kernel_call_aarch64.h"
+#endif
 
 static const char *service_name     = "AppleKeyStore";
 static const char *user_client_name = "AppleKeyStoreUserClient";
@@ -396,16 +392,9 @@ patch_user_client() {
 		goto fail;
 	}
 	hook.trap = trap;
-	// Zero out the trap's offset field.
-	kernel_io_result ior = kernel_write_word(kernel_write_unsafe,
-			trap + offsetof(IOExternalTrap, offset), 0, sizeof(kword_t), 0);
-	if (ior != KERNEL_IO_SUCCESS) {
-		error_internal("could not set up trap object");
-		goto fail;
-	}
 	// Set the registry entry ID of the user client to the trap.
-	ior = kernel_write_word(kernel_write_heap, hook.user_client_id_address, hook.trap,
-			sizeof(hook.trap), 0);
+	kernel_io_result ior = kernel_write_word(kernel_write_heap, hook.user_client_id_address,
+			hook.trap, sizeof(hook.trap), 0);
 	if (ior != KERNEL_IO_SUCCESS) {
 		error_internal("could not set user client's registry entry ID");
 		goto fail;
@@ -424,88 +413,70 @@ fail:
 	return false;
 }
 
-static bool
-kernel_call_7_impl(uint32_t *result, kaddr_t func,
-		kword_t arg1, kword_t arg2, kword_t arg3, kword_t arg4,
-		kword_t arg5, kword_t arg6, kword_t arg7) {
-	assert(arg1 != 0);
-	IOExternalTrap trap = { arg1, func };
-	size_t size = 2 * sizeof(kword_t);
-	kernel_io_result ior = kernel_write_unsafe(hook.trap, &size, &trap, 0, NULL);
-	if (ior != KERNEL_IO_SUCCESS) {
-		error_internal("could not write trap to kernel memory");
-		return false;
-	}
-	*result = IOConnectTrap6(hook.connection, 0, arg2, arg3, arg4, arg5, arg6, arg7);
-	return true;
-}
-
-static bool
-kernel_call_impl(void *result, unsigned result_size, unsigned arg_count,
+bool
+kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
 		kaddr_t func, kword_t args[]) {
-	assert(result != NULL || func == 0);
-	assert(result_size > 0 && ispow2(result_size) && result_size < sizeof(uint64_t));
-	if (arg_count > 7) {
-		if (func != 0) {
-			error_functionality_unavailable(
-					"kernel_call: a maximum of 7 arguments are supported");
-		}
-		return false;
-	}
-	if (arg_count > 0 && args[0] == 0) {
-		if (func != 0) {
-			error_functionality_unavailable(
-					"kernel_call: the first argument must be nonzero");
-		}
-		return false;
-	}
-	if (result_size > sizeof(uint32_t)) {
-		if (func != 0) {
-			error_functionality_unavailable(
-					"kernel_call: only 32-bit results can be returned");
-		}
+	if (arg_count > 7 || (arg_count > 0 && args[0] == 0) || result_size > sizeof(uint32_t)) {
+		assert(func == 0);
 		return false;
 	}
 	if (func == 0) {
 		return true;
 	}
-	// Initialize the first argument to 1 in case there are no arguments to the function.
-	kword_t a[7] = { 1 };
-	for (unsigned i = 0; i < arg_count; i++) {
-		a[i] = args[i];
-	}
-	uint32_t result32;
-	bool success = kernel_call_7(&result32, func, a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
-	if (!success) {
-		assert(error_count() > 0);
+	IOExternalTrap trap = { (args[0] == 0 ? 1 : args[0]), func, 0 };
+	size_t size = sizeof(trap);
+	kernel_io_result ior = kernel_write_unsafe(hook.trap, &size, &trap, 0, NULL);
+	if (ior != KERNEL_IO_SUCCESS) {
+		error_internal("could not write trap to kernel memory");
 		return false;
 	}
+	uint32_t result32 = IOConnectTrap6(hook.connection, 0, args[1], args[2], args[3], args[4],
+			args[5], args[6]);
 	pack_uint(result, result32, result_size);
 	return true;
 }
 
 bool
+kernel_call(void *result, unsigned result_size, unsigned arg_count,
+		kaddr_t func, kword_t args[]) {
+	assert(result != NULL || func == 0);
+	assert(result_size > 0 && ispow2(result_size) && result_size <= sizeof(uint64_t));
+	assert(arg_count <= 8);
+	if (kernel_call_7(result, result_size, arg_count, 0, args)) {
+		return kernel_call_7(result, result_size, arg_count, func, args);
+	}
+#if __arm64__
+	else if (kernel_call_aarch64(result, result_size, arg_count, 0, args)) {
+		return kernel_call_aarch64(result, result_size, arg_count, func, args);
+	}
+#endif
+	error_functionality_unavailable("kernel_call: no kernel_call implementation can perform "
+	                                "the requested kernel function call");
+	return false;
+}
+
+bool
 kernel_call_init() {
-	if (kernel_call_7 != NULL) {
+	if (hook.hooked) {
 		return true;
 	}
-	bool success = create_user_client();
-	if (!success) {
+	if (!create_user_client()) {
 		error_internal("could not create a user client at a known address");
 		goto fail;
 	}
-	success = create_hooked_vtable();
-	if (!success) {
+	if (!create_hooked_vtable()) {
 		error_internal("could not create hooked vtable");
 		goto fail;
 	}
-	success = patch_user_client();
-	if (!success) {
+	if (!patch_user_client()) {
 		error_internal("could not patch the user client");
 		goto fail;
 	}
-	kernel_call_7 = kernel_call_7_impl;
-	kernel_call   = kernel_call_impl;
+#if __arm64__
+	if (!kernel_call_init_aarch64()) {
+		goto fail;
+	}
+#endif
 	return true;
 fail:
 	kernel_call_deinit();
@@ -514,8 +485,9 @@ fail:
 
 void
 kernel_call_deinit() {
-	kernel_call   = NULL;
-	kernel_call_7 = NULL;
+#if __arm64__
+	kernel_call_deinit_aarch64();
+#endif
 	if (hook.hooked) {
 		error_stop();
 		kernel_write_word(kernel_write_unsafe, hook.user_client, hook.vtable,
