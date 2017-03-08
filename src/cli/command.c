@@ -497,6 +497,7 @@ parse_range(struct state *s) {
 	if (str[0] == '-') {
 		goto fail2;
 	} else if (str[0] == 0) {
+		end = (char *)str;
 		s->argument->range.end = (kaddr_t)(-1);
 	} else {
 		s->argument->range.end = strtoumax(str, &end, 16);
@@ -506,6 +507,7 @@ parse_range(struct state *s) {
 	}
 	s->argument->type = ARG_RANGE;
 	s->arg = end;
+	return true;
 fail1:
 	ERROR_OPTION(s, "invalid address range: '%s'", s->arg);
 	return false;
@@ -654,6 +656,7 @@ reinit_state(struct state *s) {
 static bool
 parse_option(struct state *s) {
 	s->option = NULL;
+	bool try_argument = false;
 	if (advance(s)) {
 		if (s->arg == NULL) {
 			// We've processed all elements of argv. Nothing left to do.
@@ -663,6 +666,16 @@ parse_option(struct state *s) {
 			// We tried to read the next option, but it doesn't start with a dash, so
 			// it's not an option.
 			return true;
+		}
+		if (s->arg[1] == 0) {
+			// The next "option" is "-", that is, just a dash. This is not a valid
+			// option, so let the arguments handle it.
+			return true;
+		}
+		if ('0' <= s->arg[1] && s->arg[1] <= '9') {
+			// The next "option" looks like "-[0-9]", that is, a negative number. If we
+			// don't match any options, we'll let the arguments handle it instead.
+			try_argument = true;
 		}
 		s->arg++;
 	}
@@ -678,6 +691,11 @@ parse_option(struct state *s) {
 		}
 	}
 	if (s->option == NULL) {
+		if (try_argument) {
+			// We advanced once to pass the dash, so back it out.
+			s->arg--;
+			return true;
+		}
 		ERROR_COMMAND(s, "unrecognized option '%s'", s->arg);
 		return false;
 	}

