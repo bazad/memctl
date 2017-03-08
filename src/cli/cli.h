@@ -31,5 +31,6 @@ bool ks_command(kaddr_t address, bool unslide);
 bool a_command(const char *symbol, const char *kext);
 bool ap_command(kaddr_t address, bool unpermute);
 bool s_command(kaddr_t address);
+bool kcd_command(const char *kernelcache, const char *output);
 
 #endif

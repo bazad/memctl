@@ -10,6 +10,7 @@
 #include "kernel.h"
 #include "kernel_call.h"
 #include "kernel_slide.h"
+#include "kernelcache.h"
 #include "memctl_offsets.h"
 #include "platform.h"
 #include "vtable.h"
@@ -497,6 +498,54 @@ s_command(kaddr_t address) {
 	}
 	kext_deinit(&kext);
 	return !is_error;
+}
+
+bool
+kcd_command(const char *kernelcache_path, const char *output_path) {
+	int ofd;
+	struct kernelcache *kc;
+	struct kernelcache kc_local;
+	if (output_path == NULL) {
+		ofd = STDOUT_FILENO;
+	} else {
+		ofd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if (ofd < 0) {
+			error_internal("could not open output file '%s'", output_path);
+			return false;
+		}
+	}
+	if (kernelcache_path == NULL) {
+#if KERNELCACHE
+		kc = &kernelcache;
+#else
+		assert(false);
+#endif
+	} else {
+		kext_result kr = kernelcache_init_file(&kc_local, kernelcache_path);
+		if (kr != KEXT_SUCCESS) {
+			assert(kr == KEXT_ERROR);
+			return false;
+		}
+		kc = &kc_local;
+	}
+	uint8_t *p = kc->kernel.mh;
+	size_t left = kc->kernel.size;
+	while (left > 0) {
+		ssize_t written = write(ofd, p, left);
+		if (written <= 0) {
+			error_internal("could not write to output file");
+			break;
+		}
+		left -= written;
+		p += written;
+	}
+	if (kernelcache_path != NULL) {
+		kernelcache_deinit(&kc_local);
+	}
+	if (output_path != NULL) {
+		close(ofd);
+	}
+	return (left == 0);
 }
 
 int

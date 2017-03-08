@@ -249,6 +249,16 @@ static bool s_handler(const struct argument *arguments) {
 	return s_command(address);
 }
 
+static bool kcd_handler(const struct argument *arguments) {
+	const char *output = OPT_GET_STRING_OR(0, "o", "output", NULL);
+#if KERNELCACHE
+	const char *kernelcache = ARG_GET_STRING_OR(1, "file", NULL);
+#else
+	const char *kernelcache = ARG_GET_STRING(1, "file");
+#endif
+	return kcd_command(kernelcache, output);
+}
+
 static struct command commands[] = {
 	{
 		"r", NULL, r_handler,
@@ -411,6 +421,17 @@ static struct command commands[] = {
 		"symbol for address",
 		1, (struct argspec *) &(struct argspec[1]) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "address to resolve" },
+		},
+	}, {
+		"kcd", NULL, kcd_handler,
+		"kernelcache decompress",
+		2, (struct argspec *) &(struct argspec[2]) {
+			{ "o",      "output", ARG_STRING, "output file"      },
+#if KERNELCACHE
+			{ OPTIONAL, "file",   ARG_STRING, "kernelcache file" },
+#else
+			{ ARGUMENT, "file",   ARG_STRING, "kernelcache file" },
+#endif
 		},
 	}
 };
