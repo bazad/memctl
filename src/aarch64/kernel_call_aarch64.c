@@ -580,7 +580,7 @@ static void jop_2(uint64_t, const uint64_t[8], void *, struct initial_state *, u
  */
 const struct strategy strategies[] = {
 	{ { 0x0000000003ffffff }, 0x400, jop_1 },
-	{ { 0x00000001ff5fbfff }, 0x400, jop_2 },
+	{ { 0x00000001fe5f3fef }, 0x400, jop_2 },
 };
 
 /*
