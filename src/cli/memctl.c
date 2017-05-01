@@ -503,6 +503,9 @@ s_command(kaddr_t address) {
 
 bool
 kcd_command(const char *kernelcache_path, const char *output_path) {
+	if (!initialize(KERNEL_IMAGE)) {
+		return false;
+	}
 	int ofd;
 	struct kernelcache *kc;
 	struct kernelcache kc_local;
