@@ -211,26 +211,23 @@ exec_one(struct sim *sim) {
 	uint64_t pc = sim->pc;
 	// Process the instruction, updating the state.
 	int state = 0;
-	struct aarch64_ins_adr_adrp adrp;
-	struct aarch64_ins_adr_adrp adr;
+	struct aarch64_ins_adr adr;
 	struct aarch64_ins_add_im add_im;
 	struct aarch64_ins_movknz movz;
 	struct aarch64_ins_and_orr_im orr_im;
 	struct aarch64_ins_and_sr orr_sr;
-	struct aarch64_ins_b_bl bl;
+	struct aarch64_ins_b b;
 	struct aarch64_ins_ldr_str_ui ldr_ui;
 	struct aarch64_ins_ldr_str_ui str_ui;
 	struct aarch64_ins_ldp_stp ldp;
 	struct aarch64_ins_ldp_stp stp;
 	struct aarch64_ins_ret ret;
-	if (aarch64_ins_decode_adrp(ins, pc, &adrp)) {
-		setreg(sim, adrp.Xd, adrp.label, VALUE);
-	} else if (aarch64_ins_decode_adr(ins, pc, &adr)) {
+	if (aarch64_decode_adr(ins, pc, &adr)) {
 		setreg(sim, adr.Xd, adr.label, VALUE);
 	} else if (aarch64_decode_add_im(ins, &add_im)) {
 		uint64_t value = getreg(sim, add_im.Rn, &state);
 		uint64_t imm = (uint64_t)add_im.imm << add_im.shift;
-		if (add_im.op == AARCH64_ADD_IM_OP_ADD) {
+		if (add_im.op == AARCH64_INS_ADD_IM_OP_ADD) {
 			value += imm;
 		} else {
 			value -= imm;
@@ -246,8 +243,8 @@ exec_one(struct sim *sim) {
 		uint64_t value = getreg(sim, orr_sr.Rn, &state);
 		value |= shiftreg(sim, orr_sr.Rm, orr_sr.shift, orr_sr.amount, &state);
 		setreg(sim, orr_sr.Rd, value, state);
-	} else if (aarch64_ins_decode_bl(ins, pc, &bl)) {
-		sim->bl = bl.label;
+	} else if (aarch64_decode_b(ins, pc, &b) && b.link) {
+		sim->bl = b.label;
 	} else if (aarch64_ins_decode_ldr_ui(ins, &ldr_ui)) {
 		setreg(sim, ldr_ui.Rt, 0, UNKNOWN);
 	} else if (aarch64_ins_decode_ldp_post(ins, &ldp)

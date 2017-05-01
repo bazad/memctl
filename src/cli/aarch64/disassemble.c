@@ -457,10 +457,10 @@ mov:
 
 static bool
 disassemble1(uint32_t ins, uint64_t pc, char buf[64]) {
-	struct aarch64_ins_adr_adrp adr;
-	struct aarch64_ins_b_bl     b;
-	struct aarch64_ins_br       br;
-	struct aarch64_ins_ret      ret;
+	struct aarch64_ins_adr adr;
+	struct aarch64_ins_b   b;
+	struct aarch64_ins_br  br;
+	struct aarch64_ins_ret ret;
 
 	int idx = sprintf(buf, "%llx  ", pc);
 	if (idx <= 0) {
@@ -474,14 +474,11 @@ disassemble1(uint32_t ins, uint64_t pc, char buf[64]) {
 	} else if (disassemble_logic(ins, buf)) {
 	} else if (disassemble_memory(ins, pc, buf)) {
 	} else if (disassemble_movknz(ins, buf)) {
-	} else if (aarch64_ins_decode_adr(ins, pc, &adr)) {
-		W("%-7s %s, #0x%llx", "ADR", reg(adr.Xd), adr.label);
-	} else if (aarch64_ins_decode_adrp(ins, pc, &adr)) {
-		W("%-7s %s, #0x%llx", "ADRP", reg(adr.Xd), adr.label);
-	} else if (aarch64_ins_decode_b(ins, pc, &b)) {
-		W("%-7s #0x%llx", "B", b.label);
-	} else if (aarch64_ins_decode_bl(ins, pc, &b)) {
-		W("%-7s #0x%llx", "BL", b.label);
+	} else if (aarch64_decode_adr(ins, pc, &adr)) {
+		char *name = (adr.op == AARCH64_INS_ADR_OP_ADR ? "ADR" : "ADRP");
+		W("%-7s %s, #0x%llx", name, reg(adr.Xd), adr.label);
+	} else if (aarch64_decode_b(ins, pc, &b)) {
+		W("%-7s #0x%llx", (b.link ? "BL" : "B"), b.label);
 	} else if (aarch64_decode_br(ins, &br)) {
 		W("%-7s %s", (br.link ? "BLR" : "BR"), reg(br.Xn));
 	} else if (aarch64_ins_decode_nop(ins)) {

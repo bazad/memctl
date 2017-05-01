@@ -349,30 +349,38 @@ aarch64_decode_and_sr(uint32_t ins, struct aarch64_ins_and_sr *and_sr) {
 	return true;
 }
 
-static bool
-decode_adr_adrp(uint32_t ins, uint64_t pc, struct aarch64_ins_adr_adrp *adr_adrp) {
+bool
+aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr) {
 	//  31  30   29 28       24 23                                    5 4         0
 	// +---+-------+-----------+---------------------------------------+-----------+
 	// | 0 | immlo | 1 0 0 0 0 |                 immhi                 |    Rd     | ADR
 	// | 1 | immlo | 1 0 0 0 0 |                 immhi                 |    Rd     | ADRP
 	// +---+-------+-----------+---------------------------------------+-----------+
 	//  op
+	if (!AARCH64_INS_TYPE(ins, ADR)) {
+		return false;
+	}
 	unsigned shift  = 12 * test(ins, 31);
 	int64_t imm     = extract(ins, 1, 23, 5, shift + 2) | extract(ins, 0, 30, 29, shift);
-	adr_adrp->Xd    = get_reg(ins, 1, USE_ZR, 0);
-	adr_adrp->label = (pc & ~ones(shift)) + imm;
+	adr->op    = test(ins, 31);
+	adr->Xd    = get_reg(ins, 1, USE_ZR, 0);
+	adr->label = (pc & ~ones(shift)) + imm;
 	return true;
 }
 
-static bool
-decode_b_bl(uint32_t ins, uint64_t pc, struct aarch64_ins_b_bl *b_bl) {
+bool
+aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b) {
 	//  31  30       26 25                                                  0
 	// +---+-----------+-----------------------------------------------------+
 	// | 0 | 0 0 1 0 1 |                        imm26                        | B
 	// | 1 | 0 0 1 0 1 |                        imm26                        | BL
 	// +---+-----------+-----------------------------------------------------+
 	//  op
-	b_bl->label = pc + extract(ins, 1, 25, 0, 2);
+	if (!AARCH64_INS_TYPE(ins, B)) {
+		return false;
+	}
+	b->link  = test(ins, 31);
+	b->label = pc + extract(ins, 1, 25, 0, 2);
 	return true;
 }
 
@@ -491,22 +499,6 @@ decode_ldr_str_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_str_r) {
 // Disassembly
 
 bool
-aarch64_ins_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr_adrp *adr) {
-	if (!AARCH64_INS_TYPE(ins, ADR_INS)) {
-		return false;
-	}
-	return decode_adr_adrp(ins, pc, adr);
-}
-
-bool
-aarch64_ins_decode_adrp(uint32_t ins, uint64_t pc, struct aarch64_ins_adr_adrp *adrp) {
-	if (!AARCH64_INS_TYPE(ins, ADRP_INS)) {
-		return false;
-	}
-	return decode_adr_adrp(ins, pc, adrp);
-}
-
-bool
 aarch64_ins_decode_and_im(uint32_t ins, struct aarch64_ins_and_orr_im *and_im) {
 	if (!AARCH64_INS_TYPE(ins, AND_IM_INS)) {
 		return false;
@@ -523,22 +515,6 @@ aarch64_ins_decode_ands_im(uint32_t ins, struct aarch64_ins_and_orr_im *ands_im)
 }
 
 bool
-aarch64_ins_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b_bl *b) {
-	if (!AARCH64_INS_TYPE(ins, B_INS)) {
-		return false;
-	}
-	return decode_b_bl(ins, pc, b);
-}
-
-bool
-aarch64_ins_decode_bl(uint32_t ins, uint64_t pc, struct aarch64_ins_b_bl *bl) {
-	if (!AARCH64_INS_TYPE(ins, BL_INS)) {
-		return false;
-	}
-	return decode_b_bl(ins, pc, bl);
-}
-
-bool
 aarch64_alias_cmn_xr(struct aarch64_ins_add_xr *adds_xr) {
 	// CMN extended register : ADDS extended register
 	// Preferred when Rd == '11111'
@@ -551,7 +527,7 @@ bool
 aarch64_alias_cmn_im(struct aarch64_ins_add_im *adds_im) {
 	// CMN immediate : ADDS immediate
 	// Preferred when Rd == '11111'
-	return (adds_im->op == AARCH64_ADD_IM_OP_ADD
+	return (adds_im->op == AARCH64_INS_ADD_IM_OP_ADD
 	        && adds_im->setflags
 	        && reg_is_zrsp(adds_im->Rd));
 }
@@ -576,7 +552,7 @@ bool
 aarch64_alias_cmp_im(struct aarch64_ins_add_im *subs_im) {
 	// CMP immediate : SUBS immediate
 	// Preferred when Rd == '11111'
-	return (subs_im->op == AARCH64_ADD_IM_OP_SUB
+	return (subs_im->op == AARCH64_INS_ADD_IM_OP_SUB
 	        && subs_im->setflags
 	        && reg_is_zrsp(subs_im->Rd));
 }
@@ -664,7 +640,7 @@ bool
 aarch64_alias_mov_sp(struct aarch64_ins_add_im *add_im) {
 	// MOV to/from SP : ADD immediate
 	// Preferred when shift == '00' && imm12 == '00' && (Rd == '11111' || Rn == '11111')
-	return (add_im->op == AARCH64_ADD_IM_OP_ADD
+	return (add_im->op == AARCH64_INS_ADD_IM_OP_ADD
 	        && !add_im->setflags
 	        && (reg_is_zrsp(add_im->Rd) || reg_is_zrsp(add_im->Rn))
 	        && add_im->imm == 0

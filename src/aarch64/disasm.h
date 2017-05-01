@@ -333,8 +333,8 @@ bool aarch64_alias_cmp_xr(struct aarch64_ins_add_xr *subs_xr);
 
 struct aarch64_ins_add_im {
 	enum {
-		AARCH64_ADD_IM_OP_ADD = 0,
-		AARCH64_ADD_IM_OP_SUB = 1,
+		AARCH64_INS_ADD_IM_OP_ADD = 0,
+		AARCH64_INS_ADD_IM_OP_SUB = 1,
 	}           op;
 	bool        setflags;
 	aarch64_reg Rd;
@@ -395,8 +395,8 @@ bool aarch64_alias_mov_sp(struct aarch64_ins_add_im *add_im);
 
 struct aarch64_ins_add_sr {
 	enum {
-		AARCH64_ADD_SR_OP_ADD = 0,
-		AARCH64_ADD_SR_OP_SUB = 1,
+		AARCH64_INS_ADD_SR_OP_ADD = 0,
+		AARCH64_INS_ADD_SR_OP_SUB = 1,
 	}             op;
 	bool          setflags;
 	aarch64_reg   Rd;
@@ -461,18 +461,27 @@ bool aarch64_alias_negs(struct aarch64_ins_add_sr *subs_sr);
 #define AARCH64_SUBS_SR_INS_BITS 0x6b000000
 
 
+// ---- ADR, ADRP ----
+
+#define AARCH64_ADR_MASK 0x1f000000
+#define AARCH64_ADR_BITS 0x10000000
+
+struct aarch64_ins_adr {
+	enum {
+		AARCH64_INS_ADR_OP_ADR  = 0,
+		AARCH64_INS_ADR_OP_ADRP = 1,
+	}           op;
+	aarch64_reg Xd;
+	uint64_t    label;
+};
+
+bool aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr);
+
 // ADR
 //   ADR <Xd>, <label>
 
 #define AARCH64_ADR_INS_MASK 0x9f000000
 #define AARCH64_ADR_INS_BITS 0x10000000
-
-struct aarch64_ins_adr_adrp {
-	aarch64_reg Xd;
-	uint64_t    label;
-};
-
-bool aarch64_ins_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr_adrp *adr);
 
 // ADRP
 //   ADRP <Xd>, <label>
@@ -480,7 +489,6 @@ bool aarch64_ins_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr_ad
 #define AARCH64_ADRP_INS_MASK 0x9f000000
 #define AARCH64_ADRP_INS_BITS 0x90000000
 
-bool aarch64_ins_decode_adrp(uint32_t ins, uint64_t pc, struct aarch64_ins_adr_adrp *adrp);
 
 // AND immediate
 //   AND <Wd|WSP>, <Wn>, #<imm>
@@ -567,17 +575,29 @@ bool aarch64_ins_decode_ands_im(uint32_t ins, struct aarch64_ins_and_orr_im *and
 
 // B.cond
 
+// ---- B, BL ----
+
+#define AARCH64_B_MASK 0x7c000000
+#define AARCH64_B_BITS 0x14000000
+
+struct aarch64_ins_b {
+	bool     link;
+	uint64_t label;
+};
+
+bool aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b);
+
 // B
 //   B <label>
 
 #define AARCH64_B_INS_MASK 0xfc000000
 #define AARCH64_B_INS_BITS 0x14000000
 
-struct aarch64_ins_b_bl {
-	uint64_t label;
-};
+// BL
+//   BL <label>
 
-bool aarch64_ins_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b_bl *b);
+#define AARCH64_BL_INS_MASK 0xfc000000
+#define AARCH64_BL_INS_BITS 0x94000000
 
 // BFI : BFM
 
@@ -588,14 +608,6 @@ bool aarch64_ins_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b_bl *b)
 // BIC shifted register
 
 // BICS shifted register
-
-// BL
-//   BL <label>
-
-#define AARCH64_BL_INS_MASK 0xfc000000
-#define AARCH64_BL_INS_BITS 0x94000000
-
-bool aarch64_ins_decode_bl(uint32_t ins, uint64_t pc, struct aarch64_ins_b_bl *bl);
 
 
 // ---- BLR, BR ----
