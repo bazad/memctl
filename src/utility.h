@@ -7,7 +7,8 @@
 /*
  * MACRO howmany_up
  *
- * Description:	Computes how many elements of size `b` fit in a block of size `a`, rounding up.
+ * Description:
+ * 	Compute how many elements of size `b` fit in a block of size `a`, rounding up.
  *
  * Parameters:	a			The total size
  * 		b			The size of each element
@@ -20,8 +21,9 @@
 /*
  * MACRO howmany2_up
  *
- * Description:	Computes how many elements of size `b` fit in a block of size `a`, rounding up.
- * `b` must be a power of 2.
+ * Description:
+ * 	Compute how many elements of size `b` fit in a block of size `a`, rounding up. `b` must be
+ * 	a power of 2.
  *
  * Parameters:	a			The total size
  * 		b			The size of each element, which must be a power of 2
@@ -33,7 +35,8 @@
 /*
  * MACRO round2_down
  *
- * Description:	Rounds `a` down to the nearest multiple of `b`, which must be a power of 2.
+ * Description:
+ * 	Round `a` down to the nearest multiple of `b`, which must be a power of 2.
  *
  * Parameters:	a			The value to round
  * 		b			The rounding granularity
@@ -43,7 +46,8 @@
 /*
  * MACRO round2_up
  *
- * Description:	Rounds `a` up to the nearest multiple of `b`, which must be a power of 2.
+ * Description:
+ * 	Round `a` up to the nearest multiple of `b`, which must be a power of 2.
  *
  * Parameters:	a			The value to round
  * 		b			The rounding granularity
@@ -55,7 +59,8 @@
 /*
  * MACRO min
  *
- * Description:	Return the minimum of the two arguments.
+ * Description:
+ * 	Return the minimum of the two arguments.
  */
 #define min(a, b)						\
 	({ __typeof__(a) a0 = (a);				\
@@ -65,7 +70,8 @@
 /*
  * MACRO max
  *
- * Description:	Return the maximum of the two arguments.
+ * Description:
+ * 	Return the maximum of the two arguments.
  */
 #define max(a, b)						\
 	({ __typeof__(a) a0 = (a);				\
@@ -75,11 +81,32 @@
 /*
  * MACRO ispow2
  *
- * Description:	Returns whether the argument is a power of 2 or 0.
+ * Description:
+ * 	Returns whether the argument is a power of 2 or 0.
  */
 #define ispow2(x)						\
 	({ __typeof__(x) x0 = (x);				\
 	   ((x0 & (x0 - 1)) == 0); })
+
+/*
+ * MACRO testbit
+ *
+ * Description:
+ * 	Returns true if bit n is set in x.
+ */
+#define testbit(x, n)		(((x) & (1ULL << (n))) != 0)
+
+/*
+ * MACRO popcount
+ *
+ * Description:
+ * 	Returns the popcount (number of 1 bits in the binary representation) of x.
+ */
+#ifdef __GNUC__
+#define popcount(x)	__builtin_popcount(x)
+#else
+#error popcount not implemented
+#endif
 
 /*
  * lsl

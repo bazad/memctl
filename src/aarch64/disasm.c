@@ -172,8 +172,8 @@ decode_bit_masks(unsigned sf, uint8_t N, uint8_t imms, uint8_t immr, uint8_t imm
 
 // Generalized decoders
 
-static bool
-decode_adc_sbc(uint32_t ins, struct aarch64_adc_sbc *adc_sbc) {
+bool
+aarch64_decode_adc(uint32_t ins, struct aarch64_ins_adc *adc) {
 	//  31   30  29  28             21 20       16 15         10 9         5 4         0
 	// +----+---+---+-----------------+-----------+-------------+-----------+-----------+
 	// | sf | 0 | 0 | 1 1 0 1 0 0 0 0 |    Rm     | 0 0 0 0 0 0 |    Rn     |    Rd     | ADC
@@ -182,15 +182,20 @@ decode_adc_sbc(uint32_t ins, struct aarch64_adc_sbc *adc_sbc) {
 	// | sf | 1 | 1 | 1 1 0 1 0 0 0 0 |    Rm     | 0 0 0 0 0 0 |    Rn     |    Rd     | SBCS
 	// +----+---+---+-----------------+-----------+-------------+-----------+-----------+
 	//       op   S
-	unsigned sf = test(ins, 31);
-	adc_sbc->Rd = get_reg(ins, sf, USE_ZR, 0);
-	adc_sbc->Rn = get_reg(ins, sf, USE_ZR, 5);
-	adc_sbc->Rm = get_reg(ins, sf, USE_ZR, 16);
+	if (!AARCH64_INS_TYPE(ins, ADC)) {
+		return false;
+	}
+	unsigned sf   = test(ins, 31);
+	adc->op       = test(ins, 30);
+	adc->setflags = test(ins, 29);
+	adc->Rd       = get_reg(ins, sf, USE_ZR, 0);
+	adc->Rn       = get_reg(ins, sf, USE_ZR, 5);
+	adc->Rm       = get_reg(ins, sf, USE_ZR, 16);
 	return true;
 }
 
-static bool
-decode_add_sub_xr(uint32_t ins, struct aarch64_add_sub_xr *add_sub_xr) {
+bool
+aarch64_decode_add_xr(uint32_t ins, struct aarch64_ins_add_xr *add_xr) {
 	//  31   30  29  28       24 23 22 21  20       16 15    13 12   10 9         5 4         0
 	// +----+---+---+-----------+-----+---+-----------+--------+-------+-----------+-----------+
 	// | sf | 0 | 0 | 0 1 0 1 1 | 0 0 | 1 |    Rm     | option | imm3  |    Rn     |    Rd     | ADD extended register
@@ -199,6 +204,9 @@ decode_add_sub_xr(uint32_t ins, struct aarch64_add_sub_xr *add_sub_xr) {
 	// | sf | 1 | 1 | 0 1 0 1 1 | 0 0 | 1 |    Rm     | option | imm3  |    Rn     |    Rd     | SUBS extended register
 	// +----+---+---+-----------+-----+---+-----------+--------+-------+-----------+-----------+
 	//       op   S
+	if (!AARCH64_INS_TYPE(ins, ADD_XR)) {
+		return false;
+	}
 	unsigned shift = extract(ins, 0, 12, 10, 0);
 	if (shift > 4) {
 		return false;
@@ -212,16 +220,18 @@ decode_add_sub_xr(uint32_t ins, struct aarch64_add_sub_xr *add_sub_xr) {
 	if (((!S && reg_is_zrsp(Rd)) || reg_is_zrsp(Rn)) && extend == (AARCH64_EXTEND_UXTW + sf)) {
 		extend |= AARCH64_EXTEND_LSL;
 	}
-	add_sub_xr->Rd     = Rd;
-	add_sub_xr->Rn     = Rn;
-	add_sub_xr->Rm     = get_reg(ins, Xm, USE_ZR, 16);
-	add_sub_xr->extend = extend;
-	add_sub_xr->amount = shift;
+	add_xr->op       = test(ins, 30);
+	add_xr->setflags = S;
+	add_xr->Rd       = Rd;
+	add_xr->Rn       = Rn;
+	add_xr->Rm       = get_reg(ins, Xm, USE_ZR, 16);
+	add_xr->extend   = extend;
+	add_xr->amount   = shift;
 	return true;
 }
 
-static bool
-decode_add_sub_im(uint32_t ins, struct aarch64_add_sub_im *add_sub_im) {
+bool
+aarch64_decode_add_im(uint32_t ins, struct aarch64_ins_add_im *add_im) {
 	//  31   30  29  28       24 23   22 21                     10 9         5 4         0
 	// +----+---+---+-----------+-------+-------------------------+-----------+-----------+
 	// | sf | 0 | 0 | 1 0 0 0 1 | shift |          imm12          |    Rn     |    Rd     | ADD immediate
@@ -230,6 +240,9 @@ decode_add_sub_im(uint32_t ins, struct aarch64_add_sub_im *add_sub_im) {
 	// | sf | 1 | 1 | 1 0 0 0 1 | shift |          imm12          |    Rn     |    Rd     | SUBS immediate
 	// +----+---+---+-----------+-------+-------------------------+-----------+-----------+
 	//       op   S
+	if (!AARCH64_INS_TYPE(ins, ADD_IM)) {
+		return false;
+	}
 	unsigned sf    = test(ins, 31);
 	unsigned S     = test(ins, 29);
 	unsigned shift = extract(ins, 0, 23, 22, 0);
@@ -237,15 +250,17 @@ decode_add_sub_im(uint32_t ins, struct aarch64_add_sub_im *add_sub_im) {
 	if (test(shift, 1)) {
 		return false;
 	}
-	add_sub_im->Rd    = get_reg(ins, sf, (S ? USE_ZR : USE_SP), 0);
-	add_sub_im->Rn    = get_reg(ins, sf, USE_SP, 5);
-	add_sub_im->imm   = imm;
-	add_sub_im->shift = 12 * shift;
+	add_im->op       = test(ins, 30);
+	add_im->setflags = test(ins, 29);
+	add_im->Rd       = get_reg(ins, sf, (S ? USE_ZR : USE_SP), 0);
+	add_im->Rn       = get_reg(ins, sf, USE_SP, 5);
+	add_im->imm      = imm;
+	add_im->shift    = 12 * shift;
 	return true;
 }
 
 static bool
-decode_and_orr_im(uint32_t ins, struct aarch64_and_orr_im *and_orr_im) {
+decode_and_orr_im(uint32_t ins, struct aarch64_ins_and_orr_im *and_orr_im) {
 	//  31   30 29 28         23 22  21         16 15         10 9         5 4         0
 	// +----+-----+-------------+---+-------------+-------------+-----------+-----------+
 	// | sf | 0 0 | 1 0 0 1 0 0 | N |    immr     |    imms     |    Rn     |    Rd     | AND immediate
@@ -271,8 +286,8 @@ decode_and_orr_im(uint32_t ins, struct aarch64_and_orr_im *and_orr_im) {
 	return true;
 }
 
-static bool
-decode_add_sub_sr(uint32_t ins, struct aarch64_add_sub_sr *add_sub_sr) {
+bool
+aarch64_decode_add_sr(uint32_t ins, struct aarch64_ins_add_sr *add_sr) {
 	//  31   30  29  28       24 23   22 21  20       16 15         10 9         5 4         0
 	// +----+---+---+-----------+-------+---+-----------+-------------+-----------+-----------+
 	// | sf | 0 | 0 | 0 1 0 1 1 | shift | 0 |    Rm     |    imm6     |    Rn     |    Rd     | ADD shifted register
@@ -281,6 +296,9 @@ decode_add_sub_sr(uint32_t ins, struct aarch64_add_sub_sr *add_sub_sr) {
 	// | sf | 1 | 1 | 0 1 0 1 1 | shift | 0 |    Rm     |    imm6     |    Rn     |    Rd     | SUBS shifted register
 	// +----+---+---+-----------+-------+---+-----------+-------------+-----------+-----------+
 	//       op   S
+	if (!AARCH64_INS_TYPE(ins, ADD_SR)) {
+		return false;
+	}
 	unsigned sf         = test(ins, 31);
 	aarch64_shift shift = get_shift(ins, 22);
 	unsigned amount     = extract(ins, 0, 15, 10, 0);
@@ -290,16 +308,18 @@ decode_add_sub_sr(uint32_t ins, struct aarch64_add_sub_sr *add_sub_sr) {
 	if (sf == 0 && test(amount, 5)) {
 		return false;
 	}
-	add_sub_sr->Rd     = get_reg(ins, sf, USE_ZR, 0);
-	add_sub_sr->Rn     = get_reg(ins, sf, USE_ZR, 5);
-	add_sub_sr->Rm     = get_reg(ins, sf, USE_ZR, 16);
-	add_sub_sr->shift  = shift;
-	add_sub_sr->amount = amount;
+	add_sr->op       = test(ins, 30);
+	add_sr->setflags = test(ins, 29);
+	add_sr->Rd       = get_reg(ins, sf, USE_ZR, 0);
+	add_sr->Rn       = get_reg(ins, sf, USE_ZR, 5);
+	add_sr->Rm       = get_reg(ins, sf, USE_ZR, 16);
+	add_sr->shift    = shift;
+	add_sr->amount   = amount;
 	return true;
 }
 
-static bool
-decode_and_orr_sr(uint32_t ins, struct aarch64_and_orr_sr *and_orr_sr) {
+bool
+aarch64_decode_and_sr(uint32_t ins, struct aarch64_ins_and_sr *and_sr) {
 	//  31   30 29 28       24 23   22 21  20       16 15         10 9         5 4         0
 	// +----+-----+-----------+-------+---+-----------+-------------+-----------+-----------+
 	// | sf | 0 0 | 0 1 0 1 0 | shift | 0 |    Rm     |    imm6     |    Rn     |    Rd     | AND shifted register
@@ -307,21 +327,30 @@ decode_and_orr_sr(uint32_t ins, struct aarch64_and_orr_sr *and_orr_sr) {
 	// | sf | 0 1 | 0 1 0 1 0 | shift | 0 |    Rm     |    imm6     |    Rn     |    Rd     | ORR shifted register
 	// +----+-----+-----------+-------+---+-----------+-------------+-----------+-----------+
 	//        opc                       N
+	if (!AARCH64_INS_TYPE(ins, AND_SR)) {
+		return false;
+	}
+	uint8_t opc = extract(ins, 0, 30, 29, 0);
+	if (opc == 2) {
+		return false;
+	}
 	unsigned sf     = test(ins, 31);
 	unsigned amount = extract(ins, 0, 15, 10, 0);
 	if (sf == 0 && test(amount, 5)) {
 		return false;
 	}
-	and_orr_sr->Rd     = get_reg(ins, sf, USE_ZR, 0);
-	and_orr_sr->Rn     = get_reg(ins, sf, USE_ZR, 5);
-	and_orr_sr->Rm     = get_reg(ins, sf, USE_ZR, 16);
-	and_orr_sr->shift  = get_shift(ins, 22);
-	and_orr_sr->amount = amount;
+	and_sr->op       = (opc == 1 ? AARCH64_AND_SR_OP_ORR : AARCH64_AND_SR_OP_AND);
+	and_sr->setflags = (opc == 3);
+	and_sr->Rd       = get_reg(ins, sf, USE_ZR, 0);
+	and_sr->Rn       = get_reg(ins, sf, USE_ZR, 5);
+	and_sr->Rm       = get_reg(ins, sf, USE_ZR, 16);
+	and_sr->shift    = get_shift(ins, 22);
+	and_sr->amount   = amount;
 	return true;
 }
 
 static bool
-decode_adr_adrp(uint32_t ins, uint64_t pc, struct aarch64_adr_adrp *adr_adrp) {
+decode_adr_adrp(uint32_t ins, uint64_t pc, struct aarch64_ins_adr_adrp *adr_adrp) {
 	//  31  30   29 28       24 23                                    5 4         0
 	// +---+-------+-----------+---------------------------------------+-----------+
 	// | 0 | immlo | 1 0 0 0 0 |                 immhi                 |    Rd     | ADR
@@ -336,7 +365,7 @@ decode_adr_adrp(uint32_t ins, uint64_t pc, struct aarch64_adr_adrp *adr_adrp) {
 }
 
 static bool
-decode_b_bl(uint32_t ins, uint64_t pc, struct aarch64_b_bl *b_bl) {
+decode_b_bl(uint32_t ins, uint64_t pc, struct aarch64_ins_b_bl *b_bl) {
 	//  31  30       26 25                                                  0
 	// +---+-----------+-----------------------------------------------------+
 	// | 0 | 0 0 1 0 1 |                        imm26                        | B
@@ -347,20 +376,24 @@ decode_b_bl(uint32_t ins, uint64_t pc, struct aarch64_b_bl *b_bl) {
 	return true;
 }
 
-static bool
-decode_br_blr(uint32_t ins, struct aarch64_br_blr *br_blr) {
+bool
+aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br) {
 	//  31           25 24 23 22 21 20       16 15         10 9         5 4         0
 	// +---------------+-----+-----+-----------+-------------+-----------+-----------+
 	// | 1 1 0 1 0 1 1 | 0 0 | 0 1 | 1 1 1 1 1 | 0 0 0 0 0 0 |    Rn     | 0 0 0 0 0 | BLR
 	// | 1 1 0 1 0 1 1 | 0 0 | 0 0 | 1 1 1 1 1 | 0 0 0 0 0 0 |    Rn     | 0 0 0 0 0 | BR
 	// +---------------+-----+-----+-----------+-------------+-----------+-----------+
 	//                         op
-	br_blr->Xn = get_reg(ins, 1, USE_ZR, 5);
+	if (!AARCH64_INS_TYPE(ins, BR)) {
+		return false;
+	}
+	br->Xn   = get_reg(ins, 1, USE_ZR, 5);
+	br->link = test(ins, 21);
 	return true;
 }
 
 static bool
-decode_ldp_stp(uint32_t ins, struct aarch64_ldp_stp *ldp_stp) {
+decode_ldp_stp(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_stp) {
 	//  31 30 29   27 26  25   23 22  21           15 14       10 9         5 4         0
 	// +-----+-------+---+-------+---+---------------+-----------+-----------+-----------+
 	// | x 0 | 1 0 1 | 0 | 0 0 1 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDP, post-index
@@ -380,7 +413,7 @@ decode_ldp_stp(uint32_t ins, struct aarch64_ldp_stp *ldp_stp) {
 }
 
 static bool
-decode_movknz(uint32_t ins, struct aarch64_movknz *movknz) {
+decode_movknz(uint32_t ins, struct aarch64_ins_movknz *movknz) {
 	//  31   30 29 28         23 22 21 20                              5 4         0
 	// +----+-----+-------------+-----+---------------------------------+-----------+
 	// | sf | 1 1 | 1 0 0 1 0 1 | hw  |              imm16              |    Rd     | MOVK
@@ -400,7 +433,7 @@ decode_movknz(uint32_t ins, struct aarch64_movknz *movknz) {
 }
 
 static bool
-decode_ldr_str_ix(uint32_t ins, struct aarch64_ldr_str_ix *ldr_str_ix) {
+decode_ldr_str_ix(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_str_ix) {
 	//  31 30 29   27 26  25 24 23 22 21  20               12 11 10 9         5 4         0
 	// +-----+-------+---+-----+-----+---+-------------------+-----+-----------+-----------+
 	// | 1 x | 1 1 1 | 0 | 0 0 | 0 1 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | LDR immediate, post-index
@@ -417,7 +450,7 @@ decode_ldr_str_ix(uint32_t ins, struct aarch64_ldr_str_ix *ldr_str_ix) {
 }
 
 static bool
-decode_ldr_str_ui(uint32_t ins, struct aarch64_ldr_str_ui *ldr_str_ui) {
+decode_ldr_str_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *ldr_str_ui) {
 	//  31 30 29   27 26  25 24 23 22 21                     10 9         5 4         0
 	// +-----+-------+---+-----+-----+-------------------------+-----------+-----------+
 	// | 1 x | 1 1 1 | 0 | 0 1 | 0 1 |          imm12          |    Rn     |    Rt     | LDR unsigned offset
@@ -432,7 +465,7 @@ decode_ldr_str_ui(uint32_t ins, struct aarch64_ldr_str_ui *ldr_str_ui) {
 }
 
 static bool
-decode_ldr_str_r(uint32_t ins, struct aarch64_ldr_str_r *ldr_str_r) {
+decode_ldr_str_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_str_r) {
 	//  31 30 29   27 26  25 24 23 22 21  20       16 15    13 12  11 10 9         5 4         0
 	// +-----+-------+---+-----+-----+---+-----------+--------+---+-----+-----------+-----------+
 	// | 1 x | 1 1 1 | 0 | 0 0 | 0 1 | 1 |    Rm     | option | S | 1 0 |    Rn     |    Rt     | LDR register
@@ -458,246 +491,159 @@ decode_ldr_str_r(uint32_t ins, struct aarch64_ldr_str_r *ldr_str_r) {
 // Disassembly
 
 bool
-aarch64_decode_adc(uint32_t ins, struct aarch64_adc_sbc *adc) {
-	if (!AARCH64_INS_TYPE(ins, ADC)) {
-		return false;
-	}
-	return decode_adc_sbc(ins, adc);
-}
-
-bool
-aarch64_decode_adcs(uint32_t ins, struct aarch64_adc_sbc *adcs) {
-	if (!AARCH64_INS_TYPE(ins, ADCS)) {
-		return false;
-	}
-	return decode_adc_sbc(ins, adcs);
-}
-
-bool
-aarch64_decode_add_xr(uint32_t ins, struct aarch64_add_sub_xr *add_xr){
-	if (!AARCH64_INS_TYPE(ins, ADD_XR)) {
-		return false;
-	}
-	return decode_add_sub_xr(ins, add_xr);
-}
-
-bool
-aarch64_decode_add_im(uint32_t ins, struct aarch64_add_sub_im *add_im) {
-	if (!AARCH64_INS_TYPE(ins, ADD_IM)) {
-		return false;
-	}
-	return decode_add_sub_im(ins, add_im);
-}
-
-bool aarch64_decode_add_sr(uint32_t ins, struct aarch64_add_sub_sr *add_sr) {
-	if (!AARCH64_INS_TYPE(ins, ADD_SR)) {
-		return false;
-	}
-	return decode_add_sub_sr(ins, add_sr);
-}
-
-bool
-aarch64_decode_adds_xr(uint32_t ins, struct aarch64_add_sub_xr *adds_xr) {
-	if (!AARCH64_INS_TYPE(ins, ADDS_XR)) {
-		return false;
-	}
-	return decode_add_sub_xr(ins, adds_xr);
-}
-
-bool
-aarch64_decode_adds_im(uint32_t ins, struct aarch64_add_sub_im *adds_im) {
-	if (!AARCH64_INS_TYPE(ins, ADDS_IM)) {
-		return false;
-	}
-	return decode_add_sub_im(ins, adds_im);
-}
-
-bool
-aarch64_decode_adds_sr(uint32_t ins, struct aarch64_add_sub_sr *adds_sr) {
-	if (!AARCH64_INS_TYPE(ins, ADDS_SR)) {
-		return false;
-	}
-	return decode_add_sub_sr(ins, adds_sr);
-}
-
-bool
-aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_adr_adrp *adr) {
-	if (!AARCH64_INS_TYPE(ins, ADR)) {
+aarch64_ins_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr_adrp *adr) {
+	if (!AARCH64_INS_TYPE(ins, ADR_INS)) {
 		return false;
 	}
 	return decode_adr_adrp(ins, pc, adr);
 }
 
 bool
-aarch64_decode_adrp(uint32_t ins, uint64_t pc, struct aarch64_adr_adrp *adrp) {
-	if (!AARCH64_INS_TYPE(ins, ADRP)) {
+aarch64_ins_decode_adrp(uint32_t ins, uint64_t pc, struct aarch64_ins_adr_adrp *adrp) {
+	if (!AARCH64_INS_TYPE(ins, ADRP_INS)) {
 		return false;
 	}
 	return decode_adr_adrp(ins, pc, adrp);
 }
 
 bool
-aarch64_decode_and_im(uint32_t ins, struct aarch64_and_orr_im *and_im) {
-	if (!AARCH64_INS_TYPE(ins, AND_IM)) {
+aarch64_ins_decode_and_im(uint32_t ins, struct aarch64_ins_and_orr_im *and_im) {
+	if (!AARCH64_INS_TYPE(ins, AND_IM_INS)) {
 		return false;
 	}
 	return decode_and_orr_im(ins, and_im);
 }
 
 bool
-aarch64_decode_and_sr(uint32_t ins, struct aarch64_and_orr_sr *and_sr) {
-	if (!AARCH64_INS_TYPE(ins, AND_SR)) {
-		return false;
-	}
-	return decode_and_orr_sr(ins, and_sr);
-}
-
-bool
-aarch64_decode_ands_im(uint32_t ins, struct aarch64_and_orr_im *ands_im) {
-	if (!AARCH64_INS_TYPE(ins, ANDS_IM)) {
+aarch64_ins_decode_ands_im(uint32_t ins, struct aarch64_ins_and_orr_im *ands_im) {
+	if (!AARCH64_INS_TYPE(ins, ANDS_IM_INS)) {
 		return false;
 	}
 	return decode_and_orr_im(ins, ands_im);
 }
 
 bool
-aarch64_decode_ands_sr(uint32_t ins, struct aarch64_and_orr_sr *ands_sr) {
-	if (!AARCH64_INS_TYPE(ins, ANDS_SR)) {
-		return false;
-	}
-	return decode_and_orr_sr(ins, ands_sr);
-}
-
-bool
-aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_b_bl *b) {
-	if (!AARCH64_INS_TYPE(ins, B)) {
+aarch64_ins_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b_bl *b) {
+	if (!AARCH64_INS_TYPE(ins, B_INS)) {
 		return false;
 	}
 	return decode_b_bl(ins, pc, b);
 }
 
 bool
-aarch64_decode_bl(uint32_t ins, uint64_t pc, struct aarch64_b_bl *bl) {
-	if (!AARCH64_INS_TYPE(ins, BL)) {
+aarch64_ins_decode_bl(uint32_t ins, uint64_t pc, struct aarch64_ins_b_bl *bl) {
+	if (!AARCH64_INS_TYPE(ins, BL_INS)) {
 		return false;
 	}
 	return decode_b_bl(ins, pc, bl);
 }
 
 bool
-aarch64_decode_blr(uint32_t ins, struct aarch64_br_blr *blr) {
-	if (!AARCH64_INS_TYPE(ins, BLR)) {
-		return false;
-	}
-	return decode_br_blr(ins, blr);
-}
-
-bool
-aarch64_decode_br(uint32_t ins, struct aarch64_br_blr *br) {
-	if (!AARCH64_INS_TYPE(ins, BR)) {
-		return false;
-	}
-	return decode_br_blr(ins, br);
-}
-
-bool
-aarch64_alias_cmn_xr(struct aarch64_add_sub_xr *adds_xr) {
+aarch64_alias_cmn_xr(struct aarch64_ins_add_xr *adds_xr) {
 	// CMN extended register : ADDS extended register
 	// Preferred when Rd == '11111'
-	return reg_is_zrsp(adds_xr->Rd);
+	return (adds_xr->op == AARCH64_INS_ADD_XR_OP_ADD
+	        && adds_xr->setflags
+	        && reg_is_zrsp(adds_xr->Rd));
 }
 
 bool
-aarch64_alias_cmn_im(struct aarch64_add_sub_im *adds_im) {
+aarch64_alias_cmn_im(struct aarch64_ins_add_im *adds_im) {
 	// CMN immediate : ADDS immediate
 	// Preferred when Rd == '11111'
-	return reg_is_zrsp(adds_im->Rd);
+	return (adds_im->op == AARCH64_ADD_IM_OP_ADD
+	        && adds_im->setflags
+	        && reg_is_zrsp(adds_im->Rd));
 }
 
 bool
-aarch64_alias_cmn_sr(struct aarch64_add_sub_sr *adds_sr) {
+aarch64_alias_cmn_sr(struct aarch64_ins_add_sr *adds_sr) {
 	// CMN shifted register : ADDS shifted register
 	// Preferred when Rd == '11111'
 	return reg_is_zrsp(adds_sr->Rd);
 }
 
 bool
-aarch64_alias_cmp_xr(struct aarch64_add_sub_xr *subs_xr) {
+aarch64_alias_cmp_xr(struct aarch64_ins_add_xr *subs_xr) {
 	// CMP extended register : SUBS extended register
 	// Preferred when Rd == '11111'
-	return reg_is_zrsp(subs_xr->Rd);
+	return (subs_xr->op == AARCH64_INS_ADD_XR_OP_SUB
+	        && subs_xr->setflags
+	        && reg_is_zrsp(subs_xr->Rd));
 }
 
 bool
-aarch64_alias_cmp_im(struct aarch64_add_sub_im *subs_im) {
+aarch64_alias_cmp_im(struct aarch64_ins_add_im *subs_im) {
 	// CMP immediate : SUBS immediate
 	// Preferred when Rd == '11111'
-	return reg_is_zrsp(subs_im->Rd);
+	return (subs_im->op == AARCH64_ADD_IM_OP_SUB
+	        && subs_im->setflags
+	        && reg_is_zrsp(subs_im->Rd));
 }
 
 bool
-aarch64_alias_cmp_sr(struct aarch64_add_sub_sr *subs_sr) {
+aarch64_alias_cmp_sr(struct aarch64_ins_add_sr *subs_sr) {
 	// CMP shifted register : SUBS shifted register
 	// Preferred when Rd == '11111'
 	return reg_is_zrsp(subs_sr->Rd);
 }
 
 bool
-aarch64_decode_ldp_post(uint32_t ins, struct aarch64_ldp_stp *ldp_post) {
-	if (!AARCH64_INS_TYPE(ins, LDP_POST)) {
+aarch64_ins_decode_ldp_post(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_post) {
+	if (!AARCH64_INS_TYPE(ins, LDP_POST_INS)) {
 		return false;
 	}
 	return decode_ldp_stp(ins, ldp_post);
 }
 
 bool
-aarch64_decode_ldp_pre(uint32_t ins, struct aarch64_ldp_stp *ldp_pre) {
-	if (!AARCH64_INS_TYPE(ins, LDP_PRE)) {
+aarch64_ins_decode_ldp_pre(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_pre) {
+	if (!AARCH64_INS_TYPE(ins, LDP_PRE_INS)) {
 		return false;
 	}
 	return decode_ldp_stp(ins, ldp_pre);
 }
 
 bool
-aarch64_decode_ldp_si(uint32_t ins, struct aarch64_ldp_stp *ldp_si) {
-	if (!AARCH64_INS_TYPE(ins, LDP_SI)) {
+aarch64_ins_decode_ldp_si(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_si) {
+	if (!AARCH64_INS_TYPE(ins, LDP_SI_INS)) {
 		return false;
 	}
 	return decode_ldp_stp(ins, ldp_si);
 }
 
 bool
-aarch64_decode_ldr_post(uint32_t ins, struct aarch64_ldr_str_ix *ldr_post) {
-	if (!AARCH64_INS_TYPE(ins, LDR_POST)) {
+aarch64_ins_decode_ldr_post(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_post) {
+	if (!AARCH64_INS_TYPE(ins, LDR_POST_INS)) {
 		return false;
 	}
 	return decode_ldr_str_ix(ins, ldr_post);
 }
 
 bool
-aarch64_decode_ldr_pre(uint32_t ins, struct aarch64_ldr_str_ix *ldr_pre) {
-	if (!AARCH64_INS_TYPE(ins, LDR_PRE)) {
+aarch64_ins_decode_ldr_pre(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_pre) {
+	if (!AARCH64_INS_TYPE(ins, LDR_PRE_INS)) {
 		return false;
 	}
 	return decode_ldr_str_ix(ins, ldr_pre);
 }
 
 bool
-aarch64_decode_ldr_ui(uint32_t ins, struct aarch64_ldr_str_ui *ldr_ui) {
-	if (!AARCH64_INS_TYPE(ins, LDR_UI)) {
+aarch64_ins_decode_ldr_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *ldr_ui) {
+	if (!AARCH64_INS_TYPE(ins, LDR_UI_INS)) {
 		return false;
 	}
 	return decode_ldr_str_ui(ins, ldr_ui);
 }
 
 bool
-aarch64_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ldr_lit *ldr_lit) {
+aarch64_ins_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ins_ldr_lit *ldr_lit) {
 	//  31 30 29   27 26  25 24 23                                    5 4         0
 	// +-----+-------+---+-----+---------------------------------------+-----------+
 	// | 0 x | 0 1 1 | 0 | 0 0 |                 imm19                 |    Rt     |
 	// +-----+-------+---+-----+---------------------------------------+-----------+
 	//   opc
-	if (!AARCH64_INS_TYPE(ins, LDR_LIT)) {
+	if (!AARCH64_INS_TYPE(ins, LDR_LIT_INS)) {
 		return false;
 	}
 	unsigned sf    = test(ins, 30);
@@ -707,24 +653,26 @@ aarch64_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ldr_lit *ldr_li
 }
 
 bool
-aarch64_decode_ldr_r(uint32_t ins, struct aarch64_ldr_str_r *ldr_r) {
-	if (!AARCH64_INS_TYPE(ins, LDR_R)) {
+aarch64_ins_decode_ldr_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_r) {
+	if (!AARCH64_INS_TYPE(ins, LDR_R_INS)) {
 		return false;
 	}
 	return decode_ldr_str_r(ins, ldr_r);
 }
 
 bool
-aarch64_alias_mov_sp(struct aarch64_add_sub_im *add_im) {
+aarch64_alias_mov_sp(struct aarch64_ins_add_im *add_im) {
 	// MOV to/from SP : ADD immediate
 	// Preferred when shift == '00' && imm12 == '00' && (Rd == '11111' || Rn == '11111')
-	return ((reg_is_zrsp(add_im->Rd) || reg_is_zrsp(add_im->Rn))
+	return (add_im->op == AARCH64_ADD_IM_OP_ADD
+	        && !add_im->setflags
+	        && (reg_is_zrsp(add_im->Rd) || reg_is_zrsp(add_im->Rn))
 	        && add_im->imm == 0
 	        && add_im->shift == 0);
 }
 
 bool
-aarch64_alias_mov_nwi(struct aarch64_movknz *movn) {
+aarch64_alias_mov_nwi(struct aarch64_ins_movknz *movn) {
 	// MOV inverted wide immediate : MOVN
 	// Preferred when:
 	//   32: !(IsZero(imm16) && hw != '00')
@@ -734,14 +682,14 @@ aarch64_alias_mov_nwi(struct aarch64_movknz *movn) {
 }
 
 bool
-aarch64_alias_mov_wi(struct aarch64_movknz *movz) {
+aarch64_alias_mov_wi(struct aarch64_ins_movknz *movz) {
 	// MOV wide immediate : MOVZ
 	// Preferred when !(IsZero(imm16) && hw != '00')
 	return (movz->imm != 0 || movz->shift == 0);
 }
 
 bool
-aarch64_alias_mov_bi(struct aarch64_and_orr_im *orr_im) {
+aarch64_alias_mov_bi(struct aarch64_ins_and_orr_im *orr_im) {
 	// MOV bitmask immediate : ORR immediate
 	// Preferred when Rn == '11111' && !MoveWidePreferred(sf, N, imms, immr)
 	// TODO: Use MoveWidePreferred. It should be possible to use the conditions there to
@@ -750,95 +698,92 @@ aarch64_alias_mov_bi(struct aarch64_and_orr_im *orr_im) {
 }
 
 bool
-aarch64_alias_mov_r(struct aarch64_and_orr_sr *orr_sr) {
+aarch64_alias_mov_r(struct aarch64_ins_and_sr *orr_sr) {
 	// MOV register : ORR shifted register
 	// Preferred when shift == '00' && imm6 == '000000' && Rn == '11111'
-	return (reg_is_zrsp(orr_sr->Rn)
+	return (orr_sr->op == AARCH64_AND_SR_OP_ORR
+	        && reg_is_zrsp(orr_sr->Rn)
 	        && orr_sr->amount == 0
 	        && orr_sr->shift == AARCH64_SHIFT_LSL);
 }
 
 bool
-aarch64_decode_movk(uint32_t ins, struct aarch64_movknz *movk) {
-	if (!AARCH64_INS_TYPE(ins, MOVK)) {
+aarch64_ins_decode_movk(uint32_t ins, struct aarch64_ins_movknz *movk) {
+	if (!AARCH64_INS_TYPE(ins, MOVK_INS)) {
 		return false;
 	}
 	return decode_movknz(ins, movk);
 }
 
 bool
-aarch64_decode_movn(uint32_t ins, struct aarch64_movknz *movn) {
-	if (!AARCH64_INS_TYPE(ins, MOVN)) {
+aarch64_ins_decode_movn(uint32_t ins, struct aarch64_ins_movknz *movn) {
+	if (!AARCH64_INS_TYPE(ins, MOVN_INS)) {
 		return false;
 	}
 	return decode_movknz(ins, movn);
 }
 
 bool
-aarch64_decode_movz(uint32_t ins, struct aarch64_movknz *movz) {
-	if (!AARCH64_INS_TYPE(ins, MOVZ)) {
+aarch64_ins_decode_movz(uint32_t ins, struct aarch64_ins_movknz *movz) {
+	if (!AARCH64_INS_TYPE(ins, MOVZ_INS)) {
 		return false;
 	}
 	return decode_movknz(ins, movz);
 }
 
 bool
-aarch64_alias_neg(struct aarch64_add_sub_sr *sub_sr) {
+aarch64_alias_neg(struct aarch64_ins_add_sr *sub_sr) {
 	// NEG shifted register : SUB shifted register
 	// Preferred when Rn == '11111'
 	return reg_is_zrsp(sub_sr->Rn);
 }
 
 bool
-aarch64_alias_negs(struct aarch64_add_sub_sr *subs_sr) {
+aarch64_alias_negs(struct aarch64_ins_add_sr *subs_sr) {
 	// NEGS shifted register : SUBS shifted register
 	// Preferred when Rn == '11111'
 	return reg_is_zrsp(subs_sr->Rn);
 }
 
 bool
-aarch64_alias_ngc(struct aarch64_adc_sbc *sbc) {
+aarch64_alias_ngc(struct aarch64_ins_adc *sbc) {
 	// NGC : SBC
 	// Preferred when Rn == '11111'
-	return reg_is_zrsp(sbc->Rn);
+	return (sbc->op == AARCH64_INS_ADC_OP_SBC
+	        && !sbc->setflags
+	        && reg_is_zrsp(sbc->Rn));
 }
 
 bool
-aarch64_alias_ngcs(struct aarch64_adc_sbc *sbcs) {
+aarch64_alias_ngcs(struct aarch64_ins_adc *sbcs) {
 	// NGCS : SBCS
 	// Preferred when Rn == '11111'
-	return reg_is_zrsp(sbcs->Rn);
+	return (sbcs->op == AARCH64_INS_ADC_OP_SBC
+	        && sbcs->setflags
+	        && reg_is_zrsp(sbcs->Rn));
 }
 
 bool
-aarch64_decode_nop(uint32_t ins) {
-	return AARCH64_INS_TYPE(ins, NOP);
+aarch64_ins_decode_nop(uint32_t ins) {
+	return AARCH64_INS_TYPE(ins, NOP_INS);
 }
 
 bool
-aarch64_decode_orr_im(uint32_t ins, struct aarch64_and_orr_im *orr_im) {
-	if (!AARCH64_INS_TYPE(ins, ORR_IM)) {
+aarch64_ins_decode_orr_im(uint32_t ins, struct aarch64_ins_and_orr_im *orr_im) {
+	if (!AARCH64_INS_TYPE(ins, ORR_IM_INS)) {
 		return false;
 	}
 	return decode_and_orr_im(ins, orr_im);
 }
 
 bool
-aarch64_decode_orr_sr(uint32_t ins, struct aarch64_and_orr_sr *orr_sr) {
-	if (!AARCH64_INS_TYPE(ins, ORR_SR)) {
-		return false;
-	}
-	return decode_and_orr_sr(ins, orr_sr);
-}
-
-bool
-aarch64_decode_ret(uint32_t ins, struct aarch64_ret *ret) {
+aarch64_ins_decode_ret(uint32_t ins, struct aarch64_ins_ret *ret) {
 	//  31           25 24 23 22 21 20       16 15         10 9         5 4         0
 	// +---------------+-----+-----+-----------+-------------+-----------+-----------+
 	// | 1 1 0 1 0 1 1 | 0 0 | 1 0 | 1 1 1 1 1 | 0 0 0 0 0 0 |    Rn     | 0 0 0 0 0 |
 	// +---------------+-----+-----+-----------+-------------+-----------+-----------+
 	//                         op
-	if (!AARCH64_INS_TYPE(ins, RET)) {
+	if (!AARCH64_INS_TYPE(ins, RET_INS)) {
 		return false;
 	}
 	ret->Xn = get_reg(ins, 1, USE_ZR, 5);
@@ -846,135 +791,73 @@ aarch64_decode_ret(uint32_t ins, struct aarch64_ret *ret) {
 }
 
 bool
-aarch64_decode_sbc(uint32_t ins, struct aarch64_adc_sbc *sbc) {
-	if (!AARCH64_INS_TYPE(ins, SBC)) {
-		return false;
-	}
-	return decode_adc_sbc(ins, sbc);
-}
-
-bool
-aarch64_decode_sbcs(uint32_t ins, struct aarch64_adc_sbc *sbcs) {
-	if (!AARCH64_INS_TYPE(ins, SBCS)) {
-		return false;
-	}
-	return decode_adc_sbc(ins, sbcs);
-}
-
-bool
-aarch64_decode_stp_post(uint32_t ins, struct aarch64_ldp_stp *stp_post) {
-	if (!AARCH64_INS_TYPE(ins, STP_POST)) {
+aarch64_ins_decode_stp_post(uint32_t ins, struct aarch64_ins_ldp_stp *stp_post) {
+	if (!AARCH64_INS_TYPE(ins, STP_POST_INS)) {
 		return false;
 	}
 	return decode_ldp_stp(ins, stp_post);
 }
 
 bool
-aarch64_decode_stp_pre(uint32_t ins, struct aarch64_ldp_stp *stp_pre) {
-	if (!AARCH64_INS_TYPE(ins, STP_PRE)) {
+aarch64_ins_decode_stp_pre(uint32_t ins, struct aarch64_ins_ldp_stp *stp_pre) {
+	if (!AARCH64_INS_TYPE(ins, STP_PRE_INS)) {
 		return false;
 	}
 	return decode_ldp_stp(ins, stp_pre);
 }
 
 bool
-aarch64_decode_stp_si(uint32_t ins, struct aarch64_ldp_stp *stp_si) {
-	if (!AARCH64_INS_TYPE(ins, STP_SI)) {
+aarch64_ins_decode_stp_si(uint32_t ins, struct aarch64_ins_ldp_stp *stp_si) {
+	if (!AARCH64_INS_TYPE(ins, STP_SI_INS)) {
 		return false;
 	}
 	return decode_ldp_stp(ins, stp_si);
 }
 
 bool
-aarch64_decode_str_post(uint32_t ins, struct aarch64_ldr_str_ix *str_post) {
-	if (!AARCH64_INS_TYPE(ins, STR_POST)) {
+aarch64_ins_decode_str_post(uint32_t ins, struct aarch64_ins_ldr_str_ix *str_post) {
+	if (!AARCH64_INS_TYPE(ins, STR_POST_INS)) {
 		return false;
 	}
 	return decode_ldr_str_ix(ins, str_post);
 }
 
 bool
-aarch64_decode_str_pre(uint32_t ins, struct aarch64_ldr_str_ix *str_pre) {
-	if (!AARCH64_INS_TYPE(ins, STR_PRE)) {
+aarch64_ins_decode_str_pre(uint32_t ins, struct aarch64_ins_ldr_str_ix *str_pre) {
+	if (!AARCH64_INS_TYPE(ins, STR_PRE_INS)) {
 		return false;
 	}
 	return decode_ldr_str_ix(ins, str_pre);
 }
 
 bool
-aarch64_decode_str_ui(uint32_t ins, struct aarch64_ldr_str_ui *str_ui) {
-	if (!AARCH64_INS_TYPE(ins, STR_UI)) {
+aarch64_ins_decode_str_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *str_ui) {
+	if (!AARCH64_INS_TYPE(ins, STR_UI_INS)) {
 		return false;
 	}
 	return decode_ldr_str_ui(ins, str_ui);
 }
 
 bool
-aarch64_decode_str_r(uint32_t ins, struct aarch64_ldr_str_r *str_r) {
-	if (!AARCH64_INS_TYPE(ins, STR_R)) {
+aarch64_ins_decode_str_r(uint32_t ins, struct aarch64_ins_ldr_str_r *str_r) {
+	if (!AARCH64_INS_TYPE(ins, STR_R_INS)) {
 		return false;
 	}
 	return decode_ldr_str_r(ins, str_r);
 }
 
 bool
-aarch64_decode_sub_xr(uint32_t ins, struct aarch64_add_sub_xr *sub_xr) {
-	if (!AARCH64_INS_TYPE(ins, SUB_XR)) {
-		return false;
-	}
-	return decode_add_sub_xr(ins, sub_xr);
-}
-
-bool
-aarch64_decode_sub_im(uint32_t ins, struct aarch64_add_sub_im *sub_im) {
-	if (!AARCH64_INS_TYPE(ins, SUB_IM)) {
-		return false;
-	}
-	return decode_add_sub_im(ins, sub_im);
-}
-
-bool
-aarch64_decode_sub_sr(uint32_t ins, struct aarch64_add_sub_sr *sub_sr) {
-	if (!AARCH64_INS_TYPE(ins, SUB_SR)) {
-		return false;
-	}
-	return decode_add_sub_sr(ins, sub_sr);
-}
-
-bool
-aarch64_decode_subs_xr(uint32_t ins, struct aarch64_add_sub_xr *subs_xr) {
-	if (!AARCH64_INS_TYPE(ins, SUBS_XR)) {
-		return false;
-	}
-	return decode_add_sub_xr(ins, subs_xr);
-}
-
-bool
-aarch64_decode_subs_im(uint32_t ins, struct aarch64_add_sub_im *subs_im) {
-	if (!AARCH64_INS_TYPE(ins, SUBS_IM)) {
-		return false;
-	}
-	return decode_add_sub_im(ins, subs_im);
-}
-
-bool
-aarch64_decode_subs_sr(uint32_t ins, struct aarch64_add_sub_sr *subs_sr) {
-	if (!AARCH64_INS_TYPE(ins, SUBS_SR)) {
-		return false;
-	}
-	return decode_add_sub_sr(ins, subs_sr);
-}
-
-bool
-aarch64_alias_tst_im(struct aarch64_and_orr_im *ands_im) {
+aarch64_alias_tst_im(struct aarch64_ins_and_orr_im *ands_im) {
 	// TST immediate : ANDS immediate
 	// Preferred when Rd == '11111'
 	return reg_is_zrsp(ands_im->Rd);
 }
 
 bool
-aarch64_alias_tst_sr(struct aarch64_and_orr_sr *ands_sr) {
+aarch64_alias_tst_sr(struct aarch64_ins_and_sr *ands_sr) {
 	// TST shifted register : ANDS shifted register
 	// Preferred when Rd == '11111'
-	return reg_is_zrsp(ands_sr->Rd);
+	return (ands_sr->op == AARCH64_AND_SR_OP_AND
+	        && ands_sr->setflags
+	        && reg_is_zrsp(ands_sr->Rd));
 }

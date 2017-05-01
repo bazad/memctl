@@ -126,195 +126,188 @@ extend(aarch64_extend e) {
 
 static bool
 disassemble_arith(uint32_t ins, char *buf) {
-	struct aarch64_adc_sbc    asc;
-	struct aarch64_add_sub_xr xr;
-	struct aarch64_add_sub_im im;
-	struct aarch64_add_sub_sr sr;
+	struct aarch64_ins_adc    adc;
+	struct aarch64_ins_add_xr xr;
+	struct aarch64_ins_add_im im;
+	struct aarch64_ins_add_sr sr;
 	const char *name;
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
-	if (aarch64_decode_adc(ins, &asc)) {
-		name = "ADC";
-		goto asc;
-	} else if (aarch64_decode_adcs(ins, &asc)) {
-		name = "ADCS";
-		goto asc;
+	if (aarch64_decode_adc(ins, &adc)) {
+		if (AARCH64_INS_TYPE(ins, ADC_INS)) {
+			name = "ADC";
+		} else if (AARCH64_INS_TYPE(ins, ADCS_INS)) {
+			name = "ADCS";
+		} else if (AARCH64_INS_TYPE(ins, SBC_INS)) {
+			if (aarch64_alias_ngc(&adc)) {
+				name = "NGC";
+				goto ngc;
+			}
+			name = "SBC";
+		} else { // AARCH64_INS_TYPE(ins, SBCS_INS)
+			if (aarch64_alias_ngcs(&adc)) {
+				name = "NGCS";
+				goto ngc;
+			}
+			name = "SBCS";
+		}
+		W("%-7s %s, %s, %s", name, reg(adc.Rd), reg(adc.Rn), reg(adc.Rm));
+		return true;
+ngc:
+		W("%-7s %s, %s", name, reg(adc.Rd), reg(adc.Rm));
+		return true;
 	} else if (aarch64_decode_add_xr(ins, &xr)) {
-		name = "ADD";
-		goto xr;
+		if (AARCH64_INS_TYPE(ins, ADD_XR_INS)) {
+			name = "ADD";
+		} else if (AARCH64_INS_TYPE(ins, ADDS_XR_INS)) {
+			if (aarch64_alias_cmn_xr(&xr)) {
+				name = "CMN";
+				goto c_xr;
+			}
+			name = "ADDS";
+		} else if (AARCH64_INS_TYPE(ins, SUB_XR_INS)) {
+			name = "SUB";
+		} else { // AARCH64_INS_TYPE(ins, SUBS_XR_INS)
+			if (aarch64_alias_cmp_xr(&xr)) {
+				name = "CMP";
+				goto c_xr;
+			}
+			name = "SUBS";
+		}
+		W("%-7s %s, %s, %s", name, reg(xr.Rd), reg(xr.Rn), reg(xr.Rm));
+xr_suffix:
+		if (xr.amount > 0 || !AARCH64_EXTEND_IS_LSL(xr.extend)) {
+			W(", %s", extend(xr.extend));
+		}
+		if (xr.amount > 0) {
+			W(" #%u", xr.amount);
+		}
+		return true;
+c_xr:
+		W("%-7s %s, %s", name, reg(xr.Rn), reg(xr.Rm));
+		goto xr_suffix;
 	} else if (aarch64_decode_add_im(ins, &im)) {
-		if (aarch64_alias_mov_sp(&im)) {
-			W("%-7s %s, %s", "MOV", reg(im.Rd), reg(im.Rn));
-			return true;
+		if (AARCH64_INS_TYPE(ins, ADD_IM_INS)) {
+			if (aarch64_alias_mov_sp(&im)) {
+				W("%-7s %s, %s", "MOV", reg(im.Rd), reg(im.Rn));
+				return true;
+			}
+			name = "ADD";
+		} else if (AARCH64_INS_TYPE(ins, ADDS_IM_INS)) {
+			if (aarch64_alias_cmn_im(&im)) {
+				name = "CMN";
+				goto c_im;
+			}
+			name = "ADDS";
+		} else if (AARCH64_INS_TYPE(ins, SUB_IM_INS)) {
+			name = "SUB";
+		} else { // AARCH64_INS_TYPE(ins, SUBS_IM_INS)
+			if (aarch64_alias_cmp_im(&im)) {
+				name = "CMP";
+				goto c_im;
+			}
+			name = "SUBS";
 		}
-		name = "ADD";
-		goto im;
+		W("%-7s %s, %s, #0x%x", name, reg(im.Rd), reg(im.Rn), im.imm);
+im_suffix:
+		if (im.shift > 0) {
+			W(", %s #%u", shift(AARCH64_SHIFT_LSL), im.shift);
+		}
+		return true;
+c_im:
+		W("%-7s %s, #0x%x", name, reg(im.Rn), im.imm);
+		goto im_suffix;
 	} else if (aarch64_decode_add_sr(ins, &sr)) {
-		name = "ADD";
-		goto sr;
-	} else if (aarch64_decode_adds_xr(ins, &xr)) {
-		if (aarch64_alias_cmn_xr(&xr)) {
-			name = "CMN";
-			goto c_xr;
+		if (AARCH64_INS_TYPE(ins, ADD_SR_INS)) {
+			name = "ADD";
+		} else if (AARCH64_INS_TYPE(ins, ADDS_SR_INS)) {
+			if (aarch64_alias_cmn_sr(&sr)) {
+				name = "CMN";
+				goto c_sr;
+			}
+			name = "ADDS";
+		} else if (AARCH64_INS_TYPE(ins, SUB_SR_INS)) {
+			if (aarch64_alias_neg(&sr)) {
+				name = "NEG";
+				goto neg;
+			}
+			name = "SUB";
+		} else { // AARCH64_INS_TYPE(ins, SUBS_SR_INS)
+			if (aarch64_alias_cmp_sr(&sr)) {
+				name = "CMP";
+				goto c_sr;
+			} else if (aarch64_alias_negs(&sr)) {
+				name = "NEGS";
+				goto neg;
+			}
+			name = "SUBS";
 		}
-		name = "ADDS";
-		goto xr;
-	} else if (aarch64_decode_adds_im(ins, &im)) {
-		if (aarch64_alias_cmn_im(&im)) {
-			name = "CMN";
-			goto c_im;
+		W("%-7s %s, %s, %s", name, reg(sr.Rd), reg(sr.Rn), reg(sr.Rm));
+sr_suffix:
+		if (sr.amount > 0) {
+			W(", %s #%u", shift(sr.shift), sr.amount);
 		}
-		name = "ADDS";
-		goto im;
-	} else if (aarch64_decode_adds_sr(ins, &sr)) {
-		if (aarch64_alias_cmn_sr(&sr)) {
-			name = "CMN";
-			goto c_sr;
+		return true;
+c_sr:
+		W("%-7s %s, %s", name, reg(sr.Rn), reg(sr.Rm));
+		goto sr_suffix;
+neg:
+		W("%-7s %s, %s", name, reg(sr.Rd), reg(sr.Rm));
+		if (sr.amount > 0) {
+			W(", %s #%u", shift(sr.shift), sr.amount);
 		}
-		name = "ADDS";
-		goto sr;
-	} else if (aarch64_decode_sbc(ins, &asc)) {
-		if (aarch64_alias_ngc(&asc)) {
-			name = "NGC";
-			goto ngc;
-		}
-		name = "SBC";
-		goto asc;
-	} else if (aarch64_decode_sbcs(ins, &asc)) {
-		if (aarch64_alias_ngcs(&asc)) {
-			name = "NGCS";
-			goto ngc;
-		}
-		name = "SBCS";
-		goto asc;
-	} else if (aarch64_decode_sub_xr(ins, &xr)) {
-		name = "SUB";
-		goto xr;
-	} else if (aarch64_decode_sub_im(ins, &im)) {
-		name = "SUB";
-		goto im;
-	} else if (aarch64_decode_sub_sr(ins, &sr)) {
-		if (aarch64_alias_neg(&sr)) {
-			name = "NEG";
-			goto neg;
-		}
-		name = "SUB";
-		goto sr;
-	} else if (aarch64_decode_subs_xr(ins, &xr)) {
-		if (aarch64_alias_cmp_xr(&xr)) {
-			name = "CMP";
-			goto c_xr;
-		}
-		name = "SUBS";
-		goto xr;
-	} else if (aarch64_decode_subs_im(ins, &im)) {
-		if (aarch64_alias_cmp_im(&im)) {
-			name = "CMP";
-			goto c_im;
-		}
-		name = "SUBS";
-		goto im;
-	} else if (aarch64_decode_subs_sr(ins, &sr)) {
-		if (aarch64_alias_cmp_sr(&sr)) {
-			name = "CMP";
-			goto c_sr;
-		} else if (aarch64_alias_negs(&sr)) {
-			name = "NEGS";
-			goto neg;
-		}
-		name = "SUBS";
-		goto sr;
+		return true;
 	}
 	return false;
-ngc:
-	W("%-7s %s, %s", name, reg(asc.Rd), reg(asc.Rm));
-	return true;
-asc:
-	W("%-7s %s, %s, %s", name, reg(asc.Rd), reg(asc.Rn), reg(asc.Rm));
-	return true;
-c_xr:
-	W("%-7s %s, %s", name, reg(xr.Rn), reg(xr.Rm));
-	goto xr_suffix;
-xr:
-	W("%-7s %s, %s, %s", name, reg(xr.Rd), reg(xr.Rn), reg(xr.Rm));
-xr_suffix:
-	if (xr.amount > 0 || !AARCH64_EXTEND_IS_LSL(xr.extend)) {
-		W(", %s", extend(xr.extend));
-	}
-	if (xr.amount > 0) {
-		W(" #%u", xr.amount);
-	}
-	return true;
-c_im:
-	W("%-7s %s, #0x%x", name, reg(im.Rn), im.imm);
-	goto im_suffix;
-im:
-	W("%-7s %s, %s, #0x%x", name, reg(im.Rd), reg(im.Rn), im.imm);
-im_suffix:
-	if (im.shift > 0) {
-		W(", %s #%u", shift(AARCH64_SHIFT_LSL), im.shift);
-	}
-	return true;
-c_sr:
-	W("%-7s %s, %s", name, reg(sr.Rn), reg(sr.Rm));
-	goto sr_suffix;
-sr:
-	W("%-7s %s, %s, %s", name, reg(sr.Rd), reg(sr.Rn), reg(sr.Rm));
-sr_suffix:
-	if (sr.amount > 0) {
-		W(", %s #%u", shift(sr.shift), sr.amount);
-	}
-	return true;
-neg:
-	W("%-7s %s, %s", name, reg(sr.Rd), reg(sr.Rm));
-	if (sr.amount > 0) {
-		W(", %s #%u", shift(sr.shift), sr.amount);
-	}
-	return true;
 #undef W
 }
 
 static bool
 disassemble_logic(uint32_t ins, char *buf) {
-	struct aarch64_and_orr_im im;
-	struct aarch64_and_orr_sr sr;
+	struct aarch64_ins_and_orr_im im;
+	struct aarch64_ins_and_sr     sr;
 	const char *name;
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
-	if (aarch64_decode_and_im(ins, &im)) {
+	if (aarch64_ins_decode_and_im(ins, &im)) {
 		name = "AND";
 		goto im;
 	} else if (aarch64_decode_and_sr(ins, &sr)) {
-		name = "AND";
-		goto sr;
-	} else if (aarch64_decode_ands_im(ins, &im)) {
+		if (AARCH64_INS_TYPE(ins, ORR_SR_INS)) {
+			if (aarch64_alias_mov_r(&sr)) {
+				W("%-7s %s, %s", "MOV", reg(sr.Rd), reg(sr.Rm));
+				return true;
+			}
+			name = "ORR";
+		} else if (AARCH64_INS_TYPE(ins, ANDS_SR_INS)) {
+			if (aarch64_alias_tst_im(&im)) {
+				W("%-7s %s, %s", "TST", reg(sr.Rn), reg(sr.Rm));
+				goto sr_suffix;
+			}
+			name = "ANDS";
+		} else { // AARCH64_INS_TYPE(ins, AND_SR_INS)
+			name = "AND";
+		}
+		W("%-7s %s, %s, %s", name, reg(sr.Rd), reg(sr.Rn), reg(sr.Rm));
+sr_suffix:
+		if (sr.amount > 0) {
+			W(", %s #%d", shift(sr.shift), sr.amount);
+		}
+		return true;
+	} else if (aarch64_ins_decode_ands_im(ins, &im)) {
 		if (aarch64_alias_tst_im(&im)) {
 			name = "TST";
 			goto c_im;
 		}
 		name = "ANDS";
 		goto im;
-	} else if (aarch64_decode_ands_sr(ins, &sr)) {
-		if (aarch64_alias_tst_im(&im)) {
-			name = "TST";
-			goto c_sr;
-		}
-		name = "ANDS";
-		goto sr;
-	} else if (aarch64_decode_orr_im(ins, &im)) {
+	} else if (aarch64_ins_decode_orr_im(ins, &im)) {
 		if (aarch64_alias_mov_bi(&im)) {
 			W("%-7s %s, %llx", "MOV", reg(im.Rd), im.imm);
 			return true;
 		}
 		name = "ORR";
 		goto im;
-	} else if (aarch64_decode_orr_sr(ins, &sr)) {
-		if (aarch64_alias_mov_r(&sr)) {
-			W("%-7s %s, %s", "MOV", reg(sr.Rd), reg(sr.Rm));
-			return true;
-		}
-		name = "ORR";
-		goto sr;
 	}
 	return false;
 c_im:
@@ -323,72 +316,62 @@ c_im:
 im:
 	W("%-7s %s, %s, #%llx", name, reg(im.Rd), reg(im.Rn), im.imm);
 	return true;
-c_sr:
-	W("%-7s %s, %s", name, reg(sr.Rn), reg(sr.Rm));
-	goto sr_suffix;
-sr:
-	W("%-7s %s, %s, %s", name, reg(sr.Rd), reg(sr.Rn), reg(sr.Rm));
-sr_suffix:
-	if (sr.amount > 0) {
-		W(", %s #%d", shift(sr.shift), sr.amount);
-	}
-	return true;
 #undef W
 }
 
 static bool
 disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
-	struct aarch64_ldp_stp      p;
-	struct aarch64_ldr_str_ix   ix;
-	struct aarch64_ldr_str_ui   ui;
-	struct aarch64_ldr_str_r    r;
-	struct aarch64_ldr_lit      lit;
+	struct aarch64_ins_ldp_stp    p;
+	struct aarch64_ins_ldr_str_ix ix;
+	struct aarch64_ins_ldr_str_ui ui;
+	struct aarch64_ins_ldr_str_r  r;
+	struct aarch64_ins_ldr_lit    lit;
 	const char *name = NULL;
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
-	if (aarch64_decode_ldp_post(ins, &p)) {
+	if (aarch64_ins_decode_ldp_post(ins, &p)) {
 		name = "LDP";
 		goto p_post;
-	} else if (aarch64_decode_ldp_pre(ins, &p)) {
+	} else if (aarch64_ins_decode_ldp_pre(ins, &p)) {
 		name = "LDP";
 		goto p_pre;
-	} else if (aarch64_decode_ldp_si(ins, &p)) {
+	} else if (aarch64_ins_decode_ldp_si(ins, &p)) {
 		name = "LDP";
 		goto p_si;
-	} else if (aarch64_decode_ldr_post(ins, &ix)) {
+	} else if (aarch64_ins_decode_ldr_post(ins, &ix)) {
 		name = "LDR";
 		goto r_post;
-	} else if (aarch64_decode_ldr_pre(ins, &ix)) {
+	} else if (aarch64_ins_decode_ldr_pre(ins, &ix)) {
 		name = "LDR";
 		goto r_pre;
-	} else if (aarch64_decode_ldr_ui(ins, &ui)) {
+	} else if (aarch64_ins_decode_ldr_ui(ins, &ui)) {
 		name = "LDR";
 		goto r_ui;
-	} else if (aarch64_decode_ldr_r(ins, &r)) {
+	} else if (aarch64_ins_decode_ldr_r(ins, &r)) {
 		name = "LDR";
 		goto r_r;
-	} else if (aarch64_decode_ldr_lit(ins, pc, &lit)) {
+	} else if (aarch64_ins_decode_ldr_lit(ins, pc, &lit)) {
 		W("%-7s %s, #0x%llx", "LDR", reg(lit.Rt), lit.label);
 		return true;
-	} else if (aarch64_decode_stp_post(ins, &p)) {
+	} else if (aarch64_ins_decode_stp_post(ins, &p)) {
 		name = "STP";
 		goto p_post;
-	} else if (aarch64_decode_stp_pre(ins, &p)) {
+	} else if (aarch64_ins_decode_stp_pre(ins, &p)) {
 		name = "STP";
 		goto p_pre;
-	} else if (aarch64_decode_stp_si(ins, &p)) {
+	} else if (aarch64_ins_decode_stp_si(ins, &p)) {
 		name = "STP";
 		goto p_si;
-	} else if (aarch64_decode_str_post(ins, &ix)) {
+	} else if (aarch64_ins_decode_str_post(ins, &ix)) {
 		name = "STR";
 		goto r_post;
-	} else if (aarch64_decode_str_pre(ins, &ix)) {
+	} else if (aarch64_ins_decode_str_pre(ins, &ix)) {
 		name = "STR";
 		goto r_pre;
-	} else if (aarch64_decode_str_ui(ins, &ui)) {
+	} else if (aarch64_ins_decode_str_ui(ins, &ui)) {
 		name = "STR";
 		goto r_ui;
-	} else if (aarch64_decode_str_r(ins, &r)) {
+	} else if (aarch64_ins_decode_str_r(ins, &r)) {
 		name = "STR";
 		goto r_r;
 	}
@@ -437,18 +420,18 @@ r_r:
 
 static bool
 disassemble_movknz(uint32_t ins, char *buf) {
-	struct aarch64_movknz movknz;
+	struct aarch64_ins_movknz movknz;
 	const char *name;
 	uint64_t mov_imm;
-	if (aarch64_decode_movk(ins, &movknz)) {
+	if (aarch64_ins_decode_movk(ins, &movknz)) {
 		name = "MOVK";
-	} else if (aarch64_decode_movn(ins, &movknz)) {
+	} else if (aarch64_ins_decode_movn(ins, &movknz)) {
 		if (aarch64_alias_mov_nwi(&movknz)) {
 			mov_imm = ~((uint64_t)movknz.imm << movknz.shift);
 			goto mov;
 		}
 		name = "MOVN";
-	} else if (aarch64_decode_movz(ins, &movknz)) {
+	} else if (aarch64_ins_decode_movz(ins, &movknz)) {
 		if (aarch64_alias_mov_wi(&movknz)) {
 			mov_imm = (uint64_t)movknz.imm << movknz.shift;
 			goto mov;
@@ -474,10 +457,10 @@ mov:
 
 static bool
 disassemble1(uint32_t ins, uint64_t pc, char buf[64]) {
-	struct aarch64_adr_adrp     adr;
-	struct aarch64_b_bl         b;
-	struct aarch64_br_blr       br;
-	struct aarch64_ret          ret;
+	struct aarch64_ins_adr_adrp adr;
+	struct aarch64_ins_b_bl     b;
+	struct aarch64_ins_br       br;
+	struct aarch64_ins_ret      ret;
 
 	int idx = sprintf(buf, "%llx  ", pc);
 	if (idx <= 0) {
@@ -491,21 +474,19 @@ disassemble1(uint32_t ins, uint64_t pc, char buf[64]) {
 	} else if (disassemble_logic(ins, buf)) {
 	} else if (disassemble_memory(ins, pc, buf)) {
 	} else if (disassemble_movknz(ins, buf)) {
-	} else if (aarch64_decode_adr(ins, pc, &adr)) {
+	} else if (aarch64_ins_decode_adr(ins, pc, &adr)) {
 		W("%-7s %s, #0x%llx", "ADR", reg(adr.Xd), adr.label);
-	} else if (aarch64_decode_adrp(ins, pc, &adr)) {
+	} else if (aarch64_ins_decode_adrp(ins, pc, &adr)) {
 		W("%-7s %s, #0x%llx", "ADRP", reg(adr.Xd), adr.label);
-	} else if (aarch64_decode_b(ins, pc, &b)) {
+	} else if (aarch64_ins_decode_b(ins, pc, &b)) {
 		W("%-7s #0x%llx", "B", b.label);
-	} else if (aarch64_decode_bl(ins, pc, &b)) {
+	} else if (aarch64_ins_decode_bl(ins, pc, &b)) {
 		W("%-7s #0x%llx", "BL", b.label);
-	} else if (aarch64_decode_blr(ins, &br)) {
-		W("%-7s %s", "BLR", reg(br.Xn));
 	} else if (aarch64_decode_br(ins, &br)) {
-		W("%-7s %s", "BR", reg(br.Xn));
-	} else if (aarch64_decode_nop(ins)) {
+		W("%-7s %s", (br.link ? "BLR" : "BR"), reg(br.Xn));
+	} else if (aarch64_ins_decode_nop(ins)) {
 		W("NOP");
-	} else if (aarch64_decode_ret(ins, &ret)) {
+	} else if (aarch64_ins_decode_ret(ins, &ret)) {
 		if (ret.Xn == AARCH64_X30) {
 			W("RET");
 		} else {

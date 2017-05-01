@@ -93,6 +93,7 @@ initialize(feature_t features) {
 		LOADED(OFFSETS);
 	}
 	if (NEED(KERNEL_CALL)) {
+		printf("setting up kernel function call...\n");
 		if (!kernel_call_init()) {
 			error_message("could not set up kernel function call system");
 			return false;

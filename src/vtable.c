@@ -211,54 +211,59 @@ exec_one(struct sim *sim) {
 	uint64_t pc = sim->pc;
 	// Process the instruction, updating the state.
 	int state = 0;
-	struct aarch64_adr_adrp adrp;
-	struct aarch64_adr_adrp adr;
-	struct aarch64_add_sub_im add_im;
-	struct aarch64_movknz movz;
-	struct aarch64_and_orr_im orr_im;
-	struct aarch64_and_orr_sr orr_sr;
-	struct aarch64_b_bl bl;
-	struct aarch64_ldr_str_ui ldr_ui;
-	struct aarch64_ldr_str_ui str_ui;
-	struct aarch64_ldp_stp ldp;
-	struct aarch64_ldp_stp stp;
-	struct aarch64_ret ret;
-	if (aarch64_decode_adrp(ins, pc, &adrp)) {
+	struct aarch64_ins_adr_adrp adrp;
+	struct aarch64_ins_adr_adrp adr;
+	struct aarch64_ins_add_im add_im;
+	struct aarch64_ins_movknz movz;
+	struct aarch64_ins_and_orr_im orr_im;
+	struct aarch64_ins_and_sr orr_sr;
+	struct aarch64_ins_b_bl bl;
+	struct aarch64_ins_ldr_str_ui ldr_ui;
+	struct aarch64_ins_ldr_str_ui str_ui;
+	struct aarch64_ins_ldp_stp ldp;
+	struct aarch64_ins_ldp_stp stp;
+	struct aarch64_ins_ret ret;
+	if (aarch64_ins_decode_adrp(ins, pc, &adrp)) {
 		setreg(sim, adrp.Xd, adrp.label, VALUE);
-	} else if (aarch64_decode_adr(ins, pc, &adr)) {
+	} else if (aarch64_ins_decode_adr(ins, pc, &adr)) {
 		setreg(sim, adr.Xd, adr.label, VALUE);
 	} else if (aarch64_decode_add_im(ins, &add_im)) {
-		uint64_t value = getreg(sim, add_im.Rn, &state)
-			+ ((uint64_t)add_im.imm << add_im.shift);
+		uint64_t value = getreg(sim, add_im.Rn, &state);
+		uint64_t imm = (uint64_t)add_im.imm << add_im.shift;
+		if (add_im.op == AARCH64_ADD_IM_OP_ADD) {
+			value += imm;
+		} else {
+			value -= imm;
+		}
 		setreg(sim, add_im.Rd, value, state);
-	} else if (aarch64_decode_movz(ins, &movz)) {
+	} else if (aarch64_ins_decode_movz(ins, &movz)) {
 		uint64_t value = (uint64_t)movz.imm << movz.shift;
 		setreg(sim, movz.Rd, value, VALUE);
-	} else if (aarch64_decode_orr_im(ins, &orr_im)) {
+	} else if (aarch64_ins_decode_orr_im(ins, &orr_im)) {
 		uint64_t value = getreg(sim, orr_im.Rn, &state) | orr_im.imm;
 		setreg(sim, orr_im.Rd, value, state);
-	} else if (aarch64_decode_orr_sr(ins, &orr_sr)) {
+	} else if (aarch64_decode_and_sr(ins, &orr_sr) && orr_sr.op == AARCH64_AND_SR_OP_ORR) {
 		uint64_t value = getreg(sim, orr_sr.Rn, &state);
 		value |= shiftreg(sim, orr_sr.Rm, orr_sr.shift, orr_sr.amount, &state);
 		setreg(sim, orr_sr.Rd, value, state);
-	} else if (aarch64_decode_bl(ins, pc, &bl)) {
+	} else if (aarch64_ins_decode_bl(ins, pc, &bl)) {
 		sim->bl = bl.label;
-	} else if (aarch64_decode_ldr_ui(ins, &ldr_ui)) {
+	} else if (aarch64_ins_decode_ldr_ui(ins, &ldr_ui)) {
 		setreg(sim, ldr_ui.Rt, 0, UNKNOWN);
-	} else if (aarch64_decode_ldp_post(ins, &ldp)
-			|| aarch64_decode_ldp_pre(ins, &ldp)
-			|| aarch64_decode_ldp_si(ins, &ldp)) {
+	} else if (aarch64_ins_decode_ldp_post(ins, &ldp)
+			|| aarch64_ins_decode_ldp_pre(ins, &ldp)
+			|| aarch64_ins_decode_ldp_si(ins, &ldp)) {
 		setreg(sim, ldp.Rt1, 0, UNKNOWN);
 		setreg(sim, ldp.Rt2, 0, UNKNOWN);
-	} else if (aarch64_decode_str_ui(ins, &str_ui)
-			|| aarch64_decode_stp_si(ins, &stp)
-			|| aarch64_decode_stp_pre(ins, &stp)
-			|| aarch64_decode_stp_post(ins, &stp)) {
+	} else if (aarch64_ins_decode_str_ui(ins, &str_ui)
+			|| aarch64_ins_decode_stp_si(ins, &stp)
+			|| aarch64_ins_decode_stp_pre(ins, &stp)
+			|| aarch64_ins_decode_stp_post(ins, &stp)) {
 		// Ignore.
-	} else if (aarch64_decode_ret(ins, &ret)) {
+	} else if (aarch64_ins_decode_ret(ins, &ret)) {
 		uint64_t retaddr = getreg(sim, ret.Xn, &state);
 		sim->ret = (state == VALUE ? retaddr : 1);
-	} else if (aarch64_decode_nop(ins)) {
+	} else if (aarch64_ins_decode_nop(ins)) {
 		// Nothing to do.
 	} else {
 		memctl_warning("unknown instruction: %x", ins); // TODO
