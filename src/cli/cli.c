@@ -159,7 +159,7 @@ static bool f_handler(const struct argument *arguments) {
 	size_t width          = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
 	bool physical         = OPT_PRESENT(1, "p");
 	size_t access         = OPT_GET_WIDTH_OR(2, "x", "access", 0);
-	size_t alignment      = OPT_GET_WIDTH_OR(3, "a", "alignment", width);
+	size_t alignment      = OPT_GET_WIDTH_OR(3, "a", "align", width);
 	struct argrange range = ARG_GET_RANGE(4, "range");
 	kword_t value         = ARG_GET_UINT(5, "value");
 	return f_command(range.start, range.end, value, width, physical, access, alignment);
