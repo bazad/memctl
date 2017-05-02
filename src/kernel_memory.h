@@ -174,4 +174,19 @@ kernel_io_result kernel_read_heap(kaddr_t kaddr, size_t *size, void *data, size_
 kernel_io_result kernel_write_heap(kaddr_t kaddr, size_t *size, const void *data,
 		size_t access_width, kaddr_t *next);
 
+/*
+ * kernel_virtual_to_physical
+ *
+ * Description:
+ * 	Convert a kernel virtual address into a physical address.
+ *
+ * Parameters:
+ * 		kaddr			The kernel virtual address.
+ * 	out	paddr			On return, the physical address corresponding to the
+ * 					virtual address, or 0 if the virtual address is unmapped.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+bool kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr);
 #endif

@@ -5,6 +5,8 @@
 #include "kernel_memory.h"
 
 #include "core.h"
+#include "kernel.h"
+#include "kernel_call.h"
 #include "utility.h"
 
 #include <mach/mach_vm.h>
@@ -37,6 +39,22 @@ typedef kernel_io_result (*transfer_range_fn)(
 		size_t *width,
 		kaddr_t *next,
 		bool into_kernel);
+
+/*
+ * kernel_pmap
+ *
+ * Description:
+ * 	The kernel_pmap. Used for pmap_find_phys.
+ */
+static kaddr_t kernel_pmap;
+
+/*
+ * _pmap_find_phys
+ *
+ * Description:
+ * 	The pmap_find_phys function.
+ */
+static kaddr_t _pmap_find_phys;
 
 /*
  * mach_unexpected
@@ -258,7 +276,44 @@ kernel_read_word(kernel_read_fn read, kaddr_t kaddr, void *value, size_t width,
 }
 
 kernel_io_result
-kernel_write_word(kernel_write_fn write, kaddr_t kaddr, kword_t value, size_t width, size_t access_width) {
+kernel_write_word(kernel_write_fn write, kaddr_t kaddr, kword_t value, size_t width,
+		size_t access_width) {
 	pack_uint(&value, value, width);
 	return write(kaddr, &width, &value, access_width, NULL);
+}
+
+bool
+kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr) {
+	if (kernel_pmap == 0) {
+		kaddr_t _kernel_pmap;
+		kext_result kr = kernel_symbol("_kernel_pmap", &_kernel_pmap, NULL);
+		if (kr != KEXT_SUCCESS) {
+			error_internal("could not resolve %s", "_kernel_pmap");
+			return false;
+		}
+		kr = kernel_symbol("_pmap_find_phys", &_pmap_find_phys, NULL);
+		if (kr != KEXT_SUCCESS) {
+			error_internal("could not resolve %s", "_pmap_find_phys");
+			return false;
+		}
+		kernel_io_result kior = kernel_read_word(kernel_read_unsafe, _kernel_pmap,
+				&kernel_pmap, sizeof(kernel_pmap), 0);
+		if (kior != KERNEL_IO_SUCCESS) {
+			error_internal("could not read %s", "_kernel_pmap");
+			return false;
+		}
+	}
+	ppnum_t ppnum;
+	kword_t args[] = { kernel_pmap, kaddr };
+	bool success = kernel_call(&ppnum, sizeof(ppnum), _pmap_find_phys, 2, args);
+	if (!success) {
+		error_internal("could not call %s", "_pmap_find_phys");
+		return false;
+	}
+	if (ppnum == 0) {
+		*paddr = 0;
+	} else {
+		*paddr = ((paddr_t)ppnum << page_shift) | (kaddr & page_mask);
+	}
+	return true;
 }

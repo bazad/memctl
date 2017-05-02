@@ -361,7 +361,12 @@ kp_command(kaddr_t address) {
 	if (!initialize(KERNEL_CALL)) {
 		return false;
 	}
-	printf("kp("KADDR_FMT")\n", address);
+	paddr_t paddr;
+	bool success = kernel_virtual_to_physical(address, &paddr);
+	if (!success) {
+		return false;
+	}
+	printf(KADDR_FMT"\n", paddr);
 	return true;
 }
 
