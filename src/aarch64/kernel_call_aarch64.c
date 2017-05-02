@@ -922,7 +922,7 @@ kernel_call_aarch64(void *result, unsigned result_size,
 	}
 	// Read the result from kernel memory.
 	uint32_t result32;
-	bool success = kernel_call_7(&result32, sizeof(result32), 7, initial_state.pc,
+	bool success = kernel_call_7(&result32, sizeof(result32), initial_state.pc, 7,
 			initial_state.x);
 	if (!success) {
 		return false;
