@@ -415,7 +415,7 @@ fail:
 
 bool
 kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, kword_t args[]) {
+		kaddr_t func, const kword_t args[]) {
 	if (arg_count > 7 || (arg_count > 0 && args[0] == 0) || result_size > sizeof(uint32_t)) {
 		assert(func == 0);
 		return false;
@@ -438,7 +438,7 @@ kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
 
 bool
 kernel_call(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, kword_t args[]) {
+		kaddr_t func, const kword_t args[]) {
 	assert(result != NULL || func == 0);
 	assert(result_size > 0 && ispow2(result_size) && result_size <= sizeof(uint64_t));
 	assert(arg_count <= 8);

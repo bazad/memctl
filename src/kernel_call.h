@@ -41,7 +41,7 @@ void kernel_call_deinit(void);
  * 	The return value is truncated to 32 bits.
  */
 bool kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, kword_t args[]);
+		kaddr_t func, const kword_t args[]);
 
 /*
  * kernel_call
@@ -67,6 +67,6 @@ bool kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
  * 	otherwise, with no errors produced.
  */
 bool kernel_call(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, kword_t args[]);
+		kaddr_t func, const kword_t args[]);
 
 #endif

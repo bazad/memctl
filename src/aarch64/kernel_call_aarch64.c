@@ -895,7 +895,7 @@ kernel_call_deinit_aarch64() {
 
 bool
 kernel_call_aarch64(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, kword_t args[]) {
+		kaddr_t func, const kword_t args[]) {
 	if (func == 0) {
 		// Everything is supported.
 		return true;
