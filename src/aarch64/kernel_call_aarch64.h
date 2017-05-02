@@ -36,7 +36,7 @@ void kernel_call_deinit_aarch64(void);
  * Dependencies:
  * 	kernel_call_7
  */
-bool kernel_call_aarch64(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, const kword_t args[]);
+bool kernel_call_aarch64(void *result, unsigned result_size,
+		kaddr_t func, unsigned arg_count, const kword_t args[]);
 
 #endif

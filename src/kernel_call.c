@@ -414,8 +414,8 @@ fail:
 }
 
 bool
-kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, const kword_t args[]) {
+kernel_call_7(void *result, unsigned result_size,
+		kaddr_t func, unsigned arg_count, const kword_t args[]) {
 	if (arg_count > 7 || (arg_count > 0 && args[0] == 0) || result_size > sizeof(uint32_t)) {
 		assert(func == 0);
 		return false;
@@ -432,22 +432,24 @@ kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
 	}
 	uint32_t result32 = IOConnectTrap6(hook.connection, 0, args[1], args[2], args[3], args[4],
 			args[5], args[6]);
-	pack_uint(result, result32, result_size);
+	if (result_size > 0) {
+		pack_uint(result, result32, result_size);
+	}
 	return true;
 }
 
 bool
-kernel_call(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, const kword_t args[]) {
-	assert(result != NULL || func == 0);
-	assert(result_size > 0 && ispow2(result_size) && result_size <= sizeof(uint64_t));
+kernel_call(void *result, unsigned result_size,
+		kaddr_t func, unsigned arg_count, const kword_t args[]) {
+	assert(result != NULL || func == 0 || result_size == 0);
+	assert(ispow2(result_size) && result_size <= sizeof(uint64_t));
 	assert(arg_count <= 8);
-	if (kernel_call_7(result, result_size, arg_count, 0, args)) {
-		return kernel_call_7(result, result_size, arg_count, func, args);
+	if (kernel_call_7(result, result_size, 0, arg_count, args)) {
+		return kernel_call_7(result, result_size, func, arg_count, args);
 	}
 #if __arm64__
-	else if (kernel_call_aarch64(result, result_size, arg_count, 0, args)) {
-		return kernel_call_aarch64(result, result_size, arg_count, func, args);
+	else if (kernel_call_aarch64(result, result_size, 0, arg_count, args)) {
+		return kernel_call_aarch64(result, result_size, func, arg_count, args);
 	}
 #endif
 	error_functionality_unavailable("kernel_call: no kernel_call implementation can perform "

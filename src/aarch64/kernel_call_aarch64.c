@@ -894,8 +894,8 @@ kernel_call_deinit_aarch64() {
 }
 
 bool
-kernel_call_aarch64(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, const kword_t args[]) {
+kernel_call_aarch64(void *result, unsigned result_size,
+		kaddr_t func, unsigned arg_count, const kword_t args[]) {
 	if (func == 0) {
 		// Everything is supported.
 		return true;
@@ -933,6 +933,8 @@ kernel_call_aarch64(void *result, unsigned result_size, unsigned arg_count,
 		error_internal("could not read function call result from kernel memory");
 		return false;
 	}
-	pack_uint(result, result64, result_size);
+	if (result_size > 0) {
+		pack_uint(result, result64, result_size);
+	}
 	return true;
 }

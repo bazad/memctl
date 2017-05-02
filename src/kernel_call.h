@@ -40,8 +40,8 @@ void kernel_call_deinit(void);
  * 	args[0] must be nonzero.
  * 	The return value is truncated to 32 bits.
  */
-bool kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, const kword_t args[]);
+bool kernel_call_7(void *result, unsigned result_size,
+		kaddr_t func, unsigned arg_count, const kword_t args[]);
 
 /*
  * kernel_call
@@ -53,11 +53,11 @@ bool kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
  * 	out	result			The return value of the kernel function.
  * 		result_size		The size of the return value in bytes. Must be 1, 2, 4, or
  * 					8.
+ * 		func			The function to call, or 0 to test if the given function
+ * 					call is possible given the available functionality.
  * 		arg_count		The number of arguments to the function. There can be no
  * 					more than 8 arguments, and on some platforms, the true
  * 					maximum number of supported arguments may be even smaller.
- * 		func			The function to call, or 0 to test if the given function
- * 					call is possible given the available functionality.
  * 		args			The arguments to the function.
  *
  * Returns:
@@ -66,7 +66,7 @@ bool kernel_call_7(void *result, unsigned result_size, unsigned arg_count,
  * 	If func was 0, then this function returns true if the given call is supported and false
  * 	otherwise, with no errors produced.
  */
-bool kernel_call(void *result, unsigned result_size, unsigned arg_count,
-		kaddr_t func, const kword_t args[]);
+bool kernel_call(void *result, unsigned result_size,
+		kaddr_t func, unsigned arg_count, const kword_t args[]);
 
 #endif
