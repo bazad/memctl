@@ -12,10 +12,15 @@
 #include "kernel_slide.h"
 #include "kernelcache.h"
 #include "memctl_offsets.h"
+#include "memctl_signal.h"
 #include "platform.h"
 #include "vtable.h"
 
 #include <stdio.h>
+
+#if MEMCTL_REPL
+#include <histedit.h>
+#endif
 
 /*
  * feature_t
@@ -41,15 +46,87 @@ typedef enum {
  */
 static feature_t loaded_features;
 
+#if MEMCTL_REPL
+
+/*
+ * in_repl
+ *
+ * Description:
+ * 	True if we are currently in a REPL.
+ */
+static bool in_repl;
+
+/*
+ * prompt_string
+ *
+ * Description:
+ * 	The REPL prompt string.
+ */
+static char *prompt_string;
+
+#endif // MEMCTL_REPL
+
+// Forward declaration.
+static void deinitialize(bool critical);
+
+/*
+ * signal_handler
+ *
+ * Description:
+ * 	The signal handler for terminating signals. When we receive a signal, libmemctl's
+ * 	interrupted global is set to 1. If the signal is not SIGINT, then all critical state is
+ * 	de-initialized and the signal is re-raised.
+ */
+static void
+signal_handler(int signum) {
+	interrupted = 1;
+	if (signum != SIGINT) {
+		deinitialize(true);
+		fprintf(stderr, "deinitialized\n");
+		raise(signum);
+	}
+}
+
+/*
+ * install_signal_handler
+ *
+ * Description:
+ * 	Install the signal handler for all terminating signals. For all signals besides SIGINT, the
+ * 	signal handler will be reset to SIG_DFL the first time it is received. This allows us to
+ * 	re-raise the signal to kill the program.
+ */
+static bool
+install_signal_handler() {
+	int signals[] = {
+		SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGTRAP, SIGABRT, SIGEMT, SIGFPE, SIGBUS,
+		SIGSEGV, SIGSYS, SIGPIPE, SIGALRM, SIGTERM, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF,
+		SIGUSR1, SIGUSR2,
+	};
+	struct sigaction act = { .sa_handler = signal_handler };
+	for (size_t i = 0; i < sizeof(signals) / sizeof(*signals); i++) {
+		act.sa_flags = (signals[i] == SIGINT ? 0 : SA_RESETHAND);
+		int err = sigaction(signals[i], &act, NULL);
+		if (err < 0) {
+			error_internal("could not install signal handler");
+			return false;
+		}
+	}
+	return true;
+}
+
 /*
  * default_initialize
  *
  * Description:
  * 	Initialize the basic set of features that should always be present.
  */
-static void
+static bool
 default_initialize() {
 	platform_init();
+	if (!install_signal_handler()) {
+		return false;
+	}
+	return true;
 }
 
 // Test if all bits set in x are also set in y.
@@ -109,20 +186,135 @@ initialize(feature_t features) {
  * deinitialize
  *
  * Description:
- * 	Unload all loaded features.
+ * 	Unload loaded features.
+ *
+ * Parameters:
+ * 		critical		If true, only system-critical features will be unloaded.
+ * 					Otherwise, all features will be unloaded.
+ *
+ * Notes:
+ * 	After this call, loaded_features is reset to 0, even if some features are not unloaded.
  */
 static void
-deinitialize() {
+deinitialize(bool critical) {
 #define LOADED(feature)	(ALL_SET(feature, loaded_features))
 	if (LOADED(KERNEL_CALL)) {
 		kernel_call_deinit();
 	}
-	if (LOADED(KERNEL_IMAGE)) {
+	if (!critical && LOADED(KERNEL_IMAGE)) {
 		kernel_deinit();
 	}
 	loaded_features = 0;
 #undef LOADED
 }
+
+#if MEMCTL_REPL
+
+/*
+ * repl_prompt
+ *
+ * Description:
+ * 	A callback for libedit.
+ */
+static char *
+repl_prompt(EditLine *el) {
+	return prompt_string;
+}
+
+/*
+ * repl_getc
+ *
+ * Description:
+ * 	A callback for libedit to read a character.
+ */
+static int
+repl_getc(EditLine *el, char *c) {
+	for (;;) {
+		errno = 0;
+		int ch = fgetc(stdin);
+		if (ch != EOF) {
+			*c = ch;
+			return 1;
+		}
+		if (interrupted || errno == 0) {
+			return 0;
+		}
+		if (errno != EINTR) {
+			return -1;
+		}
+		// Try again for EINTR.
+	}
+}
+
+/*
+ * run_repl
+ *
+ * Description:
+ * 	Run a memctl REPL.
+ */
+static bool
+run_repl() {
+	assert(!in_repl);
+	bool success = false;
+	EditLine *el = el_init(getprogname(), stdin, stdout, stderr);
+	if (el == NULL) {
+		error_out_of_memory();
+		goto fail0;
+	}
+	Tokenizer *tok = tok_init(NULL);
+	if (tok == NULL) {
+		error_out_of_memory();
+		goto fail1;
+	}
+	History *hist = history_init();
+	if (hist == NULL) {
+		error_out_of_memory();
+		goto fail2;
+	}
+	HistEvent ev;
+	history(hist, &ev, H_SETSIZE, 256);
+	el_set(el, EL_HIST, history, hist);
+	el_set(el, EL_SIGNAL, 0);
+	el_set(el, EL_PROMPT, repl_prompt);
+	el_set(el, EL_EDITOR, "emacs");
+	el_set(el, EL_GETCFN, repl_getc);
+	in_repl = true;
+	asprintf(&prompt_string, "%s> ", getprogname());
+	while (in_repl) {
+		int n;
+		const char *line = el_gets(el, &n);
+		if (interrupted) {
+			fprintf(stdout, "^C\n");
+			interrupted = 0;
+			continue;
+		}
+		if (line == NULL || n == 0) {
+			printf("\n");
+			success = true;
+			break;
+		}
+		int argc;
+		const char **argv;
+		tok_str(tok, line, &argc, &argv);
+		if (argc > 0) {
+			history(hist, &ev, H_ENTER, line);
+			command_run_argv(argc, argv);
+		}
+		tok_reset(tok);
+		print_errors();
+	}
+	free(prompt_string);
+	in_repl = false;
+	history_end(hist);
+fail2:
+	tok_end(tok);
+fail1:
+	el_end(el);
+fail0:
+	return success;
+}
+
+#endif // MEMCTL_REPL
 
 /*
  * looks_like_physical_address
@@ -214,7 +406,11 @@ kext_error(kext_result kr, const char *bundle_id, const char *symbol, kaddr_t ad
 
 bool
 default_action(void) {
+#if MEMCTL_REPL
+	return run_repl();
+#else
 	return command_print_help(NULL);
+#endif
 }
 
 bool
@@ -559,9 +755,11 @@ kcd_command(const char *kernelcache_path, const char *output_path) {
 
 int
 main(int argc, const char *argv[]) {
-	default_initialize();
-	bool success = command_run_argv(argc - 1, argv + 1);
-	deinitialize();
+	bool success = default_initialize();
+	if (success) {
+		success = command_run_argv(argc - 1, argv + 1);
+	}
+	deinitialize(false);
 	print_errors();
 	return (success ? 0 : 1);
 }

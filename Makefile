@@ -8,6 +8,8 @@ CORE_DIR ?= core
 CORE_LIB ?= $(CORE_DIR)/libmemctl_core.a
 CORE_ENTITLEMENTS ?= $(CORE_DIR)/entitlements.plist
 
+REPL     ?= YES
+
 ifneq ($(ARCH),x86_64)
 CLANG   := $(shell xcrun --sdk $(SDK) --find clang)
 AR      := $(shell xcrun --sdk $(SDK) --find ar)
@@ -34,6 +36,11 @@ CFLAGS     = -g -O0 -I$(SRC_DIR) -I$(EXTERNAL_HDR_DIR) $(ERRFLAGS)
 LDFLAGS    = -g -lcompression
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
+
+ifeq ($(REPL),YES)
+LDFLAGS        += -ledit -lcurses
+MEMCTL_DEFINES += -DMEMCTL_REPL=1
+endif
 
 # libmemctl aarch64 sources.
 
@@ -140,7 +147,7 @@ endif
 
 $(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBMEMCTL_HDRS)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(MEMCTL_DEFINES) -c $< -o $@
 
 $(OBJ_DIR)/%.o: %.c $(LIBMEMCTL_HDRS)
 	@mkdir -p $(@D)
