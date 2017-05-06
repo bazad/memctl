@@ -406,6 +406,34 @@ kext_error(kext_result kr, const char *bundle_id, const char *symbol, kaddr_t ad
 	}
 }
 
+/*
+ * find_vtable
+ *
+ * Description:
+ * 	Find the vtable for a given class and bundle ID, reporting an error message as appropriate.
+ */
+static bool
+find_vtable(const char *classname, const char *bundle_id, kaddr_t *address, size_t *size) {
+	if (!initialize(KERNEL_SYMBOLS)) {
+		return false;
+	}
+	kext_result kr = vtable_for_class(classname, bundle_id, address, size);
+	if (kr == KEXT_NOT_FOUND) {
+		if (bundle_id == NULL) {
+			error_message("class %s not found", classname);
+		} else if (strcmp(bundle_id, KERNEL_ID) == 0) {
+			error_message("class %s not found in kernel", classname);
+		} else {
+			error_message("class %s not found in kernel extension %s", classname,
+			              bundle_id);
+		}
+		return false;
+	} else if (kext_error(kr, bundle_id, NULL, 0)) {
+		return false;
+	}
+	return true;
+}
+
 bool
 default_action(void) {
 #if MEMCTL_REPL
@@ -504,9 +532,6 @@ wd_command(kaddr_t address, const void *data, size_t length, bool physical, size
 
 bool
 ws_command(kaddr_t address, const char *string, bool physical, size_t access) {
-	if (!initialize(KERNEL_MEMORY)) {
-		return false;
-	}
 	size_t length = strlen(string) + 1;
 	return wd_command(address, string, length, physical, access);
 }
@@ -546,11 +571,13 @@ fpr_command(pid_t pid) {
 bool
 fi_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle_id,
 		size_t access) {
-	if (!initialize(KERNEL_CALL)) {
+	kaddr_t address;
+	bool success = find_vtable(classname, bundle_id, &address, NULL);
+	if (!success) {
 		return false;
 	}
-	printf("fi\n");
-	return true;
+	return f_command(start, end, address, sizeof(address), false, false, access,
+			sizeof(address));
 }
 
 bool
@@ -591,23 +618,10 @@ kpm_command(kaddr_t start, kaddr_t end) {
 
 bool
 vt_command(const char *classname, const char *bundle_id) {
-	if (!initialize(KERNEL_SYMBOLS)) {
-		return false;
-	}
 	kaddr_t address;
 	size_t size;
-	kext_result kr = vtable_for_class(classname, bundle_id, &address, &size);
-	if (kr == KEXT_NOT_FOUND) {
-		if (bundle_id == NULL) {
-			error_message("class %s not found", classname);
-		} else if (strcmp(bundle_id, KERNEL_ID) == 0) {
-			error_message("class %s not found in kernel", classname);
-		} else {
-			error_message("class %s not found in kernel extension %s", classname,
-			              bundle_id);
-		}
-		return false;
-	} else if (kext_error(kr, bundle_id, NULL, 0)) {
+	bool success = find_vtable(classname, bundle_id, &address, &size);
+	if (!success) {
 		return false;
 	}
 	printf(KADDR_XFMT"  (%zu)\n", address, size);
@@ -751,6 +765,10 @@ kcd_command(const char *kernelcache_path, const char *output_path) {
 	size_t left = kc->kernel.size;
 	while (left > 0) {
 		ssize_t written = write(ofd, p, left);
+		if (interrupted) {
+			error_interrupt();
+			break;
+		}
 		if (written <= 0) {
 			error_internal("could not write to output file");
 			break;
