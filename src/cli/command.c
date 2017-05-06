@@ -110,7 +110,8 @@ spec_is_option(const struct argspec *spec) {
  * write_command_usage_oneline
  *
  * Description:
- * 	TODO
+ * 	Write a string describing the usage of the command to the given buffer. The number of
+ * 	characters needed to store the full string is returned.
  */
 static size_t
 write_command_usage_oneline(const struct command *command, char *buf, size_t size) {

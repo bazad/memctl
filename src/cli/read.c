@@ -2,6 +2,7 @@
 
 #include "cli/memory.h"
 
+#include "format.h"
 #include "memctl_signal.h"
 #include "utility.h"
 
@@ -27,7 +28,7 @@ memctl_read(kaddr_t address, size_t size, bool physical, size_t width, size_t ac
 			}
 			kword_t value = unpack_uint(data + width * i, width);
 			if (i % n == 0) {
-				printf("%016llx:  ", address);
+				printf(KADDR_FMT":  ", address);
 			}
 			int newline = (((i + 1) % n == 0) || (size == readsize && i == end - 1));
 			printf("%0*llx%c", (int)(2 * width), value, (newline ? '\n' : ' '));
@@ -105,7 +106,7 @@ memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size_t ac
 			asciiidx += sprintf(ascii + asciiidx, " ");
 		}
 		/* Print the dump line. */
-		printf("%016llx:  %s |%s|\n", address, hex, ascii);
+		printf(KADDR_FMT":  %s |%s|\n", address, hex, ascii);
 		/* Advance. */
 		address += 16;
 	}

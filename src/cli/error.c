@@ -120,19 +120,19 @@ print_error(error_handle error) {
 			} break;
 		case kernel_io_error: {
 			struct kernel_io_error *e = error->data;
-			PRINT("kernel I/O error at address " KADDR_FMT, e->address);
+			PRINT("kernel I/O error at address " KADDR_XFMT, e->address);
 			} break;
 		case address_protection_error: {
 			struct address_protection_error *e = error->data;
-			PRINT("kernel memory protection error at address " KADDR_FMT, e->address);
+			PRINT("kernel memory protection error at address " KADDR_XFMT, e->address);
 			} break;
 		case address_unmapped_error: {
 			struct address_unmapped_error *e = error->data;
-			PRINT("kernel address " KADDR_FMT " is unmapped", e->address);
+			PRINT("kernel address " KADDR_XFMT " is unmapped", e->address);
 			} break;
 		case address_inaccessible_error: {
 			struct address_protection_error *e = error->data;
-			PRINT("kernel address " KADDR_FMT " is inaccessible", e->address);
+			PRINT("kernel address " KADDR_XFMT " is inaccessible", e->address);
 			} break;
 		case kext_not_found_error: {
 			struct kext_not_found_error *e = error->data;

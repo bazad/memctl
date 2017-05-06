@@ -134,9 +134,9 @@ static bool
 region_is_heap(vm_region_submap_short_info_64_t info) {
 	int prot = VM_PROT_READ | VM_PROT_WRITE;
 	return ((info->protection & prot) == prot
-		&& info->share_mode != SM_EMPTY
-		&& (info->user_tag == VM_KERN_MEMORY_ZONE
-		    || info->user_tag == VM_KERN_MEMORY_KALLOC));
+	        && info->share_mode != SM_EMPTY
+	        && (info->user_tag == VM_KERN_MEMORY_ZONE
+	            || info->user_tag == VM_KERN_MEMORY_KALLOC));
 }
 
 /*
@@ -161,11 +161,12 @@ transfer_range_heap(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, 
 				&depth, (vm_region_recurse_info_t)&info, &count);
 		if (kr != KERN_SUCCESS) {
 			if (kr == KERN_INVALID_ADDRESS) {
+				// We've reached the end of the kernel memory map.
 				next_viable = 0;
 				result = KERNEL_IO_UNMAPPED;
 				break;
 			}
-			next_viable = kaddr + page_size - (kaddr & page_mask);
+			next_viable = (kaddr & ~page_mask) + page_size;
 			mach_unexpected("mach_vm_region_recurse", kr);
 			result = KERNEL_IO_ERROR;
 			break;
@@ -187,6 +188,101 @@ transfer_range_heap(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, 
 		}
 		// Incorporate the region.
 		size_t region_size = min(left, size - (kaddr - address));
+		kaddr += region_size;
+		left -= region_size;
+		transfer_size += region_size;
+	}
+	*size = transfer_size;
+	if (next != NULL) {
+		*next = next_viable;
+	}
+	if (*access == 0) {
+		*access = sizeof(kword_t);
+	}
+	return result;
+}
+
+/*
+ * region_looks_safe
+ *
+ * Description:
+ * 	Returns whether the region looks safe for the given operation.
+ */
+static bool
+region_looks_safe(vm_region_submap_short_info_64_t info, bool into_kernel) {
+	int prot = (into_kernel ? VM_PROT_WRITE : VM_PROT_READ);
+	return ((info->protection & prot) == prot
+	        && info->share_mode != SM_EMPTY);
+}
+
+/*
+ * transfer_range_safe
+ *
+ * Description:
+ * 	Find the transfer range for the given transfer, but only consider safe regions.
+ */
+static kernel_io_result
+transfer_range_safe(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, bool into_kernel) {
+	size_t left = *size;
+	size_t transfer_size = 0;
+	kaddr_t next_viable = kaddr + left;
+	kernel_io_result result = KERNEL_IO_SUCCESS;
+	while (result == KERNEL_IO_SUCCESS && left > 0) {
+		// First, check if the virtual memory region looks viable. If not, then abort the
+		// loop, since no data can be transferred from address kaddr.
+		mach_vm_address_t address = kaddr;
+		mach_vm_size_t size = 0;
+		uint32_t depth = 2048;
+		vm_region_submap_short_info_data_64_t info;
+		mach_msg_type_number_t count = VM_REGION_SUBMAP_SHORT_INFO_COUNT_64;
+		kern_return_t kr = mach_vm_region_recurse(kernel_task, &address, &size,
+				&depth, (vm_region_recurse_info_t)&info, &count);
+		if (kr != KERN_SUCCESS) {
+			if (kr == KERN_INVALID_ADDRESS) {
+				// We've reached the end of the kernel memory map.
+				next_viable = 0;
+				result = KERNEL_IO_UNMAPPED;
+				break;
+			}
+			next_viable = (kaddr & ~page_mask) + page_size;
+			mach_unexpected("mach_vm_region_recurse", kr);
+			result = KERNEL_IO_ERROR;
+			break;
+		}
+		bool viable = region_looks_safe(&info, into_kernel);
+		if (address > kaddr) {
+			result = KERNEL_IO_UNMAPPED;
+			if (viable) {
+				next_viable = address;
+			} else {
+				next_viable = address + size;
+			}
+			break;
+		}
+		if (!viable) {
+			result = KERNEL_IO_PROTECTION;
+			next_viable = address + size;
+			break;
+		}
+		// Next, check to see how many pages starting at kaddr are actually mapped. Here we
+		// do complete the rest of the loop, since some data may be transferrable.
+		size_t region_size = min(left, size - (kaddr - address));
+		error_stop();
+		for (kaddr_t unmapped = kaddr & ~page_mask; unmapped < kaddr + region_size;
+				unmapped += page_size) {
+			paddr_t paddr = 0;
+			kernel_virtual_to_physical(unmapped, &paddr);
+			if (paddr == 0) {
+				// We've encountered an unmapped page before the end of the current
+				// region. Truncate our region to this smaller size.
+				result = KERNEL_IO_UNMAPPED;
+				region_size = (unmapped > kaddr ? unmapped - kaddr : 0);
+				next_viable = unmapped + page_size;
+				break;
+			}
+		}
+		error_start();
+		// Incorporate the region.
 		kaddr += region_size;
 		left -= region_size;
 		transfer_size += region_size;
@@ -266,6 +362,18 @@ kernel_io_result
 kernel_write_heap(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
 		kaddr_t *next) {
 	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_heap,
+			transfer_unsafe, true);
+}
+
+kernel_io_result
+kernel_read(kaddr_t kaddr, size_t *size, void *data, size_t access_width, kaddr_t *next) {
+	return kernel_io(kaddr, size, data, access_width, next, transfer_range_safe,
+			transfer_unsafe, false);
+}
+
+kernel_io_result
+kernel_write(kaddr_t kaddr, size_t *size, const void *data, size_t access_width, kaddr_t *next) {
+	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_safe,
 			transfer_unsafe, true);
 }
 

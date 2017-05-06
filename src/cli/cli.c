@@ -107,7 +107,7 @@ static bool ri_handler(const struct argument *arguments) {
 	size_t length   = ARG_GET_UINT(3, "length");
 #if __arm__ || __arm64__
 	if (address & 3) {
-		error_usage("ri", NULL, "address "KADDR_FMT" is unaligned", address);
+		error_usage("ri", NULL, "address "KADDR_XFMT" is unaligned", address);
 		return false;
 	}
 #endif
@@ -158,11 +158,16 @@ static bool ws_handler(const struct argument *arguments) {
 static bool f_handler(const struct argument *arguments) {
 	size_t width          = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
 	bool physical         = OPT_PRESENT(1, "p");
-	size_t access         = OPT_GET_WIDTH_OR(2, "x", "access", 0);
+	bool heap             = OPT_PRESENT(2, "h");
 	size_t alignment      = OPT_GET_WIDTH_OR(3, "a", "align", width);
-	struct argrange range = ARG_GET_RANGE(4, "range");
-	kword_t value         = ARG_GET_UINT(5, "value");
-	return f_command(range.start, range.end, value, width, physical, access, alignment);
+	size_t access         = OPT_GET_WIDTH_OR(4, "x", "access", 0);
+	struct argrange range = ARG_GET_RANGE(5, "range");
+	kword_t value         = ARG_GET_UINT(6, "value");
+	if (physical && heap) {
+		error_usage("f", NULL, "p and h options are mutually exclusive");
+		return false;
+	}
+	return f_command(range.start, range.end, value, width, physical, heap, access, alignment);
 }
 
 static bool fpr_handler(const struct argument *arguments) {
@@ -338,11 +343,12 @@ static struct command commands[] = {
 	}, {
 		"f", NULL, f_handler,
 		"find in memory",
-		6, (struct argspec *) &(struct argspec[6]) {
+		7, (struct argspec *) &(struct argspec[7]) {
 			{ "",       "width",  ARG_WIDTH, "value width"                 },
 			{ "p",      NULL,     ARG_NONE,  "search physical memory"      },
-			{ "x",      "access", ARG_WIDTH, "memory access width"         },
+			{ "h",      NULL,     ARG_NONE,  "search heap memory"          },
 			{ "a",      "align",  ARG_WIDTH, "search alignment"            },
+			{ "x",      "access", ARG_WIDTH, "memory access width"         },
 			{ ARGUMENT, "range",  ARG_RANGE, "the address range to search" },
 			{ ARGUMENT, "value",  ARG_UINT,  "the value to find"           },
 		},

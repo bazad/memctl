@@ -9,7 +9,7 @@ read_memory(kaddr_t address, size_t *size, void *data, bool physical, size_t acc
 		error_internal("cannot read physical memory as of yet");
 		return false;
 	}
-	kernel_io_result result = kernel_read_unsafe(address, size, data, access, NULL);
+	kernel_io_result result = kernel_read(address, size, data, access, NULL);
 	return (result == KERNEL_IO_SUCCESS);
 }
 
@@ -20,6 +20,6 @@ write_memory(kaddr_t address, size_t *size, const void *data, bool physical, siz
 		error_internal("cannot write physical memory as of yet");
 		return false;
 	}
-	kernel_io_result result = kernel_write_unsafe(address, size, data, access, NULL);
+	kernel_io_result result = kernel_write(address, size, data, access, NULL);
 	return (result == KERNEL_IO_SUCCESS);
 }

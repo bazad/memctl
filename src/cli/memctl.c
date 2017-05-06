@@ -1,6 +1,7 @@
 #include "cli/cli.h"
 #include "cli/disassemble.h"
 #include "cli/error.h"
+#include "cli/find.h"
 #include "cli/format.h"
 #include "cli/memory.h"
 #include "cli/read.h"
@@ -33,9 +34,9 @@ typedef enum {
 	KERNEL_IMAGE   = 0x02,
 	KERNEL_SLIDE   = 0x04 | KERNEL_TASK | KERNEL_IMAGE,
 	KERNEL_SYMBOLS = KERNEL_IMAGE | KERNEL_SLIDE,
-	KERNEL_MEMORY  = KERNEL_TASK | KERNEL_SYMBOLS,
 	OFFSETS        = 0x08,
-	KERNEL_CALL    = 0x10 | KERNEL_MEMORY | OFFSETS,
+	KERNEL_CALL    = 0x10 | KERNEL_TASK | KERNEL_SYMBOLS | OFFSETS,
+	KERNEL_MEMORY  = KERNEL_CALL,
 } feature_t;
 
 /*
@@ -282,6 +283,7 @@ run_repl() {
 	asprintf(&prompt_string, "%s> ", getprogname());
 	while (in_repl) {
 		int n;
+		interrupted = 0;
 		const char *line = el_gets(el, &n);
 		if (interrupted) {
 			fprintf(stdout, "^C\n");
@@ -355,18 +357,18 @@ looks_like_kernel_address(kaddr_t address) {
 static bool
 check_address(kaddr_t address, size_t length, bool physical) {
 	if (address + length < address) {
-		error_usage(NULL, NULL, "overflow at address "KADDR_FMT, address);
+		error_usage(NULL, NULL, "overflow at address "KADDR_XFMT, address);
 		return false;
 	}
 	if (physical) {
 		if (!looks_like_physical_address(address)) {
-			error_usage(NULL, NULL, "address "KADDR_FMT" does not look like a "
+			error_usage(NULL, NULL, "address "KADDR_XFMT" does not look like a "
 			            "physical address", address);
 			return false;
 		}
 	} else {
 		if (!looks_like_kernel_address(address)) {
-			error_usage(NULL, NULL, "address "KADDR_FMT" does not look like a "
+			error_usage(NULL, NULL, "address "KADDR_XFMT" does not look like a "
 			            "kernel virtual address", address);
 			return false;
 		}
@@ -389,7 +391,7 @@ kext_error(kext_result kr, const char *bundle_id, const char *symbol, kaddr_t ad
 			return true;
 		case KEXT_NO_KEXT:
 			if (bundle_id == NULL) {
-				error_message("no kernel component contains address "KADDR_FMT,
+				error_message("no kernel component contains address "KADDR_XFMT,
 				              address);
 			} else {
 				error_kext_not_found(bundle_id);
@@ -436,7 +438,7 @@ rb_command(kaddr_t address, size_t length, bool physical, size_t access) {
 	if (!check_address(address, length, physical)) {
 		return false;
 	}
-	return  memctl_dump_binary(address, length, physical, access);
+	return memctl_dump_binary(address, length, physical, access);
 }
 
 #if MEMCTL_DISASSEMBLY
@@ -510,13 +512,12 @@ ws_command(kaddr_t address, const char *string, bool physical, size_t access) {
 }
 
 bool
-f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical,
+f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical, bool heap,
 		size_t access, size_t alignment) {
 	if (!initialize(KERNEL_CALL)) {
 		return false;
 	}
-	printf("f\n");
-	return true;
+	return memctl_find(start, end, value, width, physical, heap, access, alignment);
 }
 
 bool
@@ -533,12 +534,12 @@ fpr_command(pid_t pid) {
 	}
 	kword_t args[] = { pid };
 	kaddr_t address;
-	bool success = kernel_call(&address, sizeof(address), 1, _proc_find, args);
+	bool success = kernel_call(&address, sizeof(address), _proc_find, 1, args);
 	if (!success) {
 		error_message("proc_find(%d) failed", pid);
 		return false;
 	}
-	printf(KADDR_FMT"\n", address);
+	printf(KADDR_XFMT"\n", address);
 	return true;
 }
 
@@ -562,7 +563,7 @@ kp_command(kaddr_t address) {
 	if (!success) {
 		return false;
 	}
-	printf(KADDR_FMT"\n", paddr);
+	printf(PADDR_XFMT"\n", paddr);
 	return true;
 }
 
@@ -571,7 +572,20 @@ kpm_command(kaddr_t start, kaddr_t end) {
 	if (!initialize(KERNEL_CALL)) {
 		return false;
 	}
-	printf("kpm("KADDR_FMT", "KADDR_FMT")\n", start, end);
+	for (kaddr_t page = start & ~page_mask; page <= end; page += page_size) {
+		paddr_t ppage;
+		bool success = kernel_virtual_to_physical(page, &ppage);
+		if (!success) {
+			return false;
+		}
+		if (interrupted) {
+			error_interrupt();
+			return false;
+		}
+		if (ppage != 0) {
+			printf(KADDR_FMT"  "PADDR_XFMT"\n", page, ppage);
+		}
+	}
 	return true;
 }
 
@@ -596,7 +610,7 @@ vt_command(const char *classname, const char *bundle_id) {
 	} else if (kext_error(kr, bundle_id, NULL, 0)) {
 		return false;
 	}
-	printf(KADDR_FMT"  (%zu)\n", address, size);
+	printf(KADDR_XFMT"  (%zu)\n", address, size);
 	return true;
 }
 
@@ -621,7 +635,7 @@ ks_command(kaddr_t address, bool unslide) {
 	if (!initialize(KERNEL_SLIDE)) {
 		return false;
 	}
-	printf(KADDR_FMT"\n", address + (unslide ? -1 : 1) * kernel_slide);
+	printf(KADDR_XFMT"\n", address + (unslide ? -1 : 1) * kernel_slide);
 	return true;
 }
 
@@ -636,7 +650,7 @@ a_command(const char *symbol, const char *kext) {
 	if (kext_error(kr, kext, symbol, 0)) {
 		return false;
 	}
-	printf(KADDR_FMT"  (%zu)\n", address, size);
+	printf(KADDR_XFMT"  (%zu)\n", address, size);
 	return true;
 }
 
@@ -658,7 +672,7 @@ ap_command(kaddr_t address, bool unpermute) {
 			return false;
 		}
 	}
-	printf(KADDR_FMT"\n", address + (unpermute ? -1 : 1) * kernel_addrperm);
+	printf(KADDR_XFMT"\n", address + (unpermute ? -1 : 1) * kernel_addrperm);
 	return true;
 }
 

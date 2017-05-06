@@ -175,6 +175,26 @@ kernel_io_result kernel_write_heap(kaddr_t kaddr, size_t *size, const void *data
 		size_t access_width, kaddr_t *next);
 
 /*
+ * kernel_read
+ *
+ * Description:
+ * 	A kernel_read_fn that performs safety checks before reading kernel memory. All non-readable
+ * 	addresses return KERNEL_IO_PROTECTION.
+ */
+kernel_io_result kernel_read(kaddr_t kaddr, size_t *size, void *data, size_t access_width,
+		kaddr_t *next);
+
+/*
+ * kernel_write
+ *
+ * Description:
+ * 	A kernel_write_fn that performs safety checks before writing kernel memory. All
+ * 	non-writable addresses return KERNEL_IO_PROTECTION.
+ */
+kernel_io_result kernel_write(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
+		kaddr_t *next);
+
+/*
  * kernel_virtual_to_physical
  *
  * Description:
@@ -189,4 +209,5 @@ kernel_io_result kernel_write_heap(kaddr_t kaddr, size_t *size, const void *data
  * 	True if no errors were encountered.
  */
 bool kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr);
+
 #endif

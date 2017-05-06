@@ -423,6 +423,7 @@ kernel_call_7(void *result, unsigned result_size,
 	if (func == 0) {
 		return true;
 	}
+	assert(hook.hooked); // We better have already installed the hook.
 	IOExternalTrap trap = { (args[0] == 0 ? 1 : args[0]), func, 0 };
 	size_t size = sizeof(trap);
 	kernel_io_result ior = kernel_write_unsafe(hook.trap, &size, &trap, 0, NULL);

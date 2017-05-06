@@ -112,6 +112,7 @@ MEMCTL_SRCS = $(MEMCTL_ARCH_SRCS) \
 	      cli.c \
 	      command.c \
 	      error.c \
+	      find.c \
 	      memctl.c \
 	      memory.c \
 	      read.c \
@@ -122,6 +123,7 @@ MEMCTL_HDRS = $(MEMCTL_ARCH_HDRS) \
 	      command.h \
 	      disassemble.h \
 	      error.h \
+	      find.h \
 	      format.h \
 	      memory.h \
 	      read.h \
