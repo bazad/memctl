@@ -19,7 +19,7 @@
  * 		access			The access width while reading.
  *
  * Returns:
- * 	true if the read was successful.
+ * 	True if the read was successful.
  */
 bool memctl_read(kaddr_t address, size_t size, bool physical, size_t width, size_t access);
 
@@ -37,7 +37,7 @@ bool memctl_read(kaddr_t address, size_t size, bool physical, size_t width, size
  * 		access			The access width while reading.
  *
  * Returns:
- * 	true if the read was successful.
+ * 	True if the read was successful.
  */
 bool memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size_t access);
 
@@ -54,7 +54,7 @@ bool memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size
  * 		access			The access width while reading.
  *
  * Returns:
- * 	true if the read was successful.
+ * 	True if the read was successful.
  */
 bool memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t access);
 
@@ -73,7 +73,7 @@ bool memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t acce
  * 		access			The access width while reading.
  *
  * Returns:
- * 	true if the read was successful.
+ * 	True if the read was successful.
  */
 bool memctl_disassemble(kaddr_t address, size_t length, bool physical, size_t access);
 
@@ -92,7 +92,7 @@ bool memctl_disassemble(kaddr_t address, size_t length, bool physical, size_t ac
  * 		access			The access width while reading.
  *
  * Returns:
- * 	true if the read was successful.
+ * 	True if the read was successful.
  */
 bool memctl_read_string(kaddr_t address, size_t size, bool physical, size_t access);
 

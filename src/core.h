@@ -33,7 +33,7 @@ extern mach_port_t kernel_task;
  * 	needed by the core.
  *
  * Returns:
- * 	true if the core was successfully loaded.
+ * 	True if the core was successfully loaded.
  *
  * Errors:
  * 	core_error			A core-specific error condition was encountered.

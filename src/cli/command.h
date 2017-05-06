@@ -187,7 +187,7 @@ bool command_print_help(const struct command *command);
  * 					command. Must be NULL terminated.
  *
  * Returns:
- * 	true if the command ran successfully.
+ * 	True if the command ran successfully.
  */
 bool command_run_argv(int argc, const char *argv[]);
 

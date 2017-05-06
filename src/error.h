@@ -39,7 +39,7 @@ typedef const struct error *error_handle;
  * 	Initialize the global error system.
  *
  * Returns:
- * 	true if the error system was successfully initialized.
+ * 	True if the error system was successfully initialized.
  */
 bool error_init(void);
 
@@ -101,7 +101,7 @@ void *error_push_data(error_type_t type, size_t size, void (*destroy)(void *));
  * 	ap				The variadic arguments list
  *
  * Returns:
- * 	true if the error was pushed onto the stack.
+ * 	True if the error was pushed onto the stack.
  */
 bool error_push_printf(error_type_t type, const char *format, va_list ap);
 
@@ -115,7 +115,7 @@ bool error_push_printf(error_type_t type, const char *format, va_list ap);
  * 	type				The error type code
  *
  * Returns:
- * 	true if the error was pushed onto the stack.
+ * 	True if the error was pushed onto the stack.
  */
 static inline bool
 error_push(error_type_t type) {
@@ -191,7 +191,7 @@ enum {
  * 	Push an out-of-memory error in the system domain onto the error stack.
  *
  * Returns:
- * 	true if the error was pushed onto the stack.
+ * 	True if the error was pushed onto the stack.
  */
 bool error_push_out_of_memory(void);
 

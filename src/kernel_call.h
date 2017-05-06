@@ -61,7 +61,7 @@ bool kernel_call_7(void *result, unsigned result_size,
  * 		args			The arguments to the function.
  *
  * Returns:
- * 	true if the function call succeeded, false if there was an error.
+ * 	True if the function call succeeded, false if there was an error.
  *
  * 	If func was 0, then this function returns true if the given call is supported and false
  * 	otherwise, with no errors produced.

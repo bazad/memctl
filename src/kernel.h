@@ -77,7 +77,7 @@ extern struct kernelcache kernelcache;
  * 					kernel_deinit.
  *
  * Returns:
- * 	true if the kernel was initialized successfully.
+ * 	True if the kernel was initialized successfully.
  *
  * Notes:
  * 	This function can be called multiple times. The typical use case is to call this function
@@ -260,7 +260,7 @@ kext_result kext_search_data(const struct kext *kext, const void *data, size_t s
  * 					correct on platforms with a kernelcache.
  *
  * Returns:
- * 	true to halt the iteration and cause kext_for_each to return, false to continue iteration.
+ * 	True to halt the iteration and cause kext_for_each to return, false to continue iteration.
  *
  * Notes:
  * 	On platforms with a kernel cache rather than dynamically loaded kernel extensions, the size
@@ -282,7 +282,7 @@ typedef bool (*kext_for_each_callback_fn)(void *context, CFDictionaryRef info,
  * 		context			A context passed to the callback.
  *
  * Returns:
- * 	true if no errors were encountered.
+ * 	True if no errors were encountered.
  *
  * Dependencies:
  * 	kernel_slide

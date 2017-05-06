@@ -19,7 +19,7 @@
  * 	out	size			The size of the file data.
  *
  * Returns:
- * 	true if the mapping was successful.
+ * 	True if the mapping was successful.
  */
 bool mmap_file(const char *file, const void **data, size_t *size);
 

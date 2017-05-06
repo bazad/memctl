@@ -49,7 +49,7 @@ kext_result oskext_get_address(const char *bundle_id, kaddr_t *base, size_t *siz
  * 		context			A context passed to the callback.
  *
  * Returns:
- * 	true if no errors were encountered.
+ * 	True if no errors were encountered.
  *
  * Dependencies:
  * 	kernel_slide
