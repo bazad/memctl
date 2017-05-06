@@ -106,6 +106,44 @@ spec_is_option(const struct argspec *spec) {
 	return !(spec->option == ARGUMENT || spec->option == OPTIONAL);
 }
 
+// Macros used in the write_* functions below.
+#define BUF()	(buf == NULL ? NULL : buf + written)
+#define SIZE()	(buf == NULL ? 0 : size - written)
+#define WRITE(...)										\
+	written += snprintf(BUF(), SIZE(), __VA_ARGS__);					\
+	if (buf != NULL && written >= size) {							\
+		goto fail;									\
+	}
+
+/*
+ * write_argspec_usage_oneline
+ *
+ * Description:
+ * 	Write a string describing the argspec to the given buffer. The number of characters needed
+ * 	to store the full string is returned.
+ */
+static size_t
+write_argspec_usage_oneline(const struct argspec *argspec, char *buf, size_t size) {
+	size_t written = 0;
+	if (argspec->option == ARGUMENT) {
+		WRITE("<%s>", argspec->argument);
+	} else if (argspec->option == OPTIONAL) {
+		WRITE("[<%s>]", argspec->argument);
+	} else {
+		if (argspec->type == ARG_NONE) {
+			WRITE("[-%s]", argspec->option);
+		} else if (argspec->option[0] != 0) {
+			WRITE("[-%s %s]", argspec->option, argspec->argument);
+		} else {
+			assert(argspec->type != ARG_NONE);
+			WRITE("[%s]", argspec->argument);
+		}
+	}
+	return written;
+fail:
+	return 0;
+}
+
 /*
  * write_command_usage_oneline
  *
@@ -116,37 +154,22 @@ spec_is_option(const struct argspec *spec) {
 static size_t
 write_command_usage_oneline(const struct command *command, char *buf, size_t size) {
 	size_t written = 0;
-#define WRITE(...)										\
-	written += snprintf(buf + written, (buf == NULL ? 0 : size - written), __VA_ARGS__);	\
-	if (buf != NULL && written >= size) {							\
-		goto fail;									\
-	}
 	WRITE("%s", command->command);
 	for (size_t i = 0; i < command->argspecc; i++) {
 		const struct argspec *s = &command->argspecv[i];
-		if (spec_is_option(s) && s->option[0] == 0) {
-			assert(s->type != ARG_NONE);
-			WRITE("[%s]", s->argument);
-			continue;
+		if (!(spec_is_option(s) && s->option[0] == 0)) {
+			WRITE(" ");
 		}
-		WRITE(" ");
-		if (s->option == ARGUMENT) {
-			WRITE("<%s>", s->argument);
-		} else if (s->option == OPTIONAL) {
-			WRITE("[<%s>]", s->argument);
-		} else {
-			if (s->type == ARG_NONE) {
-				WRITE("[-%s]", s->option);
-			} else {
-				assert(s->option[0] != 0);
-				WRITE("[-%s %s]", s->option, s->argument);
-			}
-		}
+		written += write_argspec_usage_oneline(s, BUF(), SIZE());
 	}
 	return written;
 fail:
 	return 0;
 }
+
+#undef BUF
+#undef SIZE
+#undef WRITE
 
 /*
  * help_all
@@ -161,12 +184,12 @@ help_all() {
 	// Get the length of the usage string.
 	size_t usage_length = 4;
 	for (; c < end; c++) {
-		size_t length = write_command_usage_oneline(c, NULL, 0) + 1;
+		size_t length = write_command_usage_oneline(c, NULL, 0);
 		if (length > usage_length) {
 			usage_length = length;
 		}
 	}
-	// Print teh usage strings.
+	// Print the usage strings.
 	char *buf = malloc(usage_length + 1);
 	if (buf == NULL) {
 		error_out_of_memory();
@@ -174,7 +197,7 @@ help_all() {
 	}
 	for (c = cli.commands; c < end; c++) {
 		write_command_usage_oneline(c, buf, usage_length + 1);
-		fprintf(stderr, "%-*s%s\n", (int)usage_length, buf, c->description);
+		fprintf(stderr, "%-*s %s\n", (int)usage_length, buf, c->description);
 	}
 	free(buf);
 	return true;
@@ -188,8 +211,52 @@ help_all() {
  */
 static bool
 help_command(const struct command *command) {
-	error_internal("help_command(%s)", command->command);
-	return false;
+	bool success = false;
+	// Print out the oneline usage and description.
+	size_t length = write_command_usage_oneline(command, NULL, 0);
+	char *buf = malloc(length + 1);
+	if (buf == NULL) {
+		error_out_of_memory();
+		goto fail;
+	}
+	write_command_usage_oneline(command, buf, length + 1);
+	fprintf(stderr, "%s\n\n    %s\n", buf, command->description);
+	free(buf);
+	// Get the argspec length.
+	const struct argspec *s = command->argspecv;
+	const struct argspec *const send = s + command->argspecc;
+	size_t argspec_length = 4;
+	for (; s < send; s++) {
+		length = write_argspec_usage_oneline(s, NULL, 0);
+		if (length > argspec_length) {
+			argspec_length = length;
+		}
+	}
+	// Print out the options and arguments.
+	buf = malloc(argspec_length + 1);
+	if (buf == NULL) {
+		error_out_of_memory();
+		goto fail;
+	}
+	bool printed_options = false;
+	bool printed_arguments = false;
+	for (s = command->argspecv; s < send; s++) {
+		// Print out the section header.
+		if (spec_is_option(s) && !printed_options) {
+			fprintf(stderr, "\nOptions:\n");
+			printed_options = true;
+		} else if (!spec_is_option(s) && !printed_arguments) {
+			fprintf(stderr, "\nArguments:\n");
+			printed_arguments = true;
+		}
+		// Print out details for this option or argument.
+		write_argspec_usage_oneline(s, buf, argspec_length + 1);
+		fprintf(stderr, "    %-*s %s\n", (int)argspec_length, buf, s->description);
+	}
+	free(buf);
+	success = true;
+fail:
+	return success;
 }
 
 /*

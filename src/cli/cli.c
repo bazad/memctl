@@ -267,7 +267,7 @@ static bool kcd_handler(const struct argument *arguments) {
 static struct command commands[] = {
 	{
 		"r", NULL, r_handler,
-		"read memory",
+		"read kernel memory",
 		6, (struct argspec *) &(struct argspec[6]) {
 			{ "",       "width",   ARG_WIDTH,   "display width"               },
 			{ "d",      NULL,      ARG_NONE,    "use dump format"             },
