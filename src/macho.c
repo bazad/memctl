@@ -403,3 +403,19 @@ macho_search_data(const struct macho *macho, const void *data, size_t size, int 
 		return MACHO_SUCCESS;
 	}
 }
+
+const struct load_command *
+macho_segment_containing_address(const struct macho *macho, uint64_t addr) {
+	const struct load_command *lc = NULL;
+	for (;;) {
+		lc = macho_next_segment(macho, lc);
+		if (lc == NULL) {
+			return NULL;
+		}
+		uint64_t vmaddr = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, vmaddr);
+		size_t   vmsize = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, vmsize);
+		if (vmaddr <= addr && addr < vmaddr + vmsize) {
+			return lc;
+		}
+	}
+}

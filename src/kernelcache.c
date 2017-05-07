@@ -558,16 +558,9 @@ kernelcache_find_containing_address_callback(void *context, CFDictionaryRef info
 	if (kr != KEXT_SUCCESS) {
 		return false;
 	}
-	const struct segment_command_64 *sc = NULL;
-	for (;;) {
-		sc = (const struct segment_command_64 *)
-			macho_next_segment(&kext, (const struct load_command *)sc);
-		if (sc == NULL) {
-			return false;
-		}
-		if (sc->vmaddr <= address && address < sc->vmaddr + sc->vmsize) {
-			goto found;
-		}
+	const struct load_command *lc = macho_segment_containing_address(&kext, address);
+	if (lc == NULL) {
+		return false;
 	}
 found:
 	c->status = KEXT_SUCCESS;

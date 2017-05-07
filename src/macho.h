@@ -271,4 +271,20 @@ macho_result macho_resolve_address(const struct macho *macho, const struct symta
 macho_result macho_search_data(const struct macho *macho, const void *data, size_t size,
 		int minprot, uint64_t *addr);
 
+/*
+ * macho_segment_containing_address
+ *
+ * Description:
+ * 	Get the segment command of the segment of the Mach-O file containing the given address.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		addr			The address to search for.
+ *
+ * Returns:
+ * 	The load command of the segment containing the address or NULL.
+ */
+const struct load_command *macho_segment_containing_address(const struct macho *macho,
+		uint64_t addr);
+
 #endif

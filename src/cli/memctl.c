@@ -696,6 +696,26 @@ ap_command(kaddr_t address, bool unpermute) {
 	return true;
 }
 
+static void
+get_segment_offset(const struct macho *macho, kaddr_t address,
+		const char **segname, size_t *offset) {
+	const struct load_command *lc = macho_segment_containing_address(macho, address);
+	if (lc == NULL) {
+		return;
+	}
+	kaddr_t vmaddr;
+	if (lc->cmd == LC_SEGMENT_64) {
+		const struct segment_command_64 *sc = (const struct segment_command_64 *)lc;
+		*segname = sc->segname;
+		vmaddr   = sc->vmaddr;
+	} else {
+		const struct segment_command *sc = (const struct segment_command *)lc;
+		*segname = sc->segname;
+		vmaddr   = sc->vmaddr;
+	}
+	*offset = address - vmaddr;
+}
+
 bool
 s_command(kaddr_t address) {
 	if (!initialize(KERNEL_SYMBOLS)) {
@@ -713,21 +733,32 @@ s_command(kaddr_t address) {
 	if (is_error) {
 		return false;
 	}
+	const char *segname = NULL;
+	size_t segoffset;
+	get_segment_offset(&kext.macho, address - kernel_slide, &segname, &segoffset);
 	const char *name = NULL;
 	size_t size = 0;
 	size_t offset = 0;
 	kr = kext_resolve_address(&kext, address, &name, &size, &offset);
-	if (kr == KEXT_NOT_FOUND || (kr == KEXT_SUCCESS && strlen(name) == 0)) {
+	if (kr == KEXT_SUCCESS && strlen(name) > 0 && offset < size) {
+		assert(segname != NULL);
+		if (offset == 0) {
+			printf("%s.%s: %s  (%zu)\n", kext.bundle_id, segname, name, size);
+		} else {
+			printf("%s.%s: %s+%zu  (%zu)\n", kext.bundle_id, segname, name, offset, size);
+		}
+	} else if (segname == NULL) {
+		offset = address - kext.base;
 		if (offset == 0) {
 			printf("%s\n", kext.bundle_id);
 		} else {
 			printf("%s+%zu\n", kext.bundle_id, offset);
 		}
-	} else if (kr == KEXT_SUCCESS) {
+	} else if (kr == KEXT_SUCCESS || kr == KEXT_NOT_FOUND || kr == KEXT_NO_SYMBOLS) {
 		if (offset == 0) {
-			printf("%s: %s  (%zu)\n", kext.bundle_id, name, size);
+			printf("%s.%s\n", kext.bundle_id, segname);
 		} else {
-			printf("%s: %s+%zu  (%zu)\n", kext.bundle_id, name, offset, size);
+			printf("%s.%s+%zu\n", kext.bundle_id, segname, segoffset);
 		}
 	} else {
 		is_error = kext_error(kr, kext.bundle_id, NULL, 0);
@@ -738,9 +769,7 @@ s_command(kaddr_t address) {
 
 bool
 kcd_command(const char *kernelcache_path, const char *output_path) {
-	if (!initialize(KERNEL_IMAGE)) {
-		return false;
-	}
+	bool success = false;
 	int ofd;
 	struct kernelcache *kc;
 	struct kernelcache kc_local;
@@ -750,11 +779,14 @@ kcd_command(const char *kernelcache_path, const char *output_path) {
 		ofd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (ofd < 0) {
 			error_internal("could not open output file '%s'", output_path);
-			return false;
+			goto fail0;
 		}
 	}
 	if (kernelcache_path == NULL) {
 #if KERNELCACHE
+		if (!initialize(KERNEL_IMAGE)) {
+			goto fail1;
+		}
 		kc = &kernelcache;
 #else
 		assert(false);
@@ -763,13 +795,17 @@ kcd_command(const char *kernelcache_path, const char *output_path) {
 		kext_result kr = kernelcache_init_file(&kc_local, kernelcache_path);
 		if (kr != KEXT_SUCCESS) {
 			assert(kr == KEXT_ERROR);
-			return false;
+			goto fail1;
 		}
 		kc = &kc_local;
 	}
 	uint8_t *p = kc->kernel.mh;
 	size_t left = kc->kernel.size;
-	while (left > 0) {
+	for (;;) {
+		if (left == 0) {
+			success = true;
+			break;
+		}
 		ssize_t written = write(ofd, p, left);
 		if (interrupted) {
 			error_interrupt();
@@ -785,10 +821,12 @@ kcd_command(const char *kernelcache_path, const char *output_path) {
 	if (kernelcache_path != NULL) {
 		kernelcache_deinit(&kc_local);
 	}
+fail1:
 	if (output_path != NULL) {
 		close(ofd);
 	}
-	return (left == 0);
+fail0:
+	return success;
 }
 
 int
