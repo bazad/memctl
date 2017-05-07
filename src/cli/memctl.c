@@ -576,7 +576,7 @@ fi_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle
 	if (!success) {
 		return false;
 	}
-	return f_command(start, end, address, sizeof(address), false, false, access,
+	return f_command(start, end, address, sizeof(address), false, true, access,
 			sizeof(address));
 }
 

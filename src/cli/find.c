@@ -12,7 +12,7 @@ bool
 memctl_find(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical, bool heap,
 		size_t access, size_t alignment) {
 	// Select the read function.
-	kernel_read_fn read = kernel_read;
+	kernel_read_fn read = kernel_read_all;
 	if (heap) {
 		read = kernel_read_heap;
 	} else if (physical) {

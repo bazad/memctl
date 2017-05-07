@@ -50,7 +50,7 @@
 #define OPT_GET_SYMBOL_OR(n_, opt_, arg_, val_)		OPT_GET_OR_(n_, opt_, arg_, val_, ARG_SYMBOL, symbol)
 #define OPT_GET_ADDRESS_OR(n_, opt_, arg_, val_)	OPT_GET_OR_(n_, opt_, arg_, val_, ARG_ADDRESS, address)
 #define OPT_GET_RANGE_OR(n_, opt_, arg_, start_, end_)	\
-	OPT_GET_OR_(n_, opt_, arg_, ((struct argrange) { start_, end_ }), ARG_RANGE, range)
+	OPT_GET_OR_(n_, opt_, arg_, ((struct argrange) { start_, end_, true, true }), ARG_RANGE, range)
 
 #define ARG_GET_INT(n_, arg_)				ARG_GET_(n_, arg_, ARG_INT, sint)
 #define ARG_GET_UINT(n_, arg_)				ARG_GET_(n_, arg_, ARG_UINT, uint)
@@ -71,7 +71,37 @@
 #define ARG_GET_SYMBOL_OR(n_, arg_, val_)		ARG_GET_OR_(n_, arg_, val_, ARG_SYMBOL, symbol)
 #define ARG_GET_ADDRESS_OR(n_, arg_, val_)		ARG_GET_OR_(n_, arg_, val_, ARG_ADDRESS, address)
 #define ARG_GET_RANGE_OR(n_, arg_, start_, end_)	\
-	ARG_GET_OR_(n_, arg_, ((struct argrange) { start_, end_ }), ARG_RANGE, range)
+	ARG_GET_OR_(n_, arg_, ((struct argrange) { start_, end_, true, true }), ARG_RANGE, range)
+
+// Default values for argrange start and end values.
+// TODO: This is a hack. It should be possible to have memctl configure these by loading the core
+// and querying the kernel map.
+#if __arm64__
+# define RANGE_DEFAULT_START	0xfffffff000000000
+# define RANGE_DEFAULT_END	0xfffffff280000000
+#elif __x86_64__
+# define RANGE_DEFAULT_START	0xffffff7f80000000
+# define RANGE_DEFAULT_END	0xffffff9400000000
+#else
+# error No default kernel virtual memory range for architecture.
+#endif
+
+/*
+ * default_virtual_range
+ *
+ * Description:
+ * 	If either endpoint of the range was a default, then specify a realistic virtual address
+ * 	instead.
+ */
+static void
+default_virtual_range(struct argrange *range) {
+	if (range->default_start) {
+		range->start = RANGE_DEFAULT_START;
+	}
+	if (range->default_end) {
+		range->end = RANGE_DEFAULT_END;
+	}
+}
 
 static bool r_handler(const struct argument *arguments) {
 	size_t width    = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
@@ -167,6 +197,9 @@ static bool f_handler(const struct argument *arguments) {
 		error_usage("f", NULL, "p and h options are mutually exclusive");
 		return false;
 	}
+	if (!heap && !physical) {
+		default_virtual_range(&range);
+	}
 	return f_command(range.start, range.end, value, width, physical, heap, access, alignment);
 }
 
@@ -203,6 +236,7 @@ static bool kp_handler(const struct argument *arguments) {
 
 static bool kpm_handler(const struct argument *arguments) {
 	struct argrange range = ARG_GET_RANGE(0, "range");
+	default_virtual_range(&range);
 	return kpm_command(range.start, range.end);
 }
 

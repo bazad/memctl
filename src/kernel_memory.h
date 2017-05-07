@@ -175,24 +175,52 @@ kernel_io_result kernel_write_heap(kaddr_t kaddr, size_t *size, const void *data
 		size_t access_width, kaddr_t *next);
 
 /*
- * kernel_read
+ * kernel_read_safe
  *
  * Description:
  * 	A kernel_read_fn that performs safety checks before reading kernel memory. All non-readable
  * 	addresses return KERNEL_IO_PROTECTION.
  */
-kernel_io_result kernel_read(kaddr_t kaddr, size_t *size, void *data, size_t access_width,
+kernel_io_result kernel_read_safe(kaddr_t kaddr, size_t *size, void *data, size_t access_width,
 		kaddr_t *next);
 
 /*
- * kernel_write
+ * kernel_write_safe
  *
  * Description:
  * 	A kernel_write_fn that performs safety checks before writing kernel memory. All
  * 	non-writable addresses return KERNEL_IO_PROTECTION.
  */
-kernel_io_result kernel_write(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
+kernel_io_result kernel_write_safe(kaddr_t kaddr, size_t *size, const void *data,
+		size_t access_width, kaddr_t *next);
+
+/*
+ * kernel_read_all
+ *
+ * Description:
+ * 	A kernel_read_fn that tries to read all memory addresses that look safe. All non-readable
+ * 	addresses return KERNEL_IO_PROTECTION.
+ *
+ * Notes:
+ * 	While the goal is for this function to be safe, it is more likely to trigger a panic than
+ * 	kernel_read_safe. It is also slower than kernel_read_safe because it does not rely on the
+ * 	kernel virtual memory map to determine whether an address is mapped.
+ */
+kernel_io_result kernel_read_all(kaddr_t kaddr, size_t *size, void *data, size_t access_width,
 		kaddr_t *next);
+
+/*
+ * kernel_write_all
+ *
+ * Description:
+ * 	A kernel_write_fn that tries to write all memory addresses that look safe. All non-writable
+ * 	addresses return KERNEL_IO_PROTECTION.
+ *
+ * Notes:
+ * 	See kernel_read_all.
+ */
+kernel_io_result kernel_write_all(kaddr_t kaddr, size_t *size, const void *data,
+		size_t access_width, kaddr_t *next);
 
 /*
  * kernel_virtual_to_physical

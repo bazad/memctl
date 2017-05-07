@@ -45,16 +45,25 @@ endif
 # libmemctl aarch64 sources.
 
 LIBMEMCTL_AARCH64_SRCS = aarch64/disasm.c \
-			 aarch64/kernel_call_aarch64.c
+			 aarch64/kernel_call_aarch64.c \
+			 aarch64/physical_region.c
 
 LIBMEMCTL_AARCH64_HDRS = aarch64/disasm.h \
 			 aarch64/kernel_call_aarch64.h
+
+# libmemctl x86_64 sources.
+
+LIBMEMCTL_X86_64_SRCS = x86_64/physical_region.c
+LIBMEMCTL_X86_64_HDRS =
 
 # libmemctl sources.
 
 ifeq ($(ARCH),arm64)
 LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_AARCH64_SRCS)
 LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_AARCH64_HDRS)
+else ifeq ($(ARCH),x86_64)
+LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_X86_64_SRCS)
+LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_X86_64_HDRS)
 endif
 
 LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
@@ -90,6 +99,7 @@ LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
 		 memctl_types.h \
 		 offset.h \
 		 oskext.h \
+		 physical_region.h \
 		 platform.h \
 		 utility.h \
 		 vtable.h

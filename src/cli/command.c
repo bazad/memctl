@@ -555,6 +555,7 @@ parse_range(struct state *s) {
 		goto fail1;
 	} else if (str[0] == '-') {
 		s->argument->range.start = 0;
+		s->argument->range.default_start = true;
 	} else {
 		s->argument->range.start = strtoumax(str, &end, 16);
 		if (*end != '-') {
@@ -567,6 +568,7 @@ parse_range(struct state *s) {
 	} else if (str[0] == 0) {
 		end = (char *)str;
 		s->argument->range.end = (kaddr_t)(-1);
+		s->argument->range.default_end = true;
 	} else {
 		s->argument->range.end = strtoumax(str, &end, 16);
 		if (*end != 0) {
@@ -656,6 +658,7 @@ find_command(const char *str, const struct command **command) {
  */
 static void
 init_arguments(const struct command *command, struct argument *arguments) {
+	memset(arguments, 0, command->argspecc * sizeof(*arguments));
 	for (size_t i = 0; i < command->argspecc; i++) {
 		arguments[i].option   = command->argspecv[i].option;
 		arguments[i].argument = command->argspecv[i].argument;

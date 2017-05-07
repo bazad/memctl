@@ -74,6 +74,8 @@ struct argument {
 		struct argrange {
 			kaddr_t start;
 			kaddr_t end;
+			bool    default_start;
+			bool    default_end;
 		} range;
 	};
 };
