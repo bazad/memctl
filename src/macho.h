@@ -84,17 +84,14 @@ size_t macho_header_size(const struct macho *macho);
  *
  * Parameters:
  * 		macho			The macho struct.
- * 	inout	lc			The load command pointer. Set this to NULL to start
- * 					iterating. If lc is NULL on return, then all load commands
- * 					have been processed.
+ * 		lc			The load command pointer. Set this to NULL to start
+ * 					at the first load command.
  *
- * TODO:
- * 	This should just return the new load command directly, this extra indirection is
- * 	unnecessary. The same goes for the similar functions below.
+ * Returns:
+ * 	The next load command, or NULL if all load commands have been processed.
  */
-void macho_next_load_command(const struct macho *macho, const struct load_command **lc);
-void macho_next_load_command_32(const struct macho *macho, const struct load_command **lc);
-void macho_next_load_command_64(const struct macho *macho, const struct load_command **lc);
+const struct load_command *macho_next_load_command(const struct macho *macho,
+		const struct load_command *lc);
 
 /*
  * macho_find_load_command
@@ -104,26 +101,38 @@ void macho_next_load_command_64(const struct macho *macho, const struct load_com
  *
  * Parameters:
  * 		macho			The macho struct.
- * 	inout	lc			The load command pointer. Set this to NULL to start
- * 					iterating. If lc is NULL on return, then all load commands
- * 					have been processed.
+ * 		lc			The current load command pointer. Set this to NULL to
+ * 					return the first load command.
  * 		cmd			The load command type to iterate over.
  *
  * Returns:
- * 	MACHO_SUCCESS or MACHO_NOT_FOUND.
+ * 	The next load command, or NULL if all load commands of the given type have been processed.
  */
-macho_result macho_find_load_command(const struct macho *macho, const struct load_command **lc,
-		uint32_t cmd);
-macho_result macho_find_load_command_32(const struct macho *macho, const struct load_command **lc,
-		uint32_t cmd);
-macho_result macho_find_load_command_64(const struct macho *macho, const struct load_command **lc,
-		uint32_t cmd);
+const struct load_command *macho_find_load_command(const struct macho *macho,
+		const struct load_command *lc, uint32_t cmd);
 
 /*
- * macho_find_segment_command
+ * macho_next_segment
  *
  * Description:
- * 	Find the segment command for the given Mach-O segment.
+ * 	Iterate over the segments of a Mach-O file.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		sc			The current segment command pointer. Set this to NULL to
+ * 					return the first segment command.
+ *
+ * Returns:
+ * 	The next segment command, or NULL if there are no more segment commands after sc.
+ */
+const struct load_command *macho_next_segment(const struct macho *macho,
+		const struct load_command *sc);
+
+/*
+ * macho_find_segment
+ *
+ * Description:
+ * 	Find the segment command for the given Mach-O segment name.
  *
  * Parameters:
  * 		macho			The macho struct.
@@ -132,11 +141,7 @@ macho_result macho_find_load_command_64(const struct macho *macho, const struct 
  * Returns:
  * 	The segment command or NULL.
  */
-const struct load_command *macho_find_segment_command(const struct macho *macho,
-		const char *segname);
-const struct segment_command *macho_find_segment_command_32(const struct macho *macho,
-		const char *segname);
-const struct segment_command_64 *macho_find_segment_command_64(const struct macho *macho,
+const struct load_command *macho_find_segment(const struct macho *macho,
 		const char *segname);
 
 /*
@@ -155,10 +160,6 @@ const struct segment_command_64 *macho_find_segment_command_64(const struct mach
  */
 const void *macho_find_section(const struct macho *macho,
 		const struct load_command *segment, const char *sectname);
-const struct section *macho_find_section_32(const struct macho *macho,
-		const struct segment_command *segment, const char *sectname);
-const struct section_64 *macho_find_section_64(const struct macho *macho,
-		const struct segment_command_64 *segment, const char *sectname);
 
 /*
  * macho_segment_data
@@ -175,10 +176,6 @@ const struct section_64 *macho_find_section_64(const struct macho *macho,
  * 	out	size			On return, the size of the segment contents.
  */
 void macho_segment_data(const struct macho *macho, const struct load_command *segment,
-		const void **data, uint64_t *addr, size_t *size);
-void macho_segment_data_32(const struct macho *macho, const struct segment_command *segment,
-		const void **data, uint32_t *addr, size_t *size);
-void macho_segment_data_64(const struct macho *macho, const struct segment_command_64 *segment,
 		const void **data, uint64_t *addr, size_t *size);
 
 /*
@@ -198,10 +195,6 @@ void macho_segment_data_64(const struct macho *macho, const struct segment_comma
  */
 void macho_section_data(const struct macho *macho, const struct load_command *segment,
 		const void *section, const void **data, uint64_t *addr, size_t *size);
-void macho_section_data_32(const struct macho *macho, const struct segment_command *segment,
-		const struct section *section, const void **data, uint32_t *addr, size_t *size);
-void macho_section_data_64(const struct macho *macho, const struct segment_command_64 *segment,
-		const struct section_64 *section, const void **data, uint64_t *addr, size_t *size);
 
 /*
  * macho_find_base
@@ -217,50 +210,65 @@ void macho_section_data_64(const struct macho *macho, const struct segment_comma
  * 	A macho_result status code.
  */
 macho_result macho_find_base(struct macho *macho, uint64_t *base);
-macho_result macho_find_base_32(struct macho *macho, uint32_t *base);
-macho_result macho_find_base_64(struct macho *macho, uint64_t *base);
 
 /*
  * macho_resolve_symbol
+ *
+ * Description:
+ * 	Resolve a symbol in a Mach-O file.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		symtab			The Mach-O symtab command.
+ * 		symbol			The symbol to resolve.
+ * 	out	addr			The address of the symbol.
+ * 	out	size			A guess of the size of the symbol. This will only ever be
+ * 					an overestimate.
  *
  * Returns:
  * 	A macho_result status code.
  */
 macho_result macho_resolve_symbol(const struct macho *macho, const struct symtab_command *symtab,
 		const char *symbol, uint64_t *addr, size_t *size);
-macho_result macho_resolve_symbol_32(const struct macho *macho,
-		const struct symtab_command *symtab, const char *symbol, uint32_t *addr,
-		size_t *size);
-macho_result macho_resolve_symbol_64(const struct macho *macho,
-		const struct symtab_command *symtab, const char *symbol, uint64_t *addr,
-		size_t *size);
 
 /*
  * macho_resolve_address
+ *
+ * Description:
+ * 	Resolve an address into a symbol.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		symtab			The Mach-O symtab command.
+ * 		addr			The address to resolve.
+ * 	out	name			The symbol name.
+ * 	out	size			A guess of the size of the symbol. See
+ * 					macho_resolve_symbol.
+ * 	out	offset			The offset of addr into the symbol.
  *
  * Returns:
  * 	A macho_result status code.
  */
 macho_result macho_resolve_address(const struct macho *macho, const struct symtab_command *symtab,
 		uint64_t addr, const char **name, size_t *size, size_t *offset);
-macho_result macho_resolve_address_32(const struct macho *macho,
-		const struct symtab_command *symtab, uint32_t addr, const char **name,
-		size_t *size, size_t *offset);
-macho_result macho_resolve_address_64(const struct macho *macho,
-		const struct symtab_command *symtab, uint64_t addr, const char **name,
-		size_t *size, size_t *offset);
 
 /*
  * macho_search_data
+ *
+ * Description:
+ * 	Search the data of the Mach-O file for a given byte sequence.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		data			The data to search for.
+ * 		size			The number of bytes in data.
+ * 		minprot			The minimum memory protections of the region.
+ * 	out	addr			The virtual address of the data in the Mach-O.
  *
  * Returns:
  * 	A macho_result status code.
  */
 macho_result macho_search_data(const struct macho *macho, const void *data, size_t size,
-		int minprot, uint64_t *addr);
-macho_result macho_search_data_32(const struct macho *macho, const void *data, size_t size,
-		int minprot, uint32_t *addr);
-macho_result macho_search_data_64(const struct macho *macho, const void *data, size_t size,
 		int minprot, uint64_t *addr);
 
 #endif

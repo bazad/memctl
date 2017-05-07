@@ -269,7 +269,8 @@ missing_segment(const char *segname) {
  */
 static kext_result
 kernelcache_find_text(const struct macho *kernel, const struct segment_command_64 **text) {
-	const struct segment_command_64 *sc = macho_find_segment_command_64(kernel, SEG_TEXT);
+	const struct segment_command_64 *sc = (const struct segment_command_64 *)
+		macho_find_segment(kernel, SEG_TEXT);
 	if (sc == NULL) {
 		missing_segment(SEG_TEXT);
 		return KEXT_ERROR;
@@ -291,8 +292,8 @@ kernelcache_find_text(const struct macho *kernel, const struct segment_command_6
 static kext_result
 kernelcache_find_prelink_text(const struct macho *kernel,
 		const struct segment_command_64 **prelink_text) {
-	const struct segment_command_64 *sc = macho_find_segment_command_64(kernel,
-			kPrelinkTextSegment);
+	const struct segment_command_64 *sc = (const struct segment_command_64 *)
+		macho_find_segment(kernel, kPrelinkTextSegment);
 	if (sc == NULL) {
 		missing_segment(kPrelinkTextSegment);
 		return KEXT_ERROR;
@@ -417,8 +418,8 @@ kernelcache_deinit(struct kernelcache *kc) {
 
 kext_result
 kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prelink_info) {
-	const struct segment_command_64 *sc = macho_find_segment_command_64(kernel,
-			kPrelinkInfoSegment);
+	const struct segment_command_64 *sc = (const struct segment_command_64 *)
+		macho_find_segment(kernel, kPrelinkInfoSegment);
 	if (sc == NULL) {
 		missing_segment(kPrelinkInfoSegment);
 		return KEXT_ERROR;
@@ -559,9 +560,9 @@ kernelcache_find_containing_address_callback(void *context, CFDictionaryRef info
 	}
 	const struct segment_command_64 *sc = NULL;
 	for (;;) {
-		macho_result mr = macho_find_load_command_64(&kext,
-				(const struct load_command **)&sc, LC_SEGMENT_64);
-		if (mr != MACHO_SUCCESS) {
+		sc = (const struct segment_command_64 *)
+			macho_next_segment(&kext, (const struct load_command *)sc);
+		if (sc == NULL) {
 			return false;
 		}
 		if (sc->vmaddr <= address && address < sc->vmaddr + sc->vmsize) {

@@ -5,6 +5,13 @@
 #include <assert.h>
 #include <string.h>
 
+#define MACHO_STRUCT_FIELD(macho, struct_type, object, field)		\
+	(macho_is_64(macho) ? ((struct_type##_64 *)object)->field	\
+	                    : ((struct_type *)object)->field)
+
+#define MACHO_STRUCT_SIZE(macho, struct_type)				\
+	(macho_is_64(macho) ? sizeof(struct_type##_64) : sizeof(struct_type))
+
 bool
 macho_is_32(const struct macho *macho) {
 	return (macho->mh32->magic == MH_MAGIC);
@@ -17,133 +24,68 @@ macho_is_64(const struct macho *macho) {
 
 size_t
 macho_header_size(const struct macho *macho) {
-	if (macho_is_32(macho)) {
-		return sizeof(*macho->mh32);
-	} else {
-		return sizeof(*macho->mh64);
-	}
+	return MACHO_STRUCT_SIZE(macho, struct mach_header);
 }
 
 /*
  * macho_get_nlist
  */
-static const struct nlist *
-macho_get_nlist_32(const struct macho *macho, const struct symtab_command *symtab) {
-	assert(macho_is_32(macho));
-	return (const struct nlist *)((uintptr_t)macho->mh + symtab->symoff);
+static const void *
+macho_get_nlist(const struct macho *macho, const struct symtab_command *symtab, uint32_t idx) {
+	return (const void *)((uintptr_t)macho->mh + symtab->symoff
+			+ idx * MACHO_STRUCT_SIZE(macho, struct nlist));
 }
 
 /*
- * macho_get_nlist_64
- */
-static const struct nlist_64 *
-macho_get_nlist_64(const struct macho *macho, const struct symtab_command *symtab) {
-	assert(macho_is_64(macho));
-	return (const struct nlist_64 *)((uintptr_t)macho->mh + symtab->symoff);
-}
-
-/*
- * macho_get_section_32
+ * macho_get_section_by_index
  *
  * Description:
- * 	Find the given section in the 32-bit Mach-O image.
+ * 	Find the given section by index.
  */
-static const struct section *
-macho_get_section_32(const struct macho *macho, uint32_t sect) {
-	assert(macho_is_32(macho));
+static const void *
+macho_get_section_by_index(const struct macho *macho, uint32_t sect) {
 	if (sect < 1) {
 		return NULL;
 	}
 	const struct load_command *lc = NULL;
 	uint32_t idx = 1;
-	const struct section *sectcmd = NULL;
+	uintptr_t sectcmd = 0;
 	for (;;) {
-		macho_result mr = macho_find_load_command_32(macho, &lc, LC_SEGMENT);
-		if (mr != MACHO_SUCCESS) {
-			assert(mr == MACHO_NOT_FOUND);
+		lc = macho_next_segment(macho, lc);
+		if (lc == NULL) {
 			break;
 		}
-		const struct segment_command *sc = (const struct segment_command *)lc;
-		if (sect < idx + sc->nsects) {
-			sectcmd = (const struct section *) ((uintptr_t)sc + sizeof(*sc));
-			sectcmd += sect - idx;
+		uint32_t nsects = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, nsects);
+		if (sect < idx + nsects) {
+			size_t lc_size = MACHO_STRUCT_SIZE(macho, struct segment_command);
+			sectcmd = (uintptr_t)lc + lc_size;
+			sectcmd += (sect - idx) * MACHO_STRUCT_SIZE(macho, struct section);
 			break;
 		}
-		idx += sc->nsects;
+		idx += nsects;
 	}
-	return sectcmd;
-}
-
-/*
- * macho_get_section_64
- *
- * Description:
- * 	Find the given section in the 32-bit Mach-O image.
- */
-static const struct section_64 *
-macho_get_section_64(const struct macho *macho, uint32_t sect) {
-	assert(macho_is_64(macho));
-	if (sect < 1) {
-		return NULL;
-	}
-	const struct load_command *lc = NULL;
-	uint32_t idx = 1;
-	const struct section_64 *sectcmd = NULL;
-	for (;;) {
-		macho_result mr = macho_find_load_command_64(macho, &lc, LC_SEGMENT_64);
-		if (mr != MACHO_SUCCESS) {
-			assert(mr == MACHO_NOT_FOUND);
-			break;
-		}
-		const struct segment_command_64 *sc = (const struct segment_command_64 *)lc;
-		if (sect < idx + sc->nsects) {
-			sectcmd = (const struct section_64 *) ((uintptr_t)sc + sizeof(*sc));
-			sectcmd += sect - idx;
-			break;
-		}
-		idx += sc->nsects;
-	}
-	return sectcmd;
+	return (const void *)sectcmd;
 }
 
 static size_t
-guess_symbol_size_32(const struct macho *macho, const struct symtab_command *symtab,
-		uint32_t idx, uint32_t next) {
-	assert(macho_is_32(macho));
-	const struct nlist *nl = macho_get_nlist_32(macho, symtab) + idx;
-	size_t size = -1;
-	if (next != -1) {
-		size = next - nl->n_value;
-	}
-	const struct section *sect = macho_get_section_32(macho, nl->n_sect);
-	if (sect != NULL
-	    && sect->addr <= nl->n_value
-	    && nl->n_value < sect->addr + sect->size) {
-		size_t sect_size = sect->addr + sect->size - nl->n_value;
-		if (sect_size < size) {
-			size = sect_size;
-		}
-	}
-	// TODO: Use segment size if section size failed.
-	return (size == -1 ? 0 : size);
-}
-
-static size_t
-guess_symbol_size_64(const struct macho *macho, const struct symtab_command *symtab,
+guess_symbol_size(const struct macho *macho, const struct symtab_command *symtab,
 		uint32_t idx, uint64_t next) {
-	assert(macho_is_64(macho));
-	const struct nlist_64 *nl = macho_get_nlist_64(macho, symtab) + idx;
+	const void *nl = macho_get_nlist(macho, symtab, idx);
 	size_t size = -1;
+	uint64_t n_value = MACHO_STRUCT_FIELD(macho, struct nlist, nl, n_value);
+	uint32_t n_sect  = MACHO_STRUCT_FIELD(macho, struct nlist, nl, n_sect);
 	if (next != -1) {
-		size = next - nl->n_value;
+		size = next - n_value;
 	}
-	const struct section_64 *sect = macho_get_section_64(macho, nl->n_sect);
-	if (sect != NULL
-	    && sect->addr <= nl->n_value
-	    && nl->n_value < sect->addr + sect->size) {
-		size_t sect_size = sect->addr + sect->size - nl->n_value;
-		if (sect_size < size) {
-			size = sect_size;
+	const void *sect = macho_get_section_by_index(macho, n_sect);
+	if (sect != NULL) {
+		uint64_t sect_addr = MACHO_STRUCT_FIELD(macho, struct section, sect, addr);
+		size_t   sect_size = MACHO_STRUCT_FIELD(macho, struct section, sect, size);
+		if (sect_addr <= n_value && n_value < sect_addr + sect_size) {
+			size_t sect_limited_size = sect_addr + sect_size - n_value;
+			if (sect_limited_size < size) {
+				size = sect_limited_size;
+			}
 		}
 	}
 	// TODO: Use segment size if section size failed.
@@ -239,353 +181,140 @@ macho_validate(const void *mh, size_t size) {
 	}
 }
 
-void
-macho_next_load_command_32(const struct macho *macho, const struct load_command **lc) {
-	assert(macho_is_32(macho));
-	const struct load_command *lc0 = *lc;
-	const struct mach_header *mh = macho->mh32;
-	if (lc0 == NULL) {
-		lc0 = (const struct load_command *)((uintptr_t)mh + sizeof(*mh));
+const struct load_command *
+macho_next_load_command(const struct macho *macho, const struct load_command *lc) {
+	if (lc == NULL) {
+		lc = (const struct load_command *)((uintptr_t)macho->mh + macho_header_size(macho));
 	} else {
-		lc0 = (const struct load_command *)((uintptr_t)lc0 + lc0->cmdsize);
+		lc = (const struct load_command *)((uintptr_t)lc + lc->cmdsize);
 	}
-	uintptr_t end = (uintptr_t)mh + mh->sizeofcmds;
-	if ((uintptr_t)lc0 >= end) {
-		lc0 = NULL;
+	size_t sizeofcmds = MACHO_STRUCT_FIELD(macho, struct mach_header, macho->mh, sizeofcmds);
+	// TODO size_t sizeofcmds = (macho_is_32(macho) ? macho->mh32->sizeofcmds : macho->mh64->sizeofcmds);
+	if ((uintptr_t)lc >= (uintptr_t)macho->mh + sizeofcmds) {
+		lc = NULL;
 	}
-	*lc = lc0;
+	return lc;
 }
 
-void
-macho_next_load_command_64(const struct macho *macho, const struct load_command **lc) {
-	assert(macho_is_64(macho));
-	const struct load_command *lc0 = *lc;
-	const struct mach_header_64 *mh = macho->mh;
-	if (lc0 == NULL) {
-		lc0 = (const struct load_command *)((uintptr_t)mh + sizeof(*mh));
-	} else {
-		lc0 = (const struct load_command *)((uintptr_t)lc0 + lc0->cmdsize);
-	}
-	uintptr_t end = (uintptr_t)mh + mh->sizeofcmds;
-	if ((uintptr_t)lc0 >= end) {
-		lc0 = NULL;
-	}
-	*lc = lc0;
-}
-
-void
-macho_next_load_command(const struct macho *macho, const struct load_command **lc) {
-	if (macho_is_32(macho)) {
-		macho_next_load_command_32(macho, lc);
-	} else {
-		macho_next_load_command_64(macho, lc);
-	}
-}
-
-macho_result
-macho_find_load_command_32(const struct macho *macho, const struct load_command **lc, uint32_t cmd) {
-	assert(macho_is_32(macho));
+const struct load_command *
+macho_find_load_command(const struct macho *macho, const struct load_command *lc, uint32_t cmd) {
 	for (;;) {
-		macho_next_load_command_32(macho, lc);
-		if (*lc == NULL) {
-			return MACHO_NOT_FOUND;
-		}
-		if ((*lc)->cmd == cmd) {
-			return MACHO_SUCCESS;
-		}
-	}
-}
-
-macho_result
-macho_find_load_command_64(const struct macho *macho, const struct load_command **lc, uint32_t cmd) {
-	assert(macho_is_64(macho));
-	for (;;) {
-		macho_next_load_command_64(macho, lc);
-		if (*lc == NULL) {
-			return MACHO_NOT_FOUND;
-		}
-		if ((*lc)->cmd == cmd) {
-			return MACHO_SUCCESS;
-		}
-	}
-}
-
-macho_result
-macho_find_load_command(const struct macho *macho, const struct load_command **lc, uint32_t cmd) {
-	if (macho_is_32(macho)) {
-		return macho_find_load_command_32(macho, lc, cmd);
-	} else {
-		return macho_find_load_command_64(macho, lc, cmd);
-	}
-}
-
-const struct segment_command *
-macho_find_segment_command_32(const struct macho *macho, const char *segname) {
-	assert(macho_is_32(macho));
-	const struct load_command *lc = NULL;
-	for (;;) {
-		macho_next_load_command_32(macho, &lc);
+		lc = macho_next_load_command(macho, lc);
 		if (lc == NULL) {
 			return NULL;
 		}
-		if (lc->cmd != LC_SEGMENT) {
-			continue;
+		if (lc->cmd == cmd) {
+			return lc;
 		}
-		const struct segment_command *sc = (const struct segment_command *)lc;
-		if (strcmp(sc->segname, segname) != 0) {
-			continue;
-		}
-		return sc;
-	}
-}
-
-const struct segment_command_64 *
-macho_find_segment_command_64(const struct macho *macho, const char *segname) {
-	assert(macho_is_64(macho));
-	const struct load_command *lc = NULL;
-	for (;;) {
-		macho_next_load_command_64(macho, &lc);
-		if (lc == NULL) {
-			return NULL;
-		}
-		if (lc->cmd != LC_SEGMENT_64) {
-			continue;
-		}
-		const struct segment_command_64 *sc = (const struct segment_command_64 *)lc;
-		if (strcmp(sc->segname, segname) != 0) {
-			continue;
-		}
-		return sc;
 	}
 }
 
 const struct load_command *
-macho_find_segment_command(const struct macho *macho, const char *segname) {
-	if (macho_is_32(macho)) {
-		return (const struct load_command *)macho_find_segment_command_32(macho, segname);
-	} else {
-		return (const struct load_command *)macho_find_segment_command_64(macho, segname);
-	}
+macho_next_segment(const struct macho *macho, const struct load_command *sc) {
+	const uint32_t cmd = (macho_is_64(macho) ? LC_SEGMENT_64 : LC_SEGMENT);
+	return macho_find_load_command(macho, sc, cmd);
 }
 
-const struct section *
-macho_find_section_32(const struct macho *macho, const struct segment_command *segment,
-		const char *sectname) {
-	const struct section *sect = (const struct section *)(segment + 1);
-	const struct section *end = sect + segment->nsects;
-	for (; sect < end; sect++) {
-		if (strcmp(sect->sectname, sectname) == 0) {
-			return sect;
+const struct load_command *
+macho_find_segment(const struct macho *macho, const char *segname) {
+	const struct load_command *lc = NULL;
+	for (;;) {
+		lc = macho_next_segment(macho, lc);
+		if (lc == NULL) {
+			return NULL;
 		}
-	}
-	return NULL;
-}
-
-const struct section_64 *
-macho_find_section_64(const struct macho *macho, const struct segment_command_64 *segment,
-		const char *sectname) {
-	const struct section_64 *sect = (const struct section_64 *)(segment + 1);
-	const struct section_64 *end = sect + segment->nsects;
-	for (; sect < end; sect++) {
-		if (strcmp(sect->sectname, sectname) == 0) {
-			return sect;
+		const char *lc_segname = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, segname);
+		if (strcmp(lc_segname, segname) != 0) {
+			continue;
 		}
+		return lc;
 	}
-	return NULL;
 }
 
 const void *
 macho_find_section(const struct macho *macho, const struct load_command *segment,
 		const char *sectname) {
-	if (macho_is_32(macho)) {
-		return macho_find_section_32(macho, (const struct segment_command *)segment,
-				sectname);
-	} else {
-		return macho_find_section_64(macho, (const struct segment_command_64 *)segment,
-				sectname);
+	const size_t segment_size = MACHO_STRUCT_SIZE(macho, struct segment_command);
+	const size_t section_size = MACHO_STRUCT_SIZE(macho, struct section);
+	uintptr_t sect = (uintptr_t)segment + segment_size;
+	size_t nsects = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, nsects);
+	uintptr_t end  = sect + nsects * section_size;
+	for (; sect < end; sect += section_size) {
+		const char *name = MACHO_STRUCT_FIELD(macho, struct section, sect, sectname);
+		if (strcmp(name, sectname) == 0) {
+			return (const void *)sect;
+		}
 	}
-}
-
-void
-macho_segment_data_32(const struct macho *macho, const struct segment_command *segment,
-		const void **data, uint32_t *addr, size_t *size) {
-	*data = (const void *)((uintptr_t)macho->mh + segment->fileoff);
-	*addr = segment->vmaddr;
-	*size = segment->vmsize;
-}
-
-void
-macho_segment_data_64(const struct macho *macho, const struct segment_command_64 *segment,
-		const void **data, uint64_t *addr, size_t *size) {
-	*data = (const void *)((uintptr_t)macho->mh + segment->fileoff);
-	*addr = segment->vmaddr;
-	*size = segment->vmsize;
+	return NULL;
 }
 
 void
 macho_segment_data(const struct macho *macho, const struct load_command *segment,
 		const void **data, uint64_t *addr, size_t *size) {
-	if (macho_is_32(macho)) {
-		uint32_t addr32;
-		macho_segment_data_32(macho, (const struct segment_command *)segment,
-				data, &addr32, size);
-		*addr = addr32;
-	} else {
-		macho_segment_data_64(macho, (const struct segment_command_64 *)segment,
-				data, addr, size);
-	}
-}
-
-void
-macho_section_data_32(const struct macho *macho, const struct segment_command *segment,
-		const struct section *section, const void **data, uint32_t *addr, size_t *size) {
-	uint64_t vmoff = section->addr - segment->vmaddr;
-	*data = (const void *)((uintptr_t)macho->mh + segment->fileoff + vmoff);
-	*addr = section->addr;
-	*size = section->size;
-}
-
-void
-macho_section_data_64(const struct macho *macho, const struct segment_command_64 *segment,
-		const struct section_64 *section, const void **data, uint64_t *addr, size_t *size) {
-	uint32_t vmoff = section->addr - segment->vmaddr;
-	*data = (const void *)((uintptr_t)macho->mh + segment->fileoff + vmoff);
-	*addr = section->addr;
-	*size = section->size;
+	size_t fileoff  = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, fileoff);
+	uint64_t vmaddr = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmaddr);
+	size_t vmsize   = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmsize);
+	*data = (const void *)((uintptr_t)macho->mh + fileoff);
+	*addr = vmaddr;
+	*size = vmsize;
 }
 
 void
 macho_section_data(const struct macho *macho, const struct load_command *segment,
 		const void *section, const void **data, uint64_t *addr, size_t *size) {
-	if (macho_is_32(macho)) {
-		uint32_t addr32;
-		macho_section_data_32(macho, (const struct segment_command *)segment,
-				(const struct section *)section, data, &addr32, size);
-		*addr = addr32;
-	} else {
-		macho_section_data_64(macho, (const struct segment_command_64 *)segment,
-				(const struct section_64 *)section, data, addr, size);
-	}
-}
-
-macho_result
-macho_find_base_32(struct macho *macho, uint32_t *base) {
-	assert(macho_is_32(macho));
-	const struct segment_command *sc = NULL;
-	for (;;) {
-		macho_result mr = macho_find_load_command_32(macho, (const struct load_command **)&sc,
-				LC_SEGMENT);
-		if (mr != MACHO_SUCCESS) {
-			return MACHO_NOT_FOUND;
-		}
-		assert(sc != NULL);
-		if (sc->fileoff != 0 || sc->filesize == 0) {
-			continue;
-		}
-		*base = sc->vmaddr;
-		return MACHO_SUCCESS;
-	}
-}
-
-macho_result
-macho_find_base_64(struct macho *macho, uint64_t *base) {
-	assert(macho_is_64(macho));
-	const struct segment_command_64 *sc = NULL;
-	for (;;) {
-		macho_result mr = macho_find_load_command_64(macho, (const struct load_command **)&sc,
-				LC_SEGMENT_64);
-		if (mr != MACHO_SUCCESS) {
-			return MACHO_NOT_FOUND;
-		}
-		assert(sc != NULL);
-		if (sc->fileoff != 0 || sc->filesize == 0) {
-			continue;
-		}
-		*base = sc->vmaddr;
-		return MACHO_SUCCESS;
-	}
+	uint64_t section_addr = MACHO_STRUCT_FIELD(macho, struct section, section, addr);
+	size_t   section_size = MACHO_STRUCT_FIELD(macho, struct section, section, size);
+	uint64_t segment_addr = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmaddr);
+	size_t   fileoff = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, fileoff);
+	uint64_t vmoff = section_addr - segment_addr;
+	*data = (const void *)((uintptr_t)macho->mh + fileoff + vmoff);
+	*addr = section_addr;
+	*size = section_size;
 }
 
 macho_result
 macho_find_base(struct macho *macho, uint64_t *base) {
-	if (macho_is_32(macho)) {
-		uint32_t base32;
-		macho_result mr = macho_find_base_32(macho, &base32);
-		if (mr == MACHO_SUCCESS) {
-			*base = base32;
+	const struct load_command *lc = NULL;
+	for (;;) {
+		lc = macho_next_segment(macho, lc);
+		if (lc == NULL) {
+			return MACHO_NOT_FOUND;
 		}
-		return mr;
-	} else {
-		return macho_find_base_64(macho, base);
+		size_t fileoff  = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, fileoff);
+		size_t filesize = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, filesize);
+		uint64_t vmaddr = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, vmaddr);
+		if (fileoff != 0 || filesize == 0) {
+			continue;
+		}
+		*base = vmaddr;
+		return MACHO_SUCCESS;
 	}
 }
 
+// TODO: Make this resilient to malformed images.
 macho_result
-macho_resolve_symbol_32(const struct macho *macho, const struct symtab_command *symtab,
-		const char *symbol, uint32_t *addr, size_t *size) {
-	assert(macho_is_32(macho));
-	uint32_t strx = macho_string_index(macho, symtab, symbol);
-	if (strx == 0) {
-		return MACHO_NOT_FOUND;
-	}
-	uint32_t addr0 = 0;
-	const struct nlist *nl = macho_get_nlist_32(macho, symtab);
-	uint32_t symidx = -1;
-	for (uint32_t i = 0; i < symtab->nsyms; i++) {
-		if (nl[i].n_un.n_strx == strx) {
-			if ((nl[i].n_type & N_TYPE) == N_UNDF) {
-				return MACHO_NOT_FOUND;
-			}
-			if ((nl[i].n_type & N_TYPE) != N_SECT) {
-				error_macho("unexpected Mach-O symbol type %x for symbol %s",
-						nl[i].n_type & N_TYPE, symbol);
-				return MACHO_ERROR;
-			}
-			addr0 = nl[i].n_value;
-			symidx = i;
-			break;
-		}
-	}
-	if (symidx == -1) {
-		return MACHO_NOT_FOUND;
-	}
-	if (addr != NULL) {
-		*addr = addr0;
-	}
-	if (size != NULL) {
-		uint32_t next = -1;
-		for (uint32_t i = 0; i < symtab->nsyms; i++) {
-			if (nl[i].n_value > addr0 && nl[i].n_value < next) {
-				next = nl[i].n_value;
-			}
-		}
-		*size = guess_symbol_size_32(macho, symtab, symidx, next);
-	}
-	return MACHO_SUCCESS;
-}
-
-macho_result
-macho_resolve_symbol_64(const struct macho *macho, const struct symtab_command *symtab,
+macho_resolve_symbol(const struct macho *macho, const struct symtab_command *symtab,
 		const char *symbol, uint64_t *addr, size_t *size) {
-	assert(macho_is_64(macho));
 	uint64_t strx = macho_string_index(macho, symtab, symbol);
 	if (strx == 0) {
 		return MACHO_NOT_FOUND;
 	}
 	uint64_t addr0 = 0;
-	const struct nlist_64 *nl = macho_get_nlist_64(macho, symtab);
 	uint32_t symidx = -1;
 	for (uint32_t i = 0; i < symtab->nsyms; i++) {
-		if (nl[i].n_un.n_strx == strx) {
-			if ((nl[i].n_type & N_TYPE) == N_UNDF) {
+		const void *nl_i = macho_get_nlist(macho, symtab, i);
+		uint64_t n_strx = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_un.n_strx);
+		if (n_strx == strx) {
+			uint8_t n_type = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_type);
+			if ((n_type & N_TYPE) == N_UNDF) {
 				return MACHO_NOT_FOUND;
 			}
-			if ((nl[i].n_type & N_TYPE) != N_SECT) {
+			if ((n_type & N_TYPE) != N_SECT) {
 				error_macho("unexpected Mach-O symbol type %x for symbol %s",
-						nl[i].n_type & N_TYPE, symbol);
+						n_type & N_TYPE, symbol);
 				return MACHO_ERROR;
 			}
-			addr0 = nl[i].n_value;
+			addr0 = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_value);
 			symidx = i;
 			break;
 		}
@@ -599,167 +328,78 @@ macho_resolve_symbol_64(const struct macho *macho, const struct symtab_command *
 	if (size != NULL) {
 		uint64_t next = -1;
 		for (uint32_t i = 0; i < symtab->nsyms; i++) {
-			if (nl[i].n_value > addr0 && nl[i].n_value < next) {
-				next = nl[i].n_value;
+			const void *nl_i = macho_get_nlist(macho, symtab, i);
+			uint64_t n_value = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_value);
+			if (n_value > addr0 && n_value < next) {
+				next = n_value;
 			}
 		}
-		*size = guess_symbol_size_64(macho, symtab, symidx, next);
+		*size = guess_symbol_size(macho, symtab, symidx, next);
 	}
-	return MACHO_SUCCESS;
-}
-
-// TODO: Make this resilient to malformed images.
-macho_result
-macho_resolve_symbol(const struct macho *macho, const struct symtab_command *symtab,
-		const char *symbol, uint64_t *addr, size_t *size) {
-	if (macho_is_32(macho)) {
-		uint32_t addr32;
-		macho_result mr = macho_resolve_symbol_32(macho, symtab, symbol, &addr32, size);
-		if (mr == MACHO_SUCCESS) {
-			*addr = addr32;
-		}
-		return mr;
-	} else {
-		return macho_resolve_symbol_64(macho, symtab, symbol, addr, size);
-	}
-}
-
-macho_result
-macho_resolve_address_32(const struct macho *macho, const struct symtab_command *symtab,
-		uint32_t addr, const char **name, size_t *size, size_t *offset) {
-	assert(macho_is_32(macho));
-	const struct nlist *nl = macho_get_nlist_32(macho, symtab);
-	uint32_t symidx = -1;
-	uint32_t next = -1;
-	for (uint32_t i = 0; i < symtab->nsyms; i++) {
-		if ((nl[i].n_type & N_TYPE) != N_SECT) {
-			continue; // TODO: Handle other symbol types.
-		}
-		if ((symidx == -1 || nl[symidx].n_value < nl[i].n_value)
-		    && nl[i].n_value <= addr) {
-			symidx = i;
-		} else if (addr < nl[i].n_value && nl[i].n_value <= next) {
-			next = nl[i].n_value;
-		}
-	}
-	if (symidx == -1) {
-		return MACHO_NOT_FOUND;
-	}
-	if (nl[symidx].n_sect == NO_SECT) {
-		error_macho("symbol index %d has no section", symidx);
-		return MACHO_ERROR;
-	}
-	*name = (const char *)((uintptr_t)macho->mh + symtab->stroff + nl[symidx].n_un.n_strx);
-	*size = guess_symbol_size_32(macho, symtab, symidx, next);
-	*offset = addr - nl[symidx].n_value;
-	return MACHO_SUCCESS;
-}
-
-macho_result
-macho_resolve_address_64(const struct macho *macho, const struct symtab_command *symtab,
-		uint64_t addr, const char **name, size_t *size, size_t *offset) {
-	assert(macho_is_64(macho));
-	const struct nlist_64 *nl = macho_get_nlist_64(macho, symtab);
-	uint32_t symidx = -1;
-	uint64_t next = -1;
-	for (uint32_t i = 0; i < symtab->nsyms; i++) {
-		if ((nl[i].n_type & N_TYPE) != N_SECT) {
-			continue; // TODO: Handle other symbol types.
-		}
-		if ((symidx == -1 || nl[symidx].n_value < nl[i].n_value)
-		    && nl[i].n_value <= addr) {
-			symidx = i;
-		} else if (addr < nl[i].n_value && nl[i].n_value <= next) {
-			next = nl[i].n_value;
-		}
-	}
-	if (symidx == -1) {
-		return MACHO_NOT_FOUND;
-	}
-	if (nl[symidx].n_sect == NO_SECT) {
-		error_macho("symbol index %d has no section", symidx);
-		return MACHO_ERROR;
-	}
-	*name = (const char *)((uintptr_t)macho->mh + symtab->stroff + nl[symidx].n_un.n_strx);
-	*size = guess_symbol_size_64(macho, symtab, symidx, next);
-	*offset = addr - nl[symidx].n_value;
 	return MACHO_SUCCESS;
 }
 
 macho_result
 macho_resolve_address(const struct macho *macho, const struct symtab_command *symtab,
 		uint64_t addr, const char **name, size_t *size, size_t *offset) {
-	if (macho_is_32(macho)) {
-		return macho_resolve_address_32(macho, symtab, addr, name, size, offset);
-	} else {
-		return macho_resolve_address_64(macho, symtab, addr, name, size, offset);
+	const void *sym = NULL;
+	uint32_t symidx;
+	uint64_t sym_addr;
+	uint64_t next_addr = -1;
+	for (uint32_t i = 0; i < symtab->nsyms; i++) {
+		const void *nl_i = macho_get_nlist(macho, symtab, i);
+		uint8_t n_type = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_type);
+		if ((n_type & N_TYPE) != N_SECT) {
+			continue; // TODO: Handle other symbol types.
+		}
+		uint64_t n_value = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_value);
+		if ((sym == NULL || sym_addr < n_value) && n_value <= addr) {
+			sym = nl_i;
+			symidx = i;
+			sym_addr = n_value;
+		} else if (addr < n_value && n_value <= next_addr) {
+			next_addr = n_value;
+		}
 	}
+	if (sym == NULL) {
+		return MACHO_NOT_FOUND;
+	}
+	uint32_t sym_sect = MACHO_STRUCT_FIELD(macho, struct nlist, sym, n_sect);
+	if (sym_sect == NO_SECT) {
+		error_macho("symbol index %d has no section", symidx);
+		return MACHO_ERROR;
+	}
+	uint64_t sym_strx = MACHO_STRUCT_FIELD(macho, struct nlist, sym, n_un.n_strx);
+	*name = (const char *)((uintptr_t)macho->mh + symtab->stroff + sym_strx);
+	*size = guess_symbol_size(macho, symtab, symidx, next_addr);
+	*offset = addr - sym_addr;
+	return MACHO_SUCCESS;
 }
 
 // TODO: Make this resilient to malformed images.
 macho_result
-macho_search_data_32(const struct macho *macho, const void *data, size_t size,
-		int minprot, uint32_t *addr) {
-	assert(macho_is_32(macho));
-	const struct segment_command *sc = NULL;
-	for (;;) {
-		macho_result mr = macho_find_load_command_32(macho,
-				(const struct load_command **)&sc, LC_SEGMENT);
-		if (mr != MACHO_SUCCESS) {
-			return MACHO_NOT_FOUND;
-		}
-		assert(sc != NULL);
-		if ((sc->initprot & minprot) != minprot) {
-			continue;
-		}
-		const void *base = (const void *)((uintptr_t)macho->mh + sc->fileoff);
-		const void *found = memmem(base, sc->filesize, data, size);
-		if (found == NULL) {
-			continue;
-		}
-		size_t offset = (uintptr_t)found - (uintptr_t)base;
-		*addr = sc->vmaddr + offset;
-		return MACHO_SUCCESS;
-	}
-}
-
-macho_result
-macho_search_data_64(const struct macho *macho, const void *data, size_t size,
-		int minprot, uint64_t *addr) {
-	assert(macho_is_64(macho));
-	const struct segment_command_64 *sc = NULL;
-	for (;;) {
-		macho_result mr = macho_find_load_command_64(macho,
-				(const struct load_command **)&sc, LC_SEGMENT_64);
-		if (mr != MACHO_SUCCESS) {
-			return MACHO_NOT_FOUND;
-		}
-		assert(sc != NULL);
-		if ((sc->initprot & minprot) != minprot) {
-			continue;
-		}
-		const void *base = (const void *)((uintptr_t)macho->mh + sc->fileoff);
-		const void *found = memmem(base, sc->filesize, data, size);
-		if (found == NULL) {
-			continue;
-		}
-		size_t offset = (uintptr_t)found - (uintptr_t)base;
-		*addr = sc->vmaddr + offset;
-		return MACHO_SUCCESS;
-	}
-}
-
-macho_result
 macho_search_data(const struct macho *macho, const void *data, size_t size, int minprot,
 		uint64_t *addr) {
-	if (macho_is_32(macho)) {
-		uint32_t addr32;
-		macho_result mr = macho_search_data_32(macho, data, size, minprot, &addr32);
-		if (mr == MACHO_SUCCESS) {
-			*addr = addr32;
+	const struct load_command *lc = NULL;
+	for (;;) {
+		lc = macho_next_segment(macho, lc);
+		if (lc == NULL) {
+			return MACHO_NOT_FOUND;
 		}
-		return mr;
-	} else {
-		return macho_search_data_64(macho, data, size, minprot, addr);
+		int initprot = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, initprot);
+		if ((initprot & minprot) != minprot) {
+			continue;
+		}
+		size_t fileoff  = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, fileoff);
+		size_t filesize = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, filesize);
+		const void *base = (const void *)((uintptr_t)macho->mh + fileoff);
+		const void *found = memmem(base, filesize, data, size);
+		if (found == NULL) {
+			continue;
+		}
+		size_t offset = (uintptr_t)found - (uintptr_t)base;
+		uint64_t vmaddr = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, vmaddr);
+		*addr = vmaddr + offset;
+		return MACHO_SUCCESS;
 	}
 }

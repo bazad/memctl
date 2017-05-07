@@ -29,7 +29,7 @@ struct kext {
 	// The kext's bundle ID.
 	const char *bundle_id;
 	// The symtab command, used for resolving symbols.
-	struct symtab_command *symtab;
+	const struct symtab_command *symtab;
 };
 
 /*

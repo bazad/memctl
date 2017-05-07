@@ -502,21 +502,21 @@ find_gadgets_in_data(const void *data, uint64_t address, size_t size) {
  */
 static bool
 find_gadgets() {
-	const struct segment_command_64 *sc = NULL;
+	const struct load_command *lc = NULL;
 	for (;;) {
-		macho_find_load_command_64(&kernel.macho, (const struct load_command **)&sc,
-				LC_SEGMENT_64);
-		if (sc == NULL) {
+		lc = macho_next_segment(&kernel.macho, lc);
+		if (lc == NULL) {
 			break;
 		}
 		const int prot = VM_PROT_READ | VM_PROT_EXECUTE;
+		const struct segment_command_64 *sc = (const struct segment_command_64 *)lc;
 		if ((sc->initprot & prot) != prot || (sc->maxprot & prot) != prot) {
 			continue;
 		}
 		const void *data;
 		uint64_t address;
 		size_t size;
-		macho_segment_data_64(&kernel.macho, sc, &data, &address, &size);
+		macho_segment_data(&kernel.macho, lc, &data, &address, &size);
 		find_gadgets_in_data(data, address, size);
 		if (interrupted) {
 			error_interrupt();

@@ -404,7 +404,7 @@ context_set_kext(struct context *context, const struct macho *macho) {
 	uint64_t addr;
 	size_t size;
 	// __DATA_CONST
-	segment = macho_find_segment_command(macho, "__DATA_CONST");
+	segment = macho_find_segment(macho, "__DATA_CONST");
 	if (segment == NULL) {
 		return false;
 	}
@@ -429,7 +429,7 @@ context_set_kext(struct context *context, const struct macho *macho) {
 			&context->data_const_const.size);
 	context->data_const_const.addr = addr;
 	// __TEXT_EXEC
-	segment = macho_find_segment_command(macho, "__TEXT_EXEC");
+	segment = macho_find_segment(macho, "__TEXT_EXEC");
 	if (segment == NULL) {
 		return false;
 	}
@@ -437,14 +437,14 @@ context_set_kext(struct context *context, const struct macho *macho) {
 			&context->text_exec.size);
 	context->text_exec.addr = addr;
 	// __TEXT
-	segment = macho_find_segment_command(macho, "__TEXT");
+	segment = macho_find_segment(macho, "__TEXT");
 	if (segment == NULL) {
 		return false;
 	}
 	macho_segment_data(macho, segment, &context->text.data, &addr, &context->text.size);
 	context->text.addr = addr;
 	// __DATA
-	segment = macho_find_segment_command(macho, "__DATA");
+	segment = macho_find_segment(macho, "__DATA");
 	if (segment == NULL) {
 		return false;
 	}
@@ -632,10 +632,9 @@ find_vtable_by_static_analysis(struct context *c, const struct macho *macho) {
  */
 static kext_result
 find_vtable_by_symbol(struct context *c, const struct macho *macho) {
-	const struct symtab_command *symtab = NULL;
-	macho_result mr = macho_find_load_command(macho, (const struct load_command **)&symtab,
-			LC_SYMTAB);
-	if (mr != MACHO_SUCCESS) {
+	const struct symtab_command *symtab = (const struct symtab_command *)
+		macho_find_load_command(macho, NULL, LC_SYMTAB);
+	if (symtab == NULL) {
 		return KEXT_NOT_FOUND;
 	}
 	char *symbol = vtable_symbol(c->class_name);
@@ -643,7 +642,8 @@ find_vtable_by_symbol(struct context *c, const struct macho *macho) {
 		return KEXT_ERROR;
 	}
 	uint64_t vtable_addr;
-	mr = macho_resolve_symbol(macho, symtab, symbol, &vtable_addr, c->vtable_size);
+	macho_result mr = macho_resolve_symbol(macho, symtab, symbol, &vtable_addr,
+			c->vtable_size);
 	free(symbol);
 	if (mr == MACHO_SUCCESS) {
 		*c->vtable = vtable_addr + kernel_slide;
