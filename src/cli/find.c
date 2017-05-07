@@ -26,8 +26,8 @@ memctl_find(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physic
 	}
 	uint8_t buf[sizeof(kword_t) + page_size];
 	uint8_t *const data = buf + sizeof(kword_t);
+	uint8_t *p = data;
 	kaddr_t address = start;
-	bool spill = false;
 	// Iterate over all addresses.
 	for (;;) {
 		size_t rsize = min(end - address, page_size);
@@ -40,18 +40,21 @@ memctl_find(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physic
 			return false;
 		}
 		if (rsize > 0) {
-			uint8_t *p = (spill ? buf : data);
 			uint8_t *const e = data + rsize;
 			for (; p + width <= e; p += alignment) {
 				if (unpack_uint(p, width) == value) {
 					printf(KADDR_XFMT"\n", address + (p - data));
 				}
 			}
-			if (rsize == page_size) {
+			if (alignment < width && rsize == page_size) {
+				p = data - width + alignment;
 				*(kword_t *)buf = *(kword_t *)(data + page_size - sizeof(kword_t));
+			} else {
+				p = data;
 			}
+		} else {
+			p = data;
 		}
-		spill = (rsize == page_size);
 		if (next == 0 || next >= end) {
 			break;
 		}
