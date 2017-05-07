@@ -80,10 +80,13 @@ static void deinitialize(bool critical);
  */
 static void
 signal_handler(int signum) {
+	if (interrupted && signum == SIGINT) {
+		deinitialize(true);
+		exit(1);
+	}
 	interrupted = 1;
 	if (signum != SIGINT) {
 		deinitialize(true);
-		fprintf(stderr, "deinitialized\n");
 		raise(signum);
 	}
 }
@@ -204,6 +207,9 @@ deinitialize(bool critical) {
 	}
 	if (!critical && LOADED(KERNEL_IMAGE)) {
 		kernel_deinit();
+	}
+	if (critical) {
+		fprintf(stderr, "deinitialized\n");
 	}
 	loaded_features = 0;
 #undef LOADED

@@ -8,6 +8,7 @@
 #include "kernel.h"
 #include "kernel_memory.h"
 #include "memctl_error.h"
+#include "memctl_signal.h"
 #include "utility.h"
 
 #include <assert.h>
@@ -75,7 +76,10 @@ find_kernel_region(kaddr_t *region_base, kaddr_t *region_end) {
 		if (kr != KERN_SUCCESS) {
 			error_internal("mach_vm_region(%p) failed: %s", address,
 					mach_error_string(kr));
-			error_internal("could not find kernel region");
+			return false;
+		}
+		if (interrupted) {
+			error_interrupt();
 			return false;
 		}
 		// There are 2 different virtual memory layouts on iOS:
@@ -260,6 +264,7 @@ static bool
 kernel_slide_init_ios() {
 	kaddr_t region_base, region_end;
 	if (!find_kernel_region(&region_base, &region_end)) {
+		error_internal("could not find kernel region");
 		return false;
 	}
 	bool success = kernel_slide_init_ios_heap_scan(region_base, region_end)

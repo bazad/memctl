@@ -338,6 +338,7 @@
 #include "kernel_slide.h"
 #include "kernelcache.h"
 #include "memctl_error.h"
+#include "memctl_signal.h"
 #include "utility.h"
 
 #include <mach/mach_vm.h>
@@ -471,7 +472,7 @@ static void
 find_gadgets_in_data(const void *data, uint64_t address, size_t size) {
 	const uint32_t *ins = data;
 	const uint32_t *end = ins + (size / sizeof(uint32_t));
-	for (; ins < end; ins++) {
+	for (; ins < end && !interrupted; ins++) {
 		for (struct gadget *g = gadgets; g < gadgets + GADGET_COUNT; g++) {
 			// Skip this gadget if we've already found it or if there's not enough
 			// space left for the gadget.
@@ -499,7 +500,7 @@ find_gadgets_in_data(const void *data, uint64_t address, size_t size) {
  * 	We only scan the executable segments of the kernel Mach-O because all executable segments
  * 	of all kernel extensions lie within the kernel's __PLK_TEXT_EXEC segment.
  */
-static void
+static bool
 find_gadgets() {
 	const struct segment_command_64 *sc = NULL;
 	for (;;) {
@@ -517,7 +518,12 @@ find_gadgets() {
 		size_t size;
 		macho_segment_data_64(&kernel.macho, sc, &data, &address, &size);
 		find_gadgets_in_data(data, address, size);
+		if (interrupted) {
+			error_interrupt();
+			return false;
+		}
 	}
+	return true;
 }
 
 /*
@@ -867,7 +873,9 @@ kernel_call_init_aarch64() {
 	if (jop_payload != 0) {
 		return true;
 	}
-	find_gadgets();
+	if (!find_gadgets()) {
+		goto fail;
+	}
 	if (!choose_strategy()) {
 		goto fail;
 	}
