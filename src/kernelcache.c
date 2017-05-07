@@ -564,7 +564,7 @@ kernelcache_find_containing_address_callback(void *context, CFDictionaryRef info
 		if (mr != MACHO_SUCCESS) {
 			return false;
 		}
-		if (sc->vmaddr <= base && base < sc->vmaddr + sc->vmsize) {
+		if (sc->vmaddr <= address && address < sc->vmaddr + sc->vmsize) {
 			goto found;
 		}
 	}
@@ -588,7 +588,13 @@ kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
 		char **bundle_id, kaddr_t *base) {
 	struct kernelcache_find_containing_address_context context =
 		{ kc, kaddr, bundle_id, base, KEXT_NO_KEXT };
-	kernelcache_for_each(kc, kernelcache_find_containing_address_callback, &context);
+	// It's important to process the kernel itself last, since its segments contain those of
+	// all the prelinked kexts.
+	kernelcache_kext_for_each(kc, kernelcache_find_containing_address_callback, &context);
+	if (context.status == KEXT_NO_KEXT) {
+		kernelcache_find_containing_address_callback(&context, NULL, KERNEL_ID,
+				kc->text->vmaddr, kc->text->vmsize);
+	}
 	return context.status;
 }
 
