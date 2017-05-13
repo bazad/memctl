@@ -450,6 +450,37 @@ default_action(void) {
 }
 
 bool
+i_command() {
+	printf("release:            %d.%d.%d\n"
+	       "version:            %s\n"
+	       "machine:            %s\n",
+	       platform.release.major, platform.release.minor, platform.release.patch,
+	       platform.version,
+	       platform.machine);
+	mach_port_t host = mach_host_self();
+	if (host != MACH_PORT_NULL) {
+		host_basic_info_data_t basic_info;
+		mach_msg_type_number_t count = HOST_BASIC_INFO_COUNT;
+		kern_return_t kr = host_info(host, HOST_BASIC_INFO, (host_info_t) &basic_info,
+				&count);
+		if (kr == KERN_SUCCESS) {
+			printf("cpus:               %u / %u\n"
+			       "memory:             0x%llx\n",
+			       basic_info.physical_cpu, basic_info.logical_cpu,
+			       basic_info.max_mem);
+		}
+		host_can_has_debugger_info_data_t debug_info;
+		count = HOST_CAN_HAS_DEBUGGER_COUNT;
+		kr = host_info(host, HOST_CAN_HAS_DEBUGGER, (host_info_t) &debug_info, &count);
+		if (kr == KERN_SUCCESS) {
+			printf("can has debugger:   %s\n", debug_info.can_has_debugger ? "yes" : "no");
+		}
+		mach_port_deallocate(mach_task_self(), host);
+	}
+	return true;
+}
+
+bool
 r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t access, bool dump) {
 	if (!initialize(KERNEL_MEMORY)) {
 		return false;

@@ -6,6 +6,7 @@
 
 bool default_action(void);
 
+bool i_command(void);
 bool r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t access,
 		bool dump);
 bool rb_command(kaddr_t address, size_t length, bool physical, size_t access);

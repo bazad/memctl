@@ -103,6 +103,10 @@ default_virtual_range(struct argrange *range) {
 	}
 }
 
+static bool i_handler(const struct argument *arguments) {
+	return i_command();
+}
+
 static bool r_handler(const struct argument *arguments) {
 	size_t width    = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
 	bool dump       = OPT_PRESENT(1, "d");
@@ -300,6 +304,10 @@ static bool kcd_handler(const struct argument *arguments) {
 
 static struct command commands[] = {
 	{
+		"i", NULL, i_handler,
+		"print system information",
+		0, NULL,
+	}, {
 		"r", NULL, r_handler,
 		"read kernel memory",
 		6, (struct argspec *) &(struct argspec[6]) {

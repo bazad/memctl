@@ -220,7 +220,7 @@ help_command(const struct command *command) {
 		goto fail;
 	}
 	write_command_usage_oneline(command, buf, length + 1);
-	fprintf(stderr, "%s\n\n    %s\n", buf, command->description);
+	fprintf(stderr, "\n%s\n\n    %s\n", buf, command->description);
 	free(buf);
 	// Get the argspec length.
 	const struct argspec *s = command->argspecv;
@@ -253,6 +253,7 @@ help_command(const struct command *command) {
 		write_argspec_usage_oneline(s, buf, argspec_length + 1);
 		fprintf(stderr, "    %-*s %s\n", (int)argspec_length, buf, s->description);
 	}
+	fprintf(stderr, "\n");
 	free(buf);
 	success = true;
 fail:

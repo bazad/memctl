@@ -23,7 +23,7 @@
  * Description:
  * 	Generate the symbol name for the vtable of the specified class.
  */
-char *
+static char *
 vtable_symbol(const char *class_name) {
 	char *symbol;
 	asprintf(&symbol, "__ZTV%zu%s", strlen(class_name), class_name);
