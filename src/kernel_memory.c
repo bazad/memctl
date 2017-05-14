@@ -7,7 +7,7 @@
 #include "core.h"
 #include "kernel.h"
 #include "kernel_call.h"
-#include "physical_region.h"
+#include "memory_region.h"
 #include "utility.h"
 
 #include <mach/mach_vm.h>
@@ -302,11 +302,12 @@ transfer_range_safe(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, 
  * transfer_range_all
  *
  * Description:
- * 	Find the transfer range for the given transfer, checking physical addresses to see if the
- * 	memory is mapped and safe to access.
+ * 	Find the transfer range for the given transfer, checking virtual and physical addresses to
+ * 	see if the memory is mapped and safe to access.
  */
 static kernel_io_result
 transfer_range_all(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, bool into_kernel) {
+	bool default_access = (*access == 0);
 	size_t remaining = *size;
 	size_t transfer_size = 0;
 	size_t transfer_access = 0;
@@ -314,6 +315,23 @@ transfer_range_all(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, b
 	kernel_io_result result = KERNEL_IO_SUCCESS;
 	error_stop();
 	while (remaining > 0) {
+		size_t this_access = 0;
+		size_t this_size   = remaining;
+		// Check the virtual address.
+		const struct memory_region *vr = virtual_region_find(kaddr, this_size);
+		if (vr == NULL) {
+			// Everything's good; do nothing.
+		} else if (kaddr < vr->start) {
+			this_size = vr->start - kaddr;
+		} else if (default_access && vr->access == 0) {
+			result = KERNEL_IO_INACCESSIBLE;
+			next_viable = vr->end + 1;
+			break;
+		} else {
+			this_access = vr->access;
+			this_size   = min(this_size, vr->end + 1 - kaddr);
+		}
+		// Check the physical address.
 		paddr_t paddr = 0;
 		kernel_virtual_to_physical(kaddr, &paddr);
 		if (paddr == 0) {
@@ -321,23 +339,30 @@ transfer_range_all(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, b
 			next_viable = (kaddr & ~page_mask) + page_size;
 			break;
 		}
-		size_t phys_size = min(remaining, page_size - (kaddr & page_mask));
-		const struct physical_region *pr = physical_region_find(paddr, phys_size);
-		size_t this_access;
-		size_t this_size;
+		size_t phys_size = min(this_size, page_size - (kaddr & page_mask));
+		const struct memory_region *pr = physical_region_find(paddr, phys_size);
 		if (pr == NULL) {
-			this_access = sizeof(kword_t);
-			this_size   = phys_size;
+			this_size = phys_size;
 		} else if (paddr < pr->start) {
-			this_access = sizeof(kword_t);
-			this_size   = pr->start - paddr;
-		} else if (pr->access == 0 && *access == 0) {
+			this_size = pr->start - paddr;
+		} else if (default_access && pr->access == 0) {
 			result = KERNEL_IO_INACCESSIBLE;
 			next_viable = (kaddr & ~page_mask) + page_size;
 			break;
 		} else {
+			if (this_access != 0 && this_access != pr->access) {
+				// We need two contradictory access widths?
+				result = KERNEL_IO_INACCESSIBLE;
+				next_viable = (kaddr & ~page_mask) + page_size;
+				break;
+			}
 			this_access = pr->access;
 			this_size   = min(phys_size, pr->end + 1 - paddr);
+		}
+		// If there's been no restrictions on the access width so far, default to the
+		// kernel word size.
+		if (this_access == 0) {
+			this_access = sizeof(kword_t);
 		}
 		if (this_access != transfer_access) {
 			if (transfer_access == 0) {
@@ -356,7 +381,7 @@ transfer_range_all(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, b
 	if (next != NULL) {
 		*next = next_viable;
 	}
-	if (*access == 0) {
+	if (default_access) {
 		*access = transfer_access;
 	}
 	return result;

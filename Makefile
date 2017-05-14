@@ -46,14 +46,14 @@ endif
 
 LIBMEMCTL_AARCH64_SRCS = aarch64/disasm.c \
 			 aarch64/kernel_call_aarch64.c \
-			 aarch64/physical_region.c
+			 aarch64/memory_region.c
 
 LIBMEMCTL_AARCH64_HDRS = aarch64/disasm.h \
 			 aarch64/kernel_call_aarch64.h
 
 # libmemctl x86_64 sources.
 
-LIBMEMCTL_X86_64_SRCS = x86_64/physical_region.c
+LIBMEMCTL_X86_64_SRCS = x86_64/memory_region.c
 LIBMEMCTL_X86_64_HDRS =
 
 # libmemctl sources.
@@ -97,9 +97,9 @@ LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
 		 memctl_offsets.h \
 		 memctl_signal.h \
 		 memctl_types.h \
+		 memory_region.h \
 		 offset.h \
 		 oskext.h \
-		 physical_region.h \
 		 platform.h \
 		 utility.h \
 		 vtable.h
