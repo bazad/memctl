@@ -1,6 +1,9 @@
 #ifndef MEMCTL__PLATFORM_H_
 #define MEMCTL__PLATFORM_H_
 
+#include <mach/machine.h>
+#include <stdlib.h>
+
 /*
  * struct platform
  */
@@ -12,6 +15,11 @@ struct platform {
 	} release;
 	char version[64];
 	char machine[32];
+	cpu_type_t    cpu_type;
+	cpu_subtype_t cpu_subtype;
+	unsigned      physical_cpu;
+	unsigned      logical_cpu;
+	size_t        memory;
 };
 
 extern struct platform platform;

@@ -1,6 +1,7 @@
 #include "physical_region.h"
 
 static const struct physical_region regions[] = {
+	// TODO: These are just guesses. Verify that these regions are correct.
 	{ "BIOS",        0xe00f8000,  0xe00f8fff, 4 },
 	{ "IO APIC",     0xfec00000,  0xfecfffff, 4 },
 	{ "MCH BAR",     0xfed10000,  0xfed17fff, 4 },

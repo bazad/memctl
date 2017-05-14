@@ -123,6 +123,7 @@ MEMCTL_SRCS = $(MEMCTL_ARCH_SRCS) \
 	      command.c \
 	      error.c \
 	      find.c \
+	      format.c \
 	      memctl.c \
 	      memory.c \
 	      read.c \

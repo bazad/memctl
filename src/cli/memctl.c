@@ -451,29 +451,38 @@ default_action(void) {
 
 bool
 i_command() {
+	char *cpu_type_name;
+	char *cpu_subtype_name;
+	slot_name(platform.cpu_type, platform.cpu_subtype, &cpu_type_name, &cpu_subtype_name);
+	char memory_size_str[5];
+	format_display_size(memory_size_str, platform.memory);
+	char page_size_str[5];
+	format_display_size(page_size_str, page_size);
 	printf("release:            %d.%d.%d\n"
 	       "version:            %s\n"
-	       "machine:            %s\n",
+	       "machine:            %s\n"
+	       "cpu type:           0x%x  (%s)\n"
+	       "cpu subtype:        0x%x  (%s)\n"
+	       "cpus:               %u cores / %u threads\n"
+	       "memory:             0x%zx  (%s)\n"
+	       "page size:          0x%lx  (%s)\n",
 	       platform.release.major, platform.release.minor, platform.release.patch,
 	       platform.version,
-	       platform.machine);
+	       platform.machine,
+	       platform.cpu_type, cpu_type_name,
+	       platform.cpu_subtype, cpu_subtype_name,
+	       platform.physical_cpu, platform.logical_cpu,
+	       platform.memory, memory_size_str,
+	       page_size, page_size_str);
 	mach_port_t host = mach_host_self();
 	if (host != MACH_PORT_NULL) {
-		host_basic_info_data_t basic_info;
-		mach_msg_type_number_t count = HOST_BASIC_INFO_COUNT;
-		kern_return_t kr = host_info(host, HOST_BASIC_INFO, (host_info_t) &basic_info,
-				&count);
-		if (kr == KERN_SUCCESS) {
-			printf("cpus:               %u / %u\n"
-			       "memory:             0x%llx\n",
-			       basic_info.physical_cpu, basic_info.logical_cpu,
-			       basic_info.max_mem);
-		}
 		host_can_has_debugger_info_data_t debug_info;
-		count = HOST_CAN_HAS_DEBUGGER_COUNT;
-		kr = host_info(host, HOST_CAN_HAS_DEBUGGER, (host_info_t) &debug_info, &count);
+		mach_msg_type_number_t count = HOST_CAN_HAS_DEBUGGER_COUNT;
+		kern_return_t kr = host_info(host, HOST_CAN_HAS_DEBUGGER,
+				(host_info_t) &debug_info, &count);
 		if (kr == KERN_SUCCESS) {
-			printf("can has debugger:   %s\n", debug_info.can_has_debugger ? "yes" : "no");
+			printf("can has debugger:   %s\n",
+			       debug_info.can_has_debugger ? "yes" : "no");
 		}
 		mach_port_deallocate(mach_task_self(), host);
 	}
