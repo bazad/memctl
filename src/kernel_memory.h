@@ -89,6 +89,18 @@ typedef kernel_io_result (*kernel_write_fn)(
 		kaddr_t *next);
 
 /*
+ * kernel_memory_init
+ *
+ * Description:
+ * 	Initialize the kernel memory functions based on currently available functionality. This
+ * 	function can be called multiple times.
+ *
+ * Returns:
+ * 	True if there were no errors.
+ */
+bool kernel_memory_init(void);
+
+/*
  * kernel_read_word
  *
  * Description:
@@ -138,8 +150,7 @@ kernel_io_result kernel_write_word(kernel_write_fn write, kaddr_t kaddr, kword_t
  * Notes:
  * 	This is generally unsafe and can cause the system to panic.
  */
-kernel_io_result kernel_read_unsafe(kaddr_t kaddr, size_t *size, void *data, size_t access_width,
-		kaddr_t *next);
+extern kernel_read_fn kernel_read_unsafe;
 
 /*
  * kernel_write_unsafe
@@ -151,8 +162,7 @@ kernel_io_result kernel_read_unsafe(kaddr_t kaddr, size_t *size, void *data, siz
  * Notes:
  * 	See kernel_read_unsafe.
  */
-kernel_io_result kernel_write_unsafe(kaddr_t kaddr, size_t *size, const void *data,
-		size_t access_width, kaddr_t *next);
+extern kernel_write_fn kernel_write_unsafe;
 
 /*
  * kernel_read_heap
@@ -161,8 +171,7 @@ kernel_io_result kernel_write_unsafe(kaddr_t kaddr, size_t *size, const void *da
  * 	A kernel_read_fn that safely reads from the kernel heap. All non-heap addresses return
  * 	KERNEL_IO_PROTECTION.
  */
-kernel_io_result kernel_read_heap(kaddr_t kaddr, size_t *size, void *data, size_t access_width,
-		kaddr_t *next);
+extern kernel_read_fn kernel_read_heap;
 
 /*
  * kernel_write_heap
@@ -171,8 +180,7 @@ kernel_io_result kernel_read_heap(kaddr_t kaddr, size_t *size, void *data, size_
  * 	A kernel_write_fn that safely writes to the kernel heap. All non-heap addresses return
  * 	KERNEL_IO_PROTECTION.
  */
-kernel_io_result kernel_write_heap(kaddr_t kaddr, size_t *size, const void *data,
-		size_t access_width, kaddr_t *next);
+extern kernel_write_fn kernel_write_heap;
 
 /*
  * kernel_read_safe
@@ -181,8 +189,7 @@ kernel_io_result kernel_write_heap(kaddr_t kaddr, size_t *size, const void *data
  * 	A kernel_read_fn that performs safety checks before reading kernel memory. All non-readable
  * 	addresses return KERNEL_IO_PROTECTION.
  */
-kernel_io_result kernel_read_safe(kaddr_t kaddr, size_t *size, void *data, size_t access_width,
-		kaddr_t *next);
+extern kernel_read_fn kernel_read_safe;
 
 /*
  * kernel_write_safe
@@ -191,8 +198,7 @@ kernel_io_result kernel_read_safe(kaddr_t kaddr, size_t *size, void *data, size_
  * 	A kernel_write_fn that performs safety checks before writing kernel memory. All
  * 	non-writable addresses return KERNEL_IO_PROTECTION.
  */
-kernel_io_result kernel_write_safe(kaddr_t kaddr, size_t *size, const void *data,
-		size_t access_width, kaddr_t *next);
+extern kernel_write_fn kernel_write_safe;
 
 /*
  * kernel_read_all
@@ -206,8 +212,7 @@ kernel_io_result kernel_write_safe(kaddr_t kaddr, size_t *size, const void *data
  * 	kernel_read_safe. It is also slower than kernel_read_safe because it does not rely on the
  * 	kernel virtual memory map to determine whether an address is mapped.
  */
-kernel_io_result kernel_read_all(kaddr_t kaddr, size_t *size, void *data, size_t access_width,
-		kaddr_t *next);
+extern kernel_read_fn kernel_read_all;
 
 /*
  * kernel_write_all
@@ -219,8 +224,23 @@ kernel_io_result kernel_read_all(kaddr_t kaddr, size_t *size, void *data, size_t
  * Notes:
  * 	See kernel_read_all.
  */
-kernel_io_result kernel_write_all(kaddr_t kaddr, size_t *size, const void *data,
-		size_t access_width, kaddr_t *next);
+extern kernel_write_fn kernel_write_all;
+
+/*
+ * kernel_read_physical
+ *
+ * Description:
+ * 	A kernel_read_fn that reads physical memory.
+ */
+extern kernel_read_fn physical_read;
+
+/*
+ * kernel_write_physical
+ *
+ * Description:
+ * 	A kernel_write_fn that writes physical memory.
+ */
+extern kernel_write_fn physical_write;
 
 /*
  * kernel_virtual_to_physical

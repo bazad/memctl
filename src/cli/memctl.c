@@ -30,13 +30,14 @@
  * 	Flags for libmemctl and memctl features.
  */
 typedef enum {
-	KERNEL_TASK    = 0x01,
-	KERNEL_IMAGE   = 0x02,
-	KERNEL_SLIDE   = 0x04 | KERNEL_TASK | KERNEL_IMAGE,
-	KERNEL_SYMBOLS = KERNEL_IMAGE | KERNEL_SLIDE,
-	OFFSETS        = 0x08,
-	KERNEL_CALL    = 0x10 | KERNEL_TASK | KERNEL_SYMBOLS | OFFSETS,
-	KERNEL_MEMORY  = KERNEL_CALL,
+	KERNEL_TASK         = 0x01,
+	KERNEL_MEMORY_BASIC = 0x02 | KERNEL_TASK,
+	KERNEL_IMAGE        = 0x04,
+	KERNEL_SLIDE        = 0x08 | KERNEL_TASK | KERNEL_IMAGE,
+	KERNEL_SYMBOLS      = KERNEL_IMAGE | KERNEL_SLIDE,
+	OFFSETS             = 0x10,
+	KERNEL_CALL         = 0x20 | KERNEL_MEMORY_BASIC | KERNEL_SYMBOLS | OFFSETS,
+	KERNEL_MEMORY       = 0x40 | KERNEL_CALL,
 } feature_t;
 
 /*
@@ -144,7 +145,7 @@ default_initialize() {
  */
 static bool
 initialize(feature_t features) {
-#define NEED(feature)	(ALL_SET(feature, features) && !ALL_SET(features, loaded_features))
+#define NEED(feature)	(ALL_SET(feature, features) && !ALL_SET(feature, loaded_features))
 #define LOADED(feature)	loaded_features |= feature
 	if (NEED(KERNEL_TASK)) {
 		if (!core_load()) {
@@ -152,6 +153,13 @@ initialize(feature_t features) {
 			return false;
 		}
 		LOADED(KERNEL_TASK);
+	}
+	if (NEED(KERNEL_MEMORY_BASIC)) {
+		if (!kernel_memory_init()) {
+			error_message("could not initialize kernel memory");
+			return false;
+		}
+		LOADED(KERNEL_MEMORY_BASIC);
 	}
 	if (NEED(KERNEL_IMAGE)) {
 		if (!kernel_init(NULL)) {
@@ -181,6 +189,14 @@ initialize(feature_t features) {
 		}
 		LOADED(KERNEL_CALL);
 	}
+	if (NEED(KERNEL_MEMORY)) {
+		if (!kernel_memory_init()) {
+			error_message("could not initialize kernel memory");
+			return false;
+		}
+		LOADED(KERNEL_MEMORY);
+	}
+	assert(ALL_SET(features, loaded_features));
 	return true;
 #undef NEED
 #undef LOADED
@@ -585,7 +601,7 @@ ws_command(kaddr_t address, const char *string, bool physical, size_t access) {
 bool
 f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical, bool heap,
 		size_t access, size_t alignment) {
-	if (!initialize(KERNEL_CALL)) {
+	if (!initialize(KERNEL_CALL | KERNEL_MEMORY)) {
 		return false;
 	}
 	return memctl_find(start, end, value, width, physical, heap, access, alignment);
@@ -716,7 +732,7 @@ a_command(const char *symbol, const char *kext) {
 
 bool
 ap_command(kaddr_t address, bool unpermute) {
-	if (!initialize(KERNEL_MEMORY)) {
+	if (!initialize(KERNEL_SYMBOLS | KERNEL_MEMORY_BASIC)) {
 		return false;
 	}
 	static kword_t kernel_addrperm = 0;
@@ -726,9 +742,10 @@ ap_command(kaddr_t address, bool unpermute) {
 		if (kext_error(kr, KERNEL_ID, "_vm_kernel_addrperm", 0)) {
 			return false;
 		}
-		size_t size = sizeof(kernel_addrperm);
-		bool read = read_memory(_vm_kernel_addrperm, &size, &kernel_addrperm, false, 0);
-		if (!read) {
+		kernel_io_result kior = kernel_read_word(kernel_read_unsafe, _vm_kernel_addrperm,
+				&kernel_addrperm, sizeof(kernel_addrperm), 0);
+		if (kior != KERNEL_IO_SUCCESS) {
+			error_internal("could not read %s", "_vm_kernel_addrperm");
 			return false;
 		}
 	}

@@ -41,6 +41,18 @@ typedef kernel_io_result (*transfer_range_fn)(
 		kaddr_t *next,
 		bool into_kernel);
 
+// The read/write functions.
+kernel_read_fn  kernel_read_unsafe;
+kernel_write_fn kernel_write_unsafe;
+kernel_read_fn  kernel_read_heap;
+kernel_write_fn kernel_write_heap;
+kernel_read_fn  kernel_read_safe;
+kernel_write_fn kernel_write_safe;
+kernel_read_fn  kernel_read_all;
+kernel_write_fn kernel_write_all;
+kernel_read_fn  physical_read;
+kernel_write_fn physical_write;
+
 /*
  * kernel_pmap
  *
@@ -429,58 +441,6 @@ kernel_io(kaddr_t kaddr, size_t *size, void *data, size_t access, kaddr_t *next,
 }
 
 kernel_io_result
-kernel_read_unsafe(kaddr_t kaddr, size_t *size, void *data, size_t access_width, kaddr_t *next) {
-	return kernel_io(kaddr, size, data, access_width, next, transfer_range_unsafe,
-			transfer_unsafe, false);
-}
-
-kernel_io_result
-kernel_write_unsafe(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
-		kaddr_t *next) {
-	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_unsafe,
-			transfer_unsafe, true);
-}
-
-kernel_io_result
-kernel_read_heap(kaddr_t kaddr, size_t *size, void *data, size_t access_width, kaddr_t *next) {
-	return kernel_io(kaddr, size, data, access_width, next, transfer_range_heap,
-			transfer_unsafe, false);
-}
-
-kernel_io_result
-kernel_write_heap(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
-		kaddr_t *next) {
-	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_heap,
-			transfer_unsafe, true);
-}
-
-kernel_io_result
-kernel_read_safe(kaddr_t kaddr, size_t *size, void *data, size_t access_width, kaddr_t *next) {
-	return kernel_io(kaddr, size, data, access_width, next, transfer_range_safe,
-			transfer_unsafe, false);
-}
-
-kernel_io_result
-kernel_write_safe(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
-		kaddr_t *next) {
-	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_safe,
-			transfer_unsafe, true);
-}
-
-kernel_io_result
-kernel_read_all(kaddr_t kaddr, size_t *size, void *data, size_t access_width, kaddr_t *next) {
-	return kernel_io(kaddr, size, data, access_width, next, transfer_range_all,
-			transfer_unsafe, false);
-}
-
-kernel_io_result
-kernel_write_all(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
-		kaddr_t *next) {
-	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_all,
-			transfer_unsafe, true);
-}
-
-kernel_io_result
 kernel_read_word(kernel_read_fn read, kaddr_t kaddr, void *value, size_t width,
 		size_t access_width) {
 	return read(kaddr, &width, value, access_width, NULL);
@@ -493,8 +453,93 @@ kernel_write_word(kernel_write_fn write, kaddr_t kaddr, kword_t value, size_t wi
 	return write(kaddr, &width, &value, access_width, NULL);
 }
 
+static kernel_io_result
+kernel_read_unsafe_(kaddr_t kaddr, size_t *size, void *data, size_t access_width, kaddr_t *next) {
+	return kernel_io(kaddr, size, data, access_width, next, transfer_range_unsafe,
+			transfer_unsafe, false);
+}
+
+static kernel_io_result
+kernel_write_unsafe_(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
+		kaddr_t *next) {
+	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_unsafe,
+			transfer_unsafe, true);
+}
+
+static kernel_io_result
+kernel_read_heap_(kaddr_t kaddr, size_t *size, void *data, size_t access_width, kaddr_t *next) {
+	return kernel_io(kaddr, size, data, access_width, next, transfer_range_heap,
+			transfer_unsafe, false);
+}
+
+static kernel_io_result
+kernel_write_heap_(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
+		kaddr_t *next) {
+	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_heap,
+			transfer_unsafe, true);
+}
+
+static kernel_io_result
+kernel_read_safe_(kaddr_t kaddr, size_t *size, void *data, size_t access_width, kaddr_t *next) {
+	return kernel_io(kaddr, size, data, access_width, next, transfer_range_safe,
+			transfer_unsafe, false);
+}
+
+static kernel_io_result
+kernel_write_safe_(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
+		kaddr_t *next) {
+	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_safe,
+			transfer_unsafe, true);
+}
+
+static kernel_io_result
+kernel_read_all_(kaddr_t kaddr, size_t *size, void *data, size_t access_width, kaddr_t *next) {
+	return kernel_io(kaddr, size, data, access_width, next, transfer_range_all,
+			transfer_unsafe, false);
+}
+
+static kernel_io_result
+kernel_write_all_(kaddr_t kaddr, size_t *size, const void *data, size_t access_width,
+		kaddr_t *next) {
+	return kernel_io(kaddr, size, (void *)data, access_width, next, transfer_range_all,
+			transfer_unsafe, true);
+}
+
 bool
 kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr) {
+	ppnum_t ppnum;
+	kword_t args[] = { kernel_pmap, kaddr };
+	bool success = kernel_call(&ppnum, sizeof(ppnum), _pmap_find_phys, 2, args);
+	if (!success) {
+		error_internal("could not call %s", "_pmap_find_phys");
+		return false;
+	}
+	if (ppnum == 0) {
+		*paddr = 0;
+	} else {
+		*paddr = ((paddr_t)ppnum << page_shift) | (kaddr & page_mask);
+	}
+	return true;
+}
+
+bool
+kernel_memory_init() {
+#define SET(fn)			\
+	if (fn == NULL) {	\
+		fn = fn##_;	\
+	}
+	// Load the basic functionality provided by kernel_task.
+	if (kernel_task == MACH_PORT_NULL) {
+		return true;
+	}
+	SET(kernel_read_unsafe);
+	SET(kernel_write_unsafe);
+	SET(kernel_read_heap);
+	SET(kernel_write_heap);
+	// Load symbols and read values for kernel_virtual_to_physical.
+	if (kernel.base == 0 || kernel.slide == 0) {
+		return true;
+	}
 	if (kernel_pmap == 0) {
 		kaddr_t _kernel_pmap;
 		kext_result kr = kernel_symbol("_kernel_pmap", &_kernel_pmap, NULL);
@@ -514,17 +559,16 @@ kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr) {
 			return false;
 		}
 	}
-	ppnum_t ppnum;
-	kword_t args[] = { kernel_pmap, kaddr };
-	bool success = kernel_call(&ppnum, sizeof(ppnum), _pmap_find_phys, 2, args);
-	if (!success) {
-		error_internal("could not call %s", "_pmap_find_phys");
-		return false;
+	// Load the functions taht depend on kernel_virtual_to_physical.
+	kword_t args[2] = { kernel_pmap, kernel.base };
+	if (!kernel_call(NULL, sizeof(ppnum_t), 0, 2, args)) {
+		return true;
 	}
-	if (ppnum == 0) {
-		*paddr = 0;
-	} else {
-		*paddr = ((paddr_t)ppnum << page_shift) | (kaddr & page_mask);
-	}
+	SET(kernel_read_safe);
+	SET(kernel_write_safe);
+	SET(kernel_read_all);
+	SET(kernel_write_all);
+	// TODO: Add support for physical_read/physical_write.
 	return true;
+#undef SET
 }
