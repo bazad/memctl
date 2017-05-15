@@ -227,20 +227,20 @@ extern kernel_read_fn kernel_read_all;
 extern kernel_write_fn kernel_write_all;
 
 /*
- * kernel_read_physical
+ * physical_read_unsafe
  *
  * Description:
- * 	A kernel_read_fn that reads physical memory.
+ * 	A kernel_read_fn that reads physical memory without any safety checks.
  */
-extern kernel_read_fn physical_read;
+extern kernel_read_fn physical_read_unsafe;
 
 /*
- * kernel_write_physical
+ * physical_write_unsafe
  *
  * Description:
- * 	A kernel_write_fn that writes physical memory.
+ * 	A kernel_write_fn that writes physical memory without any safety checks.
  */
-extern kernel_write_fn physical_write;
+extern kernel_write_fn physical_write_unsafe;
 
 /*
  * kernel_virtual_to_physical

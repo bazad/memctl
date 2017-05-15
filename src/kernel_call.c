@@ -453,8 +453,10 @@ kernel_call(void *result, unsigned result_size,
 		return kernel_call_aarch64(result, result_size, func, arg_count, args);
 	}
 #endif
-	error_functionality_unavailable("kernel_call: no kernel_call implementation can perform "
-	                                "the requested kernel function call");
+	if (func != 0) {
+		error_functionality_unavailable("kernel_call: no kernel_call implementation can "
+		                                "perform the requested kernel function call");
+	}
 	return false;
 }
 

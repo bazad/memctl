@@ -4,22 +4,18 @@
 
 bool
 read_memory(kaddr_t address, size_t *size, void *data, bool physical, size_t access) {
+	kernel_read_fn fn = kernel_read_all;
 	if (physical) {
-		*size = 0;
-		error_internal("cannot read physical memory as of yet");
-		return false;
+		fn = physical_read_unsafe;
 	}
-	kernel_io_result result = kernel_read_all(address, size, data, access, NULL);
-	return (result == KERNEL_IO_SUCCESS);
+	return (fn(address, size, data, access, NULL) == KERNEL_IO_SUCCESS);
 }
 
 bool
 write_memory(kaddr_t address, size_t *size, const void *data, bool physical, size_t access) {
+	kernel_write_fn fn = kernel_write_all;
 	if (physical) {
-		*size = 0;
-		error_internal("cannot write physical memory as of yet");
-		return false;
+		fn = physical_write_unsafe;
 	}
-	kernel_io_result result = kernel_write_all(address, size, data, access, NULL);
-	return (result == KERNEL_IO_SUCCESS);
+	return (fn(address, size, data, access, NULL) == KERNEL_IO_SUCCESS);
 }

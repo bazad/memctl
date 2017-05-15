@@ -50,24 +50,26 @@ kernel_read_fn  kernel_read_safe;
 kernel_write_fn kernel_write_safe;
 kernel_read_fn  kernel_read_all;
 kernel_write_fn kernel_write_all;
-kernel_read_fn  physical_read;
-kernel_write_fn physical_write;
+kernel_read_fn  physical_read_unsafe;
+kernel_write_fn physical_write_unsafe;
 
-/*
- * kernel_pmap
- *
- * Description:
- * 	The kernel_pmap. Used for pmap_find_phys.
- */
+// pmap_t kernel_pmap;
 static kaddr_t kernel_pmap;
 
-/*
- * _pmap_find_phys
- *
- * Description:
- * 	The pmap_find_phys function.
- */
+// ppnum_t pmap_find_phys(pmap_t map, addr64_t va);
 static kaddr_t _pmap_find_phys;
+
+// UInt<N> IOMappedRead<N>(IOPhysicalAddress address)
+static kaddr_t _IOMappedRead8;
+static kaddr_t _IOMappedRead16;
+static kaddr_t _IOMappedRead32;
+static kaddr_t _IOMappedRead64;
+
+// void IOMappedWrite<N>(IOPhysicalAddress address, UInt<N> value)
+static kaddr_t _IOMappedWrite8;
+static kaddr_t _IOMappedWrite16;
+static kaddr_t _IOMappedWrite32;
+static kaddr_t _IOMappedWrite64;
 
 /*
  * mach_unexpected
@@ -81,13 +83,33 @@ mach_unexpected(const char *function, kern_return_t kr) {
 }
 
 /*
+ * ilog2
+ *
+ * Description:
+ * 	Integer logarithm base 2. ilog2(0) is 0.
+ */
+static unsigned
+ilog2(uint64_t n) {
+	unsigned log = 0;
+	for (;;) {
+		n >>= 1;
+		if (n == 0) {
+			return log;
+		}
+		log += 1;
+	}
+}
+
+/*
  * transfer_unsafe
  *
  * Description:
- * 	A transfer function that performs direct memory writes. This is generally unsafe.
+ * 	A transfer function that performs direct virtual memory reads and writes. This is generally
+ * 	unsafe.
  */
 static kernel_io_result
 transfer_unsafe(kaddr_t kaddr, size_t size, void *data, size_t access, bool into_kernel) {
+	assert(access != 0);
 	uint8_t *p = (uint8_t *)data;
 	while (size > 0) {
 		size_t copysize = min(size, page_size - (kaddr & page_mask));
@@ -113,8 +135,91 @@ transfer_unsafe(kaddr_t kaddr, size_t size, void *data, size_t access, bool into
 			}
 		}
 		kaddr += copysize;
-		p += copysize;
-		size -= copysize;
+		p     += copysize;
+		size  -= copysize;
+	}
+	return KERNEL_IO_SUCCESS;
+}
+
+/*
+ * physical_word_read_unsafe
+ *
+ * Description:
+ * 	Read a word of physical memory.
+ */
+static bool
+physical_word_read_unsafe(paddr_t paddr, void *data, size_t logsize) {
+	assert(logsize <= 3);
+	const kaddr_t fn[4] = {
+		_IOMappedRead8, _IOMappedRead16, _IOMappedRead32, _IOMappedRead64
+	};
+	bool success = kernel_call(data, 1 << logsize, fn[logsize], 1, &paddr);
+	if (!success) {
+		error_internal("could not read physical address 0x%llx", (long long)paddr);
+	}
+	return success;
+}
+
+/*
+ * physical_word_write_unsafe
+ *
+ * Description:
+ * 	Write a word of physical memory.
+ */
+static bool
+physical_word_write_unsafe(paddr_t paddr, uint64_t data, size_t logsize) {
+	assert(logsize <= 3);
+	const kaddr_t fn[4] = {
+		_IOMappedWrite8, _IOMappedWrite16, _IOMappedWrite32, _IOMappedWrite64
+	};
+	kword_t args[2] = { paddr, data };
+	bool success = kernel_call(NULL, 0, fn[logsize], 2, args);
+	if (!success) {
+		error_internal("could not write physical address 0x%llx", (long long)paddr);
+	}
+	return success;
+}
+
+/*
+ * transfer_physical_words_unsafe
+ *
+ * Description:
+ * 	A transfer function that performs direct physical memory reads and writes using word-sized
+ * 	transfers. This is generally unsafe.
+ *
+ * Notes:
+ * 	Since at most 8 bytes can be transferred per kernel call, this operation is slow.
+ */
+static kernel_io_result
+transfer_physical_words_unsafe(paddr_t paddr, size_t size, void *data, size_t access,
+		bool into_kernel) {
+	assert(access != 0);
+	uint8_t *p = (uint8_t *)data;
+	kword_t dummy_args[] = { 1 };
+	bool trunc_32 = !into_kernel && !kernel_call(NULL, sizeof(uint64_t), 0, 1, dummy_args);
+	while (size > 0) {
+		size_t wordsize = min(size, sizeof(kword_t) - (paddr & page_mask));
+		if (access < wordsize) {
+			wordsize = access;
+		}
+		if (wordsize == sizeof(uint64_t) && trunc_32) {
+			wordsize = sizeof(uint32_t);
+		}
+		size_t logsize = ilog2(wordsize);
+		wordsize = 1 << logsize;
+		bool success;
+		if (into_kernel) {
+			success = physical_word_write_unsafe(paddr, unpack_uint(p, wordsize),
+					logsize);
+		} else {
+			success = physical_word_read_unsafe(paddr, p, logsize);
+		}
+		if (!success) {
+			return KERNEL_IO_ERROR;
+		}
+		paddr += wordsize;
+		p     += wordsize;
+		size  -= wordsize;
 	}
 	return KERNEL_IO_SUCCESS;
 }
@@ -123,13 +228,13 @@ transfer_unsafe(kaddr_t kaddr, size_t size, void *data, size_t access, bool into
  * transfer_range_unsafe
  *
  * Description:
- * 	A transfer range function that assumes the whole range to be transferred is valid. This is
- * 	generally unsafe.
+ * 	A transfer range function that assumes the whole virtual or physical range to be
+ * 	transferred is valid. This is generally unsafe.
  */
 static kernel_io_result
-transfer_range_unsafe(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, bool into_kernel) {
+transfer_range_unsafe(kaddr_t addr, size_t *size, size_t *access, kaddr_t *next, bool into_kernel) {
 	if (next != NULL) {
-		*next = kaddr + *size;
+		*next = addr + *size;
 	}
 	if (*access == 0) {
 		*access = sizeof(kword_t);
@@ -505,6 +610,20 @@ kernel_write_all_(kaddr_t kaddr, size_t *size, const void *data, size_t access_w
 			transfer_unsafe, true);
 }
 
+static kernel_io_result
+physical_read_unsafe_(paddr_t paddr, size_t *size, void *data, size_t access_width,
+		kaddr_t *next) {
+	return kernel_io(paddr, size, data, access_width, next, transfer_range_unsafe,
+			transfer_physical_words_unsafe, false);
+}
+
+static kernel_io_result
+physical_write_unsafe_(paddr_t paddr, size_t *size, const void *data, size_t access_width,
+		kaddr_t *next) {
+	return kernel_io(paddr, size, (void *)data, access_width, next, transfer_range_unsafe,
+			transfer_physical_words_unsafe, true);
+}
+
 bool
 kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr) {
 	ppnum_t ppnum;
@@ -524,10 +643,32 @@ kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr) {
 
 bool
 kernel_memory_init() {
-#define SET(fn)			\
-	if (fn == NULL) {	\
-		fn = fn##_;	\
+#define SET(fn)									\
+	if (fn == NULL) {							\
+		fn = fn##_;							\
 	}
+#define DO_RESOLVE(sym)								\
+	kext_result kr = kernel_symbol(#sym, &sym, NULL);			\
+	if (kr != KEXT_SUCCESS) {						\
+		error_internal("could not resolve %s", #sym);			\
+		return false;							\
+	}
+#define RESOLVE(sym)								\
+	if (sym == 0) {								\
+		DO_RESOLVE(sym);						\
+	}
+#define READ(var)								\
+	if (var == 0) {								\
+		kaddr_t _##var;							\
+		DO_RESOLVE(_##var);						\
+		kernel_io_result kior = kernel_read_word(kernel_read_unsafe,	\
+				_##var, &var, sizeof(var), 0);			\
+		if (kior != KERNEL_IO_SUCCESS) {				\
+			error_internal("could not read %s", "_"#var);		\
+			return false;						\
+		}								\
+	}
+
 	// Load the basic functionality provided by kernel_task.
 	if (kernel_task == MACH_PORT_NULL) {
 		return true;
@@ -536,39 +677,38 @@ kernel_memory_init() {
 	SET(kernel_write_unsafe);
 	SET(kernel_read_heap);
 	SET(kernel_write_heap);
-	// Load symbols and read values for kernel_virtual_to_physical.
+	// Load symbols and kernel variable values.
 	if (kernel.base == 0 || kernel.slide == 0) {
 		return true;
 	}
-	if (kernel_pmap == 0) {
-		kaddr_t _kernel_pmap;
-		kext_result kr = kernel_symbol("_kernel_pmap", &_kernel_pmap, NULL);
-		if (kr != KEXT_SUCCESS) {
-			error_internal("could not resolve %s", "_kernel_pmap");
-			return false;
-		}
-		kr = kernel_symbol("_pmap_find_phys", &_pmap_find_phys, NULL);
-		if (kr != KEXT_SUCCESS) {
-			error_internal("could not resolve %s", "_pmap_find_phys");
-			return false;
-		}
-		kernel_io_result kior = kernel_read_word(kernel_read_unsafe, _kernel_pmap,
-				&kernel_pmap, sizeof(kernel_pmap), 0);
-		if (kior != KERNEL_IO_SUCCESS) {
-			error_internal("could not read %s", "_kernel_pmap");
-			return false;
-		}
+	READ(kernel_pmap);
+	RESOLVE(_pmap_find_phys);
+	RESOLVE(_IOMappedRead8);
+	RESOLVE(_IOMappedRead16);
+	RESOLVE(_IOMappedRead32);
+	RESOLVE(_IOMappedRead64);
+	RESOLVE(_IOMappedWrite8);
+	RESOLVE(_IOMappedWrite16);
+	RESOLVE(_IOMappedWrite32);
+	RESOLVE(_IOMappedWrite64);
+	// Load the functions that depend on kernel_virtual_to_physical.
+	kword_t kv2p_args[2] = { kernel_pmap, kernel.base };
+	if (kernel_call(NULL, sizeof(ppnum_t), 0, 2, kv2p_args)) {
+		SET(kernel_read_safe);
+		SET(kernel_write_safe);
+		SET(kernel_read_all);
+		SET(kernel_write_all);
 	}
-	// Load the functions taht depend on kernel_virtual_to_physical.
-	kword_t args[2] = { kernel_pmap, kernel.base };
-	if (!kernel_call(NULL, sizeof(ppnum_t), 0, 2, args)) {
-		return true;
+	kword_t dummy_args[2] = { 1, 1 };
+	if (kernel_call(NULL, sizeof(uint32_t), 0, 1, dummy_args)) {
+		SET(physical_read_unsafe);
 	}
-	SET(kernel_read_safe);
-	SET(kernel_write_safe);
-	SET(kernel_read_all);
-	SET(kernel_write_all);
-	// TODO: Add support for physical_read/physical_write.
+	if (kernel_call(NULL, 0, 0, 2, dummy_args)) {
+		SET(physical_write_unsafe);
+	}
 	return true;
 #undef SET
+#undef DO_RESOLVE
+#undef RESOLVE
+#undef READ
 }
