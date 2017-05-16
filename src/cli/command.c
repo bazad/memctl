@@ -22,6 +22,9 @@ struct state {
 	// processed, arg might point into the middle of the argv string. NULL when no more
 	// arguments are left.
 	const char *arg;
+	// The argument index. This is used to determine whether an argument may be part of the
+	// compact format.
+	int argidx;
 	// The current argument being populated.
 	struct argument *argument;
 	// The current (or most recently processed) option, or NULL if options are not currently
@@ -31,6 +34,11 @@ struct state {
 	// discarded. The keep_error flag signals that the match succeeded enough that the error
 	// message should still be displayed and the command aborted.
 	bool keep_error;
+	// When processing an option starting with a dash, we sometimes can't tell if this is an
+	// unrecognized option or an argument that starts with a dash. If option processing fails,
+	// it will fall back to argument parsing. If that also fails, it will print the
+	// unrecognized option error message.
+	const char *bad_option;
 	// The start index for iterating options or arguments.
 	unsigned start;
 	// The end index for iterating options or arguments.
@@ -53,6 +61,7 @@ struct state {
  */
 struct savepoint {
 	const char *arg;
+	int argidx;
 	int argc;
 	const char **argv;
 };
@@ -268,9 +277,10 @@ fail:
  */
 static void
 state_save(const struct state *s, struct savepoint *save) {
-	save->arg  = s->arg;
-	save->argc = s->argc;
-	save->argv = s->argv;
+	save->arg    = s->arg;
+	save->argidx = s->argidx;
+	save->argc   = s->argc;
+	save->argv   = s->argv;
 }
 
 /*
@@ -281,9 +291,10 @@ state_save(const struct state *s, struct savepoint *save) {
  */
 static void
 state_restore(struct state *s, const struct savepoint *save) {
-	s->arg  = save->arg;
-	s->argc = save->argc;
-	s->argv = save->argv;
+	s->arg    = save->arg;
+	s->argidx = save->argidx;
+	s->argc   = save->argc;
+	s->argv   = save->argv;
 }
 
 /*
@@ -292,6 +303,11 @@ state_restore(struct state *s, const struct savepoint *save) {
  * Description:
  * 	Advance arg to the next argv if the current argv has no more data. Returns true if the
  * 	state has been advanced to a new argv or if there is no more data available.
+ *
+ * Notes:
+ * 	This function is not idempotent. In particular, if we are at the end of argument 1 and
+ * 	argument 2 is the empty string, the first call to advance will move to argument 2 and the
+ * 	next call to advance will move to argument 3.
  */
 static bool
 advance(struct state *s) {
@@ -303,31 +319,11 @@ advance(struct state *s) {
 		s->argv++;
 		s->argc--;
 		s->arg = s->argv[0];
+		s->argidx++;
 		assert(s->argc > 0 || s->arg == NULL);
 		return true;
 	}
 	return false;
-}
-
-/*
- * require
- *
- * Description:
- * 	Require that argument data be available in arg. If no more data is available, return false.
- *
- * Notes:
- * 	This function only advances at most one argument. If arg[0] == 0 after calling require,
- * 	this means that the state was at the end of an argument and require caused it to advance to
- * 	the next one, but the new argument is an empty string.
- *
- * 	This function is not idempotent.
- */
-static bool
-require(struct state *s) {
-	if (advance(s)) {
-		return (s->arg != NULL);
-	}
-	return true;
 }
 
 static bool
@@ -338,8 +334,7 @@ parse_none(struct state *s) {
 
 static bool
 parse_int(struct state *s) {
-	int argc = s->argc;
-	if (!require(s)) {
+	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing integer");
 		return false;
 	}
@@ -348,10 +343,9 @@ parse_int(struct state *s) {
 	if (end == s->arg) {
 		goto fail;
 	}
-	// If we are not processing options, or if we are but changed arguments to get from the end
-	// of the option to the beginning of its argument, then we must process the whole of the
-	// current argument.
-	if ((s->option == NULL || argc != s->argc) && *end != 0) {
+	// If this is not the first argument and we didn't process the whole current argument,
+	// fail.
+	if (s->argidx != 0 && *end != 0) {
 		goto fail;
 	}
 	s->argument->type = ARG_INT;
@@ -363,16 +357,15 @@ fail:
 }
 
 static bool
-parse_uint_internal(struct state *s, int argc) {
+parse_uint_internal(struct state *s) {
 	char *end;
 	s->argument->uint = strtoumax(s->arg, &end, 0);
 	if (end == s->arg) {
 		goto fail;
 	}
-	// If we are not processing options, or if we are but changed arguments to get from the end
-	// of the option to the beginning of its argument, then we must process the whole of the
-	// current argument.
-	if ((s->option == NULL || argc != s->argc) && *end != 0) {
+	// If this is not the first argument and we didn't process the whole current argument,
+	// fail.
+	if (s->argidx != 0 && *end != 0) {
 		goto fail;
 	}
 	s->argument->type = ARG_UINT;
@@ -385,22 +378,20 @@ fail:
 
 static bool
 parse_uint(struct state *s) {
-	int argc = s->argc;
-	if (!require(s)) {
+	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing integer");
 		return false;
 	}
-	return parse_uint_internal(s, argc);
+	return parse_uint_internal(s);
 }
 
 static bool
 parse_width(struct state *s) {
-	int argc = s->argc;
-	if (!require(s)) {
+	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing width");
 		return false;
 	}
-	if (!parse_uint_internal(s, argc)) {
+	if (!parse_uint_internal(s)) {
 		return false;
 	}
 	size_t width = s->argument->uint;
@@ -436,7 +427,7 @@ hex_digit(int c) {
 
 static bool
 parse_data(struct state *s) {
-	if (!require(s)) {
+	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing data");
 		return false;
 	}
@@ -451,7 +442,7 @@ parse_data(struct state *s) {
 	}
 	size /= 2;
 	uint8_t *data = malloc(size);
-	if (data == NULL) {
+	if (data == NULL && size > 0) {
 		error_out_of_memory();
 		return false;
 	}
@@ -474,7 +465,7 @@ parse_data(struct state *s) {
 
 static bool
 parse_string(struct state *s) {
-	if (!require(s)) {
+	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing string");
 		return false;
 	}
@@ -498,21 +489,21 @@ parse_argv(struct state *s) {
 
 static bool
 parse_symbol(struct state *s) {
-	if (!require(s)) {
+	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing symbol");
 		return false;
 	}
 	char *str = strdup(s->arg);
 	char *sep = strchr(str, ':');
 	if (sep == NULL) {
-		s->argument->symbol.kext = KERNEL_ID;
+		s->argument->symbol.kext   = KERNEL_ID;
 		s->argument->symbol.symbol = str;
 	} else if (sep == str) {
-		s->argument->symbol.kext = NULL;
+		s->argument->symbol.kext   = NULL;
 		s->argument->symbol.symbol = str + 1;
 	} else {
 		*sep = 0;
-		s->argument->symbol.kext = str;
+		s->argument->symbol.kext   = str;
 		s->argument->symbol.symbol = sep + 1;
 	}
 	s->argument->type = ARG_SYMBOL;
@@ -524,7 +515,7 @@ parse_symbol(struct state *s) {
 // TODO: Resolve symbols + arithmetic.
 static bool
 parse_address(struct state *s) {
-	if (!require(s)) {
+	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing address");
 		return false;
 	}
@@ -533,6 +524,7 @@ parse_address(struct state *s) {
 	}
 	char *end;
 	s->argument->address = strtoumax(s->arg, &end, 16);
+	// Always process the full argument.
 	if (*end != 0) {
 		goto fail;
 	}
@@ -546,7 +538,7 @@ fail:
 
 static bool
 parse_range(struct state *s) {
-	if (!require(s)) {
+	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing address range");
 		return false;
 	}
@@ -694,9 +686,11 @@ init_state(struct state *s, const struct command *command, int argc, const char 
 		struct argument *arguments) {
 	assert(argc > 0);
 	s->arg        = argv[0] + strlen(command->command);
+	s->argidx     = 0;
 	s->argument   = NULL;
 	s->option     = NULL;
 	s->keep_error = false;
+	s->bad_option = NULL;
 	s->start      = 0;
 	s->end        = option_count(command);
 	s->command    = command;
@@ -728,7 +722,7 @@ reinit_state(struct state *s) {
 static bool
 parse_option(struct state *s) {
 	s->option = NULL;
-	bool try_argument = false;
+	bool have_dash = false;
 	if (advance(s)) {
 		if (s->arg == NULL) {
 			// We've processed all elements of argv. Nothing left to do.
@@ -744,12 +738,8 @@ parse_option(struct state *s) {
 			// option, so let the arguments handle it.
 			return true;
 		}
-		if ('0' <= s->arg[1] && s->arg[1] <= '9') {
-			// The next "option" looks like "-[0-9]", that is, a negative number. If we
-			// don't match any options, we'll let the arguments handle it instead.
-			try_argument = true;
-		}
 		s->arg++;
+		have_dash = true;
 	}
 	// Check if this matches any option.
 	const struct argspec *specs = s->command->argspecv;
@@ -763,8 +753,11 @@ parse_option(struct state *s) {
 		}
 	}
 	if (s->option == NULL) {
-		if (try_argument) {
-			// We advanced once to pass the dash, so back it out.
+		if (have_dash) {
+			// We have an option or argument, but we can't tell which. Save this arg as
+			// a bad option, back out the dash, and then return true to start
+			// processing the arguments.
+			s->bad_option = s->arg;
 			s->arg--;
 			return true;
 		}
@@ -786,11 +779,17 @@ parse_option(struct state *s) {
 	if (s->option->option[0] == 0) {
 		state_save(s, &save);
 	}
+	// If we're at the end of the current arg string and we expect an argument, advance to the
+	// next arg string. Otherwise, stay in the same place so that we can detect the transition
+	// to arguments.
+	if (*s->arg == 0 && s->option->type != ARG_NONE) {
+		advance(s);
+	}
 	// Try to parse the option's argument.
 	assert(s->option->type < sizeof(parse_fns) / sizeof(parse_fns[0]));
 	if (!(parse_fns[s->option->type])(s)) {
 		// If this is an unnamed option, clear the errors. We'll skip trying to match this
-		// option from now on.
+		// option from now on, but continue parsing options on the next iteration.
 		if (s->option->option[0] == 0 && error_last()->type == usage_error
 				&& !s->keep_error) {
 			error_clear();
@@ -821,6 +820,13 @@ parse_arguments(struct state *s) {
 		// Try to parse the argument.
 		assert(spec->type < sizeof(parse_fns) / sizeof(parse_fns[0]));
 		if (!(parse_fns[spec->type])(s)) {
+			// If we previously had a bad option and it also failed argument parsing,
+			// then print the bad option message.
+			if (s->bad_option != NULL && error_last()->type == usage_error) {
+				error_clear();
+				ERROR_COMMAND(s, "unrecognized option '%s'", s->arg);
+				return false;
+			}
 			// If the issue was that no data was left and we've reached the optional
 			// arguments, clear the error and stop processing.
 			if (s->arg == NULL && spec->option == OPTIONAL &&
@@ -831,9 +837,15 @@ parse_arguments(struct state *s) {
 			return false;
 		}
 		s->argument->present = true;
+		// We've processed any pending bad options successfully.
+		s->bad_option = NULL;
+		// We've finished parsing this argument, but we're still at the end of that arg
+		// string. Advance to the next one.
+		assert(s->arg == NULL || *s->arg == 0);
+		advance(s);
 	}
 	// If there's any leftover data, emit an error.
-	if (require(s)) {
+	if (s->arg != NULL) {
 		ERROR_COMMAND(s, "unexpected argument '%s'", s->arg);
 		return false;
 	}

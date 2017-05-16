@@ -103,6 +103,48 @@ default_virtual_range(struct argrange *range) {
 	}
 }
 
+/*
+ * parse_protection
+ *
+ * Description:
+ * 	Parse the given protection string (e.g. 'r-x').
+ */
+static bool
+parse_protection(const char *command, const char *protection, int *pprot) {
+	int prot = 0;
+	for (size_t i = 0; ; i++) {
+		char c = protection[i];
+		if (c == 0) {
+			if (i == 0) {
+				break;
+			}
+			*pprot = prot;
+			return true;
+		} else if (i == 3) {
+			break;
+		}
+		c = tolower(c);
+		int flag;
+		if (c == 'r') {
+			flag = VM_PROT_READ;
+		} else if (c == 'w') {
+			flag = VM_PROT_WRITE;
+		} else if (c == 'x') {
+			flag = VM_PROT_EXECUTE;
+		} else if (c == '-') {
+			continue;
+		} else {
+			break;
+		}
+		if (prot & flag) {
+			break;
+		}
+		prot |= flag;
+	}
+	error_usage(command, NULL, "invalid protection '%s'", protection);
+	return false;
+}
+
 static bool i_handler(const struct argument *arguments) {
 	return i_command();
 }
@@ -268,6 +310,17 @@ static bool vmm_handler(const struct argument *arguments) {
 	unsigned depth        = OPT_GET_UINT_OR(0, "d", "depth", 2048);
 	struct argrange range = ARG_GET_RANGE_OR(1, "range", 0, -1);
 	return vmm_command(range.start, range.end, depth);
+}
+
+static bool vmp_handler(const struct argument *arguments) {
+	const char *protection = ARG_GET_STRING(0, "protection");
+	kaddr_t address        = ARG_GET_ADDRESS(1, "address");
+	size_t length          = ARG_GET_UINT_OR(2, "length", 1);
+	int prot;
+	if (!parse_protection("vmp", protection, &prot)) {
+		return false;
+	}
+	return vmp_command(address, length, prot);
 }
 
 static bool ks_handler(const struct argument *arguments) {
@@ -438,11 +491,19 @@ static struct command commands[] = {
 			{ ARGUMENT, "address", ARG_ADDRESS, "kernel virtual address" },
 		},
 	}, {
-		"vmm", NULL, vmm_handler,
+		"vmm", "vm", vmm_handler,
 		"show virtual memory info",
 		2, (struct argspec *) &(struct argspec[2]) {
 			{ "d",      "depth", ARG_UINT,  "submap depth"             },
 			{ OPTIONAL, "range", ARG_RANGE, "kernel virtual addresses" },
+		},
+	}, {
+		"vmp", "vm", vmp_handler,
+		"set virtual memory protection",
+		3, (struct argspec *) &(struct argspec[3]) {
+			{ ARGUMENT, "protection", ARG_STRING,  "protection"         },
+			{ ARGUMENT, "address",    ARG_ADDRESS, "address to protect" },
+			{ OPTIONAL, "length",     ARG_UINT,    "length of region"   },
 		},
 	}, {
 		"ks", NULL, ks_handler,

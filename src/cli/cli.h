@@ -28,6 +28,7 @@ bool kpm_command(kaddr_t start, kaddr_t end);
 bool vt_command(const char *classname, const char *bundle_id);
 bool vm_command(kaddr_t address, unsigned depth);
 bool vmm_command(kaddr_t start, kaddr_t end, unsigned depth);
+bool vmp_command(kaddr_t address, size_t length, int prot);
 bool ks_command(kaddr_t address, bool unslide);
 bool a_command(const char *symbol, const char *kext);
 bool ap_command(kaddr_t address, bool unpermute);
