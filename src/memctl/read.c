@@ -1,7 +1,7 @@
-#include "cli/read.h"
+#include "read.h"
 
-#include "cli/memory.h"
-#include "cli/format.h"
+#include "memory.h"
+#include "format.h"
 
 #include "memctl/memctl_signal.h"
 #include "memctl/utility.h"

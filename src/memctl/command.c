@@ -1,6 +1,6 @@
-#include "cli/command.h"
+#include "command.h"
 
-#include "cli/error.h"
+#include "error.h"
 
 #include "memctl/kernel.h"
 #include "memctl/utility.h"

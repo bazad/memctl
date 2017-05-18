@@ -30,53 +30,53 @@ BIN_DIR = bin
 LIB_DIR = lib
 EXTERNAL_HDR_DIR = external
 
-MEMCTL_DIR = cli
+LIBMEMCTL_DIR     = libmemctl
+LIBMEMCTL_INC_DIR = memctl
+MEMCTL_DIR        = memctl
 
 # Flags.
 
 ERRFLAGS   = -Wall -Wpedantic -Wno-gnu -Werror
-CFLAGS     = -g -O0 -I$(SRC_DIR) -I$(INC_DIR) $(ERRFLAGS)
+CFLAGS     = -g -O0 -I$(INC_DIR) $(ERRFLAGS)
 LDFLAGS    = -g -lcompression
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
 
-LIBMEMCTL_CFLAGS = -I$(EXTERNAL_HDR_DIR)
+LIBMEMCTL_CFLAGS = -I$(SRC_DIR)/$(LIBMEMCTL_DIR) -I$(EXTERNAL_HDR_DIR)
+MEMCTL_CFLAGS    = -I$(SRC_DIR)/$(MEMCTL_DIR) -I$(EXTERNAL_HDR_DIR)
 
 ifeq ($(REPL),YES)
 LDFLAGS        += -ledit -lcurses
 MEMCTL_DEFINES += -DMEMCTL_REPL=1
 endif
 
-# libmemctl aarch64 sources.
+# libmemctl arm64/aarch64 sources.
 
-LIBMEMCTL_AARCH64_SRCS = aarch64/disasm.c \
-			 aarch64/kernel_call_aarch64.c \
-			 aarch64/memory_region.c
+ARCH_arm64_DIR = aarch64
 
-LIBMEMCTL_AARCH64_HDRS =
+LIBMEMCTL_arm64_SRCS = disasm.c \
+		       kernel_call_aarch64.c \
+		       memory_region.c
 
-LIBMEMCTL_AARCH64_INCS = aarch64/disasm.h \
-			 aarch64/kernel_call_aarch64.h
+LIBMEMCTL_arm64_HDRS = kernel_call_aarch64.h
+
+LIBMEMCTL_arm64_INCS = disasm.h
 
 # libmemctl x86_64 sources.
 
-LIBMEMCTL_X86_64_SRCS = x86_64/memory_region.c
+ARCH_x86_64_DIR = x86_64
 
-LIBMEMCTL_X86_64_HDRS =
+LIBMEMCTL_x86_64_SRCS = memory_region.c
 
-LIBMEMCTL_X86_64_INCS =
+LIBMEMCTL_x86_64_HDRS =
+
+LIBMEMCTL_x86_64_INCS =
 
 # libmemctl sources.
 
-ifeq ($(ARCH),arm64)
-LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_AARCH64_SRCS)
-LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_AARCH64_HDRS)
-LIBMEMCTL_ARCH_INCS = $(LIBMEMCTL_AARCH64_INCS)
-else ifeq ($(ARCH),x86_64)
-LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_X86_64_SRCS)
-LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_X86_64_HDRS)
-LIBMEMCTL_ARCH_INCS = $(LIBMEMCTL_X86_64_INCS)
-endif
+LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_$(ARCH)_SRCS:%=$(ARCH_$(ARCH)_DIR)/%)
+LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_$(ARCH)_HDRS:%=$(ARCH_$(ARCH)_DIR)/%)
+LIBMEMCTL_ARCH_INCS = $(LIBMEMCTL_$(ARCH)_INCS:%=$(ARCH_$(ARCH)_DIR)/%)
 
 LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 core.c \
@@ -118,19 +118,19 @@ LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
 		 utility.h \
 		 vtable.h
 
-LIBMEMCTL_INCS := $(LIBMEMCTL_INCS:%=$(INC_DIR)/memctl/%)
-
-LIBMEMCTL_OBJS := $(LIBMEMCTL_SRCS:%.c=$(OBJ_DIR)/%.o)
+LIBMEMCTL_SRCS := $(LIBMEMCTL_SRCS:%=$(SRC_DIR)/$(LIBMEMCTL_DIR)/%)
+LIBMEMCTL_HDRS := $(LIBMEMCTL_HDRS:%=$(SRC_DIR)/$(LIBMEMCTL_DIR)/%)
+LIBMEMCTL_INCS := $(LIBMEMCTL_INCS:%=$(INC_DIR)/$(LIBMEMCTL_INC_DIR)/%)
+LIBMEMCTL_OBJS := $(LIBMEMCTL_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 MEMCTL_LIB := $(LIB_DIR)/libmemctl.a
 
 # memctl sources.
 
-MEMCTL_AARCH64_SRCS = aarch64/disassemble.c
+MEMCTL_arm64_SRCS = disassemble.c
 
-ifeq ($(ARCH),arm64)
-MEMCTL_ARCH_SRCS = $(MEMCTL_AARCH64_SRCS)
-endif
+MEMCTL_ARCH_SRCS = $(MEMCTL_$(ARCH)_SRCS:%=$(ARCH_$(ARCH)_DIR)/%)
+MEMCTL_ARCH_HDRS = $(MEMCTL_$(ARCH)_HDRS:%=$(ARCH_$(ARCH)_DIR)/%)
 
 MEMCTL_SRCS = $(MEMCTL_ARCH_SRCS) \
 	      cli.c \
@@ -154,9 +154,9 @@ MEMCTL_HDRS = $(MEMCTL_ARCH_HDRS) \
 	      read.h \
 	      vmmap.h
 
-MEMCTL_SRCS := $(MEMCTL_SRCS:%=$(MEMCTL_DIR)/%)
-MEMCTL_HDRS := $(MEMCTL_HDRS:%=$(MEMCTL_DIR)/%)
-MEMCTL_OBJS := $(MEMCTL_SRCS:%.c=$(OBJ_DIR)/%.o)
+MEMCTL_SRCS := $(MEMCTL_SRCS:%=$(SRC_DIR)/$(MEMCTL_DIR)/%)
+MEMCTL_HDRS := $(MEMCTL_HDRS:%=$(SRC_DIR)/$(MEMCTL_DIR)/%)
+MEMCTL_OBJS := $(MEMCTL_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 MEMCTL_BIN := $(BIN_DIR)/memctl
 
@@ -164,19 +164,17 @@ MEMCTL_BIN := $(BIN_DIR)/memctl
 
 .PHONY: all clean
 
-vpath % $(SRC_DIR)
-
 all: $(MEMCTL_BIN)
 
 ifneq ($(wildcard $(CORE_ENTITLEMENTS)),)
 CODESIGN_FLAGS = --entitlements "$(CORE_ENTITLEMENTS)"
 endif
 
-$(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBMEMCTL_INCS)
+$(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(SRC_DIR)/$(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBMEMCTL_INCS)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(MEMCTL_DEFINES) -c $< -o $@
+	$(CC) $(CFLAGS) $(MEMCTL_CFLAGS) $(MEMCTL_DEFINES) -c $< -o $@
 
-$(OBJ_DIR)/%.o: %.c $(LIBMEMCTL_INCS) $(LIBMEMCTL_HDRS)
+$(OBJ_DIR)/$(LIBMEMCTL_DIR)/%.o: $(SRC_DIR)/$(LIBMEMCTL_DIR)/%.c $(LIBMEMCTL_INCS) $(LIBMEMCTL_HDRS)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(LIBMEMCTL_CFLAGS) -c $< -o $@
 

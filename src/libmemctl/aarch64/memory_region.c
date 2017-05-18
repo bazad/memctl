@@ -1,4 +1,4 @@
-#include "memory_region.h"
+#include "memctl/memory_region.h"
 
 static const struct memory_region physical_regions[] = {
 	// TODO: This is a hack. Investigate the correct regions and access widths and list them

@@ -332,14 +332,14 @@
  * cannot save any memory by packing the payload densely.
  */
 
-#include "core.h"
-#include "kernel_call.h"
-#include "kernel_memory.h"
-#include "kernel_slide.h"
-#include "kernelcache.h"
-#include "memctl_error.h"
-#include "memctl_signal.h"
-#include "utility.h"
+#include "memctl/core.h"
+#include "memctl/kernel_call.h"
+#include "memctl/kernel_memory.h"
+#include "memctl/kernel_slide.h"
+#include "memctl/kernelcache.h"
+#include "memctl/memctl_error.h"
+#include "memctl/memctl_signal.h"
+#include "memctl/utility.h"
 
 #include <mach/mach_vm.h>
 

@@ -1,7 +1,7 @@
-#include "cli/vmmap.h"
+#include "vmmap.h"
 
-#include "cli/error.h"
-#include "cli/format.h"
+#include "error.h"
+#include "format.h"
 
 #include "memctl/core.h"
 #include "memctl/memctl_signal.h"

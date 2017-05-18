@@ -4,7 +4,7 @@
  * kernel_call routines for AArch64. These functions should not be called directly.
  */
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 /*
  * kernel_call_init_aarch64

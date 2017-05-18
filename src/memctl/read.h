@@ -3,7 +3,7 @@
 
 #include "memctl/memctl_types.h"
 
-#include "cli/disassemble.h"
+#include "disassemble.h"
 
 /*
  * memctl_read

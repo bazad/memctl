@@ -1,4 +1,4 @@
-#include "disasm.h"
+#include "memctl/aarch64/disasm.h"
 
 #include <assert.h>
 #include <stdlib.h>

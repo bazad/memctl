@@ -1,8 +1,7 @@
-#include "cli/disassemble.h"
+#include "disassemble.h"
 
 #include "memctl/aarch64/disasm.h"
-
-#include "utility.h"
+#include "memctl/utility.h"
 
 #include <assert.h>
 #include <stdio.h>

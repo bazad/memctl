@@ -1,6 +1,6 @@
-#include "cli/find.h"
+#include "find.h"
 
-#include "cli/format.h"
+#include "format.h"
 
 #include "memctl/kernel_memory.h"
 #include "memctl/memctl_signal.h"

@@ -1,8 +1,8 @@
 #ifndef MEMCTL_CLI__CLI_H_
 #define MEMCTL_CLI__CLI_H_
 
-#include "cli/command.h"
-#include "cli/disassemble.h"
+#include "command.h"
+#include "disassemble.h"
 
 bool default_action(void);
 

@@ -1,4 +1,4 @@
-#include "cli/format.h"
+#include "format.h"
 
 #include <mach/mach.h>
 #include <stdio.h>
