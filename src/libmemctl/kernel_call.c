@@ -17,6 +17,8 @@
 
 #if __arm64__
 #include "aarch64/kernel_call_aarch64.h"
+#elif __x86_64__
+#include "memctl/x86_64/kernel_call_syscall_x86_64.h"
 #endif
 
 static const char *service_name     = "AppleKeyStore";
@@ -446,6 +448,11 @@ kernel_call(void *result, unsigned result_size,
 	assert(result != NULL || func == 0 || result_size == 0);
 	assert(ispow2(result_size) && result_size <= sizeof(uint64_t));
 	assert(arg_count <= 8);
+#if __x86_64__
+	if (kernel_call_syscall_x86_64(result, result_size, 0, arg_count, args)) {
+		return kernel_call_syscall_x86_64(result, result_size, func, arg_count, args);
+	} else
+#endif
 	if (kernel_call_7(result, result_size, 0, arg_count, args)) {
 		return kernel_call_7(result, result_size, func, arg_count, args);
 	}
@@ -482,6 +489,10 @@ kernel_call_init() {
 	if (!kernel_call_init_aarch64()) {
 		goto fail;
 	}
+#elif __x86_64__
+	if (!kernel_call_init_syscall_x86_64()) {
+		goto fail;
+	}
 #endif
 	return true;
 fail:
@@ -493,6 +504,8 @@ void
 kernel_call_deinit() {
 #if __arm64__
 	kernel_call_deinit_aarch64();
+#elif __x86_64__
+	kernel_call_deinit_syscall_x86_64();
 #endif
 	if (hook.hooked) {
 		error_stop();

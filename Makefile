@@ -66,11 +66,13 @@ LIBMEMCTL_arm64_INCS = disasm.h
 
 ARCH_x86_64_DIR = x86_64
 
-LIBMEMCTL_x86_64_SRCS = memory_region.c
+LIBMEMCTL_x86_64_SRCS = kernel_call_syscall_asm.s \
+			kernel_call_syscall_x86_64.c \
+			memory_region.c
 
-LIBMEMCTL_x86_64_HDRS =
+LIBMEMCTL_x86_64_HDRS = kernel_call_syscall_code.h
 
-LIBMEMCTL_x86_64_INCS =
+LIBMEMCTL_x86_64_INCS = kernel_call_syscall_x86_64.h
 
 # libmemctl sources.
 
@@ -122,6 +124,7 @@ LIBMEMCTL_SRCS := $(LIBMEMCTL_SRCS:%=$(SRC_DIR)/$(LIBMEMCTL_DIR)/%)
 LIBMEMCTL_HDRS := $(LIBMEMCTL_HDRS:%=$(SRC_DIR)/$(LIBMEMCTL_DIR)/%)
 LIBMEMCTL_INCS := $(LIBMEMCTL_INCS:%=$(INC_DIR)/$(LIBMEMCTL_INC_DIR)/%)
 LIBMEMCTL_OBJS := $(LIBMEMCTL_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+LIBMEMCTL_OBJS := $(LIBMEMCTL_OBJS:$(SRC_DIR)/%.s=$(OBJ_DIR)/%.o)
 
 MEMCTL_LIB := $(LIB_DIR)/libmemctl.a
 
@@ -175,6 +178,10 @@ $(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(SRC_DIR)/$(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBM
 	$(CC) $(CFLAGS) $(MEMCTL_CFLAGS) $(MEMCTL_DEFINES) -c $< -o $@
 
 $(OBJ_DIR)/$(LIBMEMCTL_DIR)/%.o: $(SRC_DIR)/$(LIBMEMCTL_DIR)/%.c $(LIBMEMCTL_INCS) $(LIBMEMCTL_HDRS)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) $(LIBMEMCTL_CFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/$(LIBMEMCTL_DIR)/%.o: $(SRC_DIR)/$(LIBMEMCTL_DIR)/%.s $(LIBMEMCTL_INCS) $(LIBMEMCTL_HDRS)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(LIBMEMCTL_CFLAGS) -c $< -o $@
 
