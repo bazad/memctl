@@ -1,7 +1,7 @@
 #ifndef MEMCTL_CLI__VMMAP_H_
 #define MEMCTL_CLI__VMMAP_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 /*
  * memctl_vmmap

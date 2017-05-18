@@ -1,7 +1,7 @@
 #ifndef MEMCTL__KERNEL_SLIDE_H_
 #define MEMCTL__KERNEL_SLIDE_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 /*
  * kernel_slide

@@ -1,6 +1,6 @@
 #include "cli/disassemble.h"
 
-#include "aarch64/disasm.h"
+#include "memctl/aarch64/disasm.h"
 
 #include "utility.h"
 

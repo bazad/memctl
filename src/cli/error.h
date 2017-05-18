@@ -1,7 +1,7 @@
 #ifndef MEMCTL_CLI__ERROR_H_
 #define MEMCTL_CLI__ERROR_H_
 
-#include "memctl_error.h"
+#include "memctl/memctl_error.h"
 
 /*
  * Description:

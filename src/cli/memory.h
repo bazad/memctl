@@ -1,7 +1,7 @@
 #ifndef MEMCTL__CLI__MEMORY_H_
 #define MEMCTL__CLI__MEMORY_H_
 
-#include "kernel_memory.h"
+#include "memctl/kernel_memory.h"
 
 /*
  * read_memory

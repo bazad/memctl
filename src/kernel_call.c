@@ -1,13 +1,14 @@
-#include "kernel_call.h"
+#include "memctl/kernel_call.h"
 
-#include "core.h"
-#include "kernel.h"
-#include "kernel_memory.h"
+#include "memctl/core.h"
+#include "memctl/kernel.h"
+#include "memctl/kernel_memory.h"
+#include "memctl/memctl_offsets.h"
+#include "memctl/memctl_signal.h"
+#include "memctl/utility.h"
+#include "memctl/vtable.h"
+
 #include "memctl_common.h"
-#include "memctl_offsets.h"
-#include "memctl_signal.h"
-#include "utility.h"
-#include "vtable.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>

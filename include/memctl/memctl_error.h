@@ -1,8 +1,8 @@
 #ifndef MEMCTL__MEMCTL_ERROR_H_
 #define MEMCTL__MEMCTL_ERROR_H_
 
-#include "error.h"
-#include "memctl_types.h"
+#include "memctl/error.h"
+#include "memctl/memctl_types.h"
 
 enum {
 	open_error                       = 8,

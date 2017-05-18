@@ -2,8 +2,8 @@
 
 #include "cli/error.h"
 
-#include "kernel.h"
-#include "utility.h"
+#include "memctl/kernel.h"
+#include "memctl/utility.h"
 
 #include <assert.h>
 #include <inttypes.h>

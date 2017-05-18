@@ -1,7 +1,7 @@
 #ifndef MEMCTL__CORE_H_
 #define MEMCTL__CORE_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 #include <mach/mach.h>
 #include <stdint.h>

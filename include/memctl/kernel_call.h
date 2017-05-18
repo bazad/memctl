@@ -1,7 +1,7 @@
 #ifndef MEMCTL__KERNEL_CALL_H_
 #define MEMCTL__KERNEL_CALL_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 /*
  * kernel_call_init

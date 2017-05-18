@@ -1,7 +1,7 @@
-#include "memctl_offsets.h"
+#include "memctl/memctl_offsets.h"
 
-#include "kernel.h"
-#include "memctl_error.h"
+#include "memctl/kernel.h"
+#include "memctl/memctl_error.h"
 
 DEFINE_OFFSET(IORegistryEntry, reserved);
 DEFINE_OFFSET(IORegistryEntry__ExpansionData, fRegistryEntryID);

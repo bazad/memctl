@@ -2,14 +2,14 @@
 #include "mach/vm_statistics.h"
 #undef KERNEL_PRIVATE
 
-#include "kernel_slide.h"
+#include "memctl/kernel_slide.h"
 
-#include "core.h"
-#include "kernel.h"
-#include "kernel_memory.h"
-#include "memctl_error.h"
-#include "memctl_signal.h"
-#include "utility.h"
+#include "memctl/core.h"
+#include "memctl/kernel.h"
+#include "memctl/kernel_memory.h"
+#include "memctl/memctl_error.h"
+#include "memctl/memctl_signal.h"
+#include "memctl/utility.h"
 
 #include <assert.h>
 #include <mach/vm_region.h>

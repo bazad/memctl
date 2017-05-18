@@ -1,14 +1,15 @@
-#include "kernel.h"
+#include "memctl/kernel.h"
 
-#include "kernel_slide.h"
-#include "memctl_common.h"
-#include "memctl_error.h"
+#include "memctl/kernel_slide.h"
+#include "memctl/memctl_error.h"
 
 #if KERNELCACHE
-#include "kernelcache.h"
+#include "memctl/kernelcache.h"
 #else
-#include "oskext.h"
+#include "memctl/oskext.h"
 #endif
+
+#include "memctl_common.h"
 
 #include <assert.h>
 #include <errno.h>

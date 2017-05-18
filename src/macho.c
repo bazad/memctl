@@ -1,6 +1,6 @@
-#include "macho.h"
+#include "memctl/macho.h"
 
-#include "memctl_error.h"
+#include "memctl/memctl_error.h"
 
 #include <assert.h>
 #include <string.h>

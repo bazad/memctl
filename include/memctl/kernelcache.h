@@ -1,8 +1,8 @@
 #ifndef MEMCTL__KERNELCACHE_H_
 #define MEMCTL__KERNELCACHE_H_
 
-#include "kernel.h"
-#include "macho.h"
+#include "memctl/kernel.h"
+#include "memctl/macho.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 

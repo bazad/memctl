@@ -1,7 +1,7 @@
 #ifndef MEMCTL__CLI__FIND_H_
 #define MEMCTL__CLI__FIND_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 /*
  * memctl_find

@@ -1,7 +1,8 @@
-#include "kernelcache.h"
+#include "memctl/kernelcache.h"
+
+#include "memctl/memctl_error.h"
 
 #include "memctl_common.h"
-#include "memctl_error.h"
 
 #include <compression.h>
 #include <IOKit/IOCFUnserialize.h>

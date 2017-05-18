@@ -1,7 +1,7 @@
 #ifndef MEMCTL__MEMCTL_OFFSETS_H_
 #define MEMCTL__MEMCTL_OFFSETS_H_
 
-#include "offset.h"
+#include "memctl/offset.h"
 
 #define DECLARE_OFFSET(base, object)	\
 extern struct offset OFFSET(base, object)

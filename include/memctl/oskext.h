@@ -1,12 +1,9 @@
 #ifndef MEMCTL__OSKEXT_H_
 #define MEMCTL__OSKEXT_H_
 
-#include <stdint.h>
-#include <stdlib.h>
-
-#include "kernel.h"
-#include "macho.h"
-#include "memctl_types.h"
+#include "memctl/kernel.h"
+#include "memctl/macho.h"
+#include "memctl/memctl_types.h"
 
 /*
  * oskext_get_address

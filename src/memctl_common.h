@@ -1,7 +1,7 @@
 #ifndef MEMCTL__MEMCTL_COMMON_H_
 #define MEMCTL__MEMCTL_COMMON_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 

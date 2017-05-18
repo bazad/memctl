@@ -1,4 +1,4 @@
-#include "platform.h"
+#include "memctl/platform.h"
 
 #include <assert.h>
 #include <mach/mach.h>

@@ -3,7 +3,7 @@
 #include "cli/error.h"
 #include "cli/format.h"
 
-#include "kernel.h"
+#include "memctl/kernel.h"
 
 #include <stdio.h>
 #include <string.h>

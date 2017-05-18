@@ -1,6 +1,6 @@
 #include "memctl_common.h"
 
-#include "memctl_error.h"
+#include "memctl/memctl_error.h"
 
 #include <errno.h>
 #include <fcntl.h>

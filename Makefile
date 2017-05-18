@@ -24,18 +24,23 @@ CODESIGN := codesign
 # Directories.
 
 SRC_DIR = src
+INC_DIR = include
 OBJ_DIR = obj
 BIN_DIR = bin
 LIB_DIR = lib
 EXTERNAL_HDR_DIR = external
 
+MEMCTL_DIR = cli
+
 # Flags.
 
 ERRFLAGS   = -Wall -Wpedantic -Wno-gnu -Werror
-CFLAGS     = -g -O0 -I$(SRC_DIR) -I$(EXTERNAL_HDR_DIR) $(ERRFLAGS)
+CFLAGS     = -g -O0 -I$(SRC_DIR) -I$(INC_DIR) $(ERRFLAGS)
 LDFLAGS    = -g -lcompression
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
+
+LIBMEMCTL_CFLAGS = -I$(EXTERNAL_HDR_DIR)
 
 ifeq ($(REPL),YES)
 LDFLAGS        += -ledit -lcurses
@@ -48,22 +53,29 @@ LIBMEMCTL_AARCH64_SRCS = aarch64/disasm.c \
 			 aarch64/kernel_call_aarch64.c \
 			 aarch64/memory_region.c
 
-LIBMEMCTL_AARCH64_HDRS = aarch64/disasm.h \
+LIBMEMCTL_AARCH64_HDRS =
+
+LIBMEMCTL_AARCH64_INCS = aarch64/disasm.h \
 			 aarch64/kernel_call_aarch64.h
 
 # libmemctl x86_64 sources.
 
 LIBMEMCTL_X86_64_SRCS = x86_64/memory_region.c
+
 LIBMEMCTL_X86_64_HDRS =
+
+LIBMEMCTL_X86_64_INCS =
 
 # libmemctl sources.
 
 ifeq ($(ARCH),arm64)
 LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_AARCH64_SRCS)
 LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_AARCH64_HDRS)
+LIBMEMCTL_ARCH_INCS = $(LIBMEMCTL_AARCH64_INCS)
 else ifeq ($(ARCH),x86_64)
 LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_X86_64_SRCS)
 LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_X86_64_HDRS)
+LIBMEMCTL_ARCH_INCS = $(LIBMEMCTL_X86_64_INCS)
 endif
 
 LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
@@ -84,6 +96,9 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 vtable.c
 
 LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
+		 memctl_common.h
+
+LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
 		 core.h \
 		 error.h \
 		 kernel.h \
@@ -92,7 +107,6 @@ LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
 		 kernel_slide.h \
 		 kernelcache.h \
 		 macho.h \
-		 memctl_common.h \
 		 memctl_error.h \
 		 memctl_offsets.h \
 		 memctl_signal.h \
@@ -104,13 +118,13 @@ LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
 		 utility.h \
 		 vtable.h
 
+LIBMEMCTL_INCS := $(LIBMEMCTL_INCS:%=$(INC_DIR)/memctl/%)
+
 LIBMEMCTL_OBJS := $(LIBMEMCTL_SRCS:%.c=$(OBJ_DIR)/%.o)
 
 MEMCTL_LIB := $(LIB_DIR)/libmemctl.a
 
 # memctl sources.
-
-MEMCTL_DIR = cli
 
 MEMCTL_AARCH64_SRCS = aarch64/disassemble.c
 
@@ -158,13 +172,13 @@ ifneq ($(wildcard $(CORE_ENTITLEMENTS)),)
 CODESIGN_FLAGS = --entitlements "$(CORE_ENTITLEMENTS)"
 endif
 
-$(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBMEMCTL_HDRS)
+$(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBMEMCTL_INCS)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(MEMCTL_DEFINES) -c $< -o $@
 
-$(OBJ_DIR)/%.o: %.c $(LIBMEMCTL_HDRS)
+$(OBJ_DIR)/%.o: %.c $(LIBMEMCTL_INCS) $(LIBMEMCTL_HDRS)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(LIBMEMCTL_CFLAGS) -c $< -o $@
 
 $(MEMCTL_BIN): $(MEMCTL_LIB) $(CORE_LIB) $(MEMCTL_OBJS)
 	@mkdir -p $(@D)

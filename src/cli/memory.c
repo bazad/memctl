@@ -1,6 +1,6 @@
 #include "memory.h"
 
-#include "kernel_memory.h"
+#include "memctl/kernel_memory.h"
 
 bool
 read_memory(kaddr_t address, size_t *size, void *data, bool physical, size_t access) {

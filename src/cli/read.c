@@ -1,10 +1,10 @@
 #include "cli/read.h"
 
 #include "cli/memory.h"
+#include "cli/format.h"
 
-#include "format.h"
-#include "memctl_signal.h"
-#include "utility.h"
+#include "memctl/memctl_signal.h"
+#include "memctl/utility.h"
 
 #include <assert.h>
 #include <ctype.h>

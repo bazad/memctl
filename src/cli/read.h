@@ -1,7 +1,7 @@
 #ifndef MEMCTL__CLI__READ_H_
 #define MEMCTL__CLI__READ_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 #include "cli/disassemble.h"
 

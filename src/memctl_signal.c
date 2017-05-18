@@ -1,3 +1,3 @@
-#include "memctl_signal.h"
+#include "memctl/memctl_signal.h"
 
 volatile sig_atomic_t interrupted;

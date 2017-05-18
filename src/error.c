@@ -1,4 +1,4 @@
-#include "error.h"
+#include "memctl/error.h"
 
 #include <assert.h>
 #include <stdio.h>

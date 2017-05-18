@@ -3,8 +3,8 @@
 #include "cli/error.h"
 #include "cli/format.h"
 
-#include "core.h"
-#include "memctl_signal.h"
+#include "memctl/core.h"
+#include "memctl/memctl_signal.h"
 
 #include <mach/mach_vm.h>
 #include <stdio.h>

@@ -1,10 +1,10 @@
 #ifndef MEMCTL__KERNEL_MEMORY_H_
 #define MEMCTL__KERNEL_MEMORY_H_
 
+#include "memctl/memctl_error.h"
+
 #include <stdint.h>
 #include <mach/vm_page_size.h>
-
-#include "memctl_error.h"
 
 #define page_size	vm_kernel_page_size
 #define page_shift	vm_kernel_page_shift

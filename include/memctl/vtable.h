@@ -1,7 +1,7 @@
 #ifndef MEMCTL__VTABLE_H_
 #define MEMCTL__VTABLE_H_
 
-#include "kernel.h"
+#include "memctl/kernel.h"
 
 /*
  * vtable

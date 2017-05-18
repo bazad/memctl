@@ -1,13 +1,13 @@
-#include "vtable.h"
+#include "memctl/vtable.h"
 
-#include "kernel.h"
-#include "memctl_error.h"
-#include "utility.h"
+#include "memctl/kernel.h"
+#include "memctl/memctl_error.h"
+#include "memctl/utility.h"
 
 #if __arm64__
-#include "aarch64/disasm.h"
-#include "kernel_slide.h"
-#include "kernelcache.h"
+#include "memctl/aarch64/disasm.h"
+#include "memctl/kernel_slide.h"
+#include "memctl/kernelcache.h"
 #endif
 
 #include <stdio.h>

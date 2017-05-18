@@ -1,7 +1,7 @@
 #ifndef MEMCTL_CLI__FORMAT_H_
 #define MEMCTL_CLI__FORMAT_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 #if KERNEL_BITS == 32
 # define KADDR_FMT	"%08x"

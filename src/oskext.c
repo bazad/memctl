@@ -1,10 +1,11 @@
-#include "oskext.h"
+#include "memctl/oskext.h"
 
-#include "core.h"
-#include "kernel.h"
-#include "kernel_slide.h"
+#include "memctl/core.h"
+#include "memctl/kernel.h"
+#include "memctl/kernel_slide.h"
+#include "memctl/memctl_error.h"
+
 #include "memctl_common.h"
-#include "memctl_error.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>

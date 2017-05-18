@@ -7,15 +7,15 @@
 #include "cli/read.h"
 #include "cli/vmmap.h"
 
-#include "core.h"
-#include "kernel.h"
-#include "kernel_call.h"
-#include "kernel_slide.h"
-#include "kernelcache.h"
-#include "memctl_offsets.h"
-#include "memctl_signal.h"
-#include "platform.h"
-#include "vtable.h"
+#include "memctl/core.h"
+#include "memctl/kernel.h"
+#include "memctl/kernel_call.h"
+#include "memctl/kernel_slide.h"
+#include "memctl/kernelcache.h"
+#include "memctl/memctl_offsets.h"
+#include "memctl/memctl_signal.h"
+#include "memctl/platform.h"
+#include "memctl/vtable.h"
 
 #include <mach/mach_vm.h>
 #include <stdio.h>

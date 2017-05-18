@@ -1,7 +1,7 @@
 #ifndef MEMCTL__MEMORY_REGION_H_
 #define MEMCTL__MEMORY_REGION_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 /*
  * struct memory_region

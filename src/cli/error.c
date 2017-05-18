@@ -2,7 +2,7 @@
 
 #include "cli/format.h"
 
-#include "kernel.h"
+#include "memctl/kernel.h"
 
 #include <assert.h>
 #include <stdio.h>

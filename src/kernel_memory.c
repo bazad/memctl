@@ -2,13 +2,13 @@
 #include "mach/vm_statistics.h"
 #undef KERNEL_PRIVATE
 
-#include "kernel_memory.h"
+#include "memctl/kernel_memory.h"
 
-#include "core.h"
-#include "kernel.h"
-#include "kernel_call.h"
-#include "memory_region.h"
-#include "utility.h"
+#include "memctl/core.h"
+#include "memctl/kernel.h"
+#include "memctl/kernel_call.h"
+#include "memctl/memory_region.h"
+#include "memctl/utility.h"
 
 #include <mach/mach_vm.h>
 #include <mach/vm_region.h>

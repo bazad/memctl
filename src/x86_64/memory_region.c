@@ -1,4 +1,4 @@
-#include "memory_region.h"
+#include "memctl/memory_region.h"
 
 static const struct memory_region physical_regions[] = {
 	// TODO: These are just guesses. Verify that these regions are correct.

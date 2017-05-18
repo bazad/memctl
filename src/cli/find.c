@@ -2,9 +2,9 @@
 
 #include "cli/format.h"
 
-#include "kernel_memory.h"
-#include "memctl_signal.h"
-#include "utility.h"
+#include "memctl/kernel_memory.h"
+#include "memctl/memctl_signal.h"
+#include "memctl/utility.h"
 
 #include <stdio.h>
 

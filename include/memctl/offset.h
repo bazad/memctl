@@ -1,7 +1,7 @@
 #ifndef MEMCTL__OFFSET_H_
 #define MEMCTL__OFFSET_H_
 
-#include "memctl_types.h"
+#include "memctl/memctl_types.h"
 
 #include <assert.h>
 
