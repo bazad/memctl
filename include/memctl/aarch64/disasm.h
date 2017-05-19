@@ -188,11 +188,11 @@ enum {
 #define AARCH64_ADC_CLASS_BITS 0x1a000000
 
 struct aarch64_ins_adc {
-	enum {
-		AARCH64_INS_ADC_OP_ADC = 0,
-		AARCH64_INS_ADC_OP_SBC = 1,
-	}             op;
-	bool          setflags;
+#define AARCH64_INS_ADC_OP_ADC	0
+#define AARCH64_INS_ADC_OP_SBC	1
+	uint8_t       op:1;
+	uint8_t       setflags:1;
+	uint8_t       _fill:6;
 	aarch64_gpreg Rd;
 	aarch64_gpreg Rn;
 	aarch64_gpreg Rm;
@@ -243,11 +243,11 @@ bool aarch64_alias_ngcs(struct aarch64_ins_adc *sbcs);
 #define AARCH64_ADD_XR_CLASS_BITS 0x0b200000
 
 struct aarch64_ins_add_xr {
-	enum {
-		AARCH64_INS_ADD_XR_OP_ADD = 0,
-		AARCH64_INS_ADD_XR_OP_SUB = 1,
-	}              op;
-	bool           setflags;
+#define AARCH64_INS_ADD_XR_OP_ADD	0
+#define AARCH64_INS_ADD_XR_OP_SUB	1
+	uint8_t        op:1;
+	uint8_t        setflags:1;
+	uint8_t        _fill:6;
 	aarch64_gpreg  Rd;
 	aarch64_gpreg  Rn;
 	aarch64_gpreg  Rm;
@@ -299,11 +299,11 @@ bool aarch64_alias_cmp_xr(struct aarch64_ins_add_xr *subs_xr);
 #define AARCH64_ADD_IM_CLASS_BITS 0x11000000
 
 struct aarch64_ins_add_im {
-	enum {
-		AARCH64_INS_ADD_IM_OP_ADD = 0,
-		AARCH64_INS_ADD_IM_OP_SUB = 1,
-	}             op;
-	bool          setflags;
+#define AARCH64_INS_ADD_IM_OP_ADD	0
+#define AARCH64_INS_ADD_IM_OP_SUB	1
+	uint8_t       op:1;
+	uint8_t       setflags:1;
+	uint8_t       _fill:6;
 	aarch64_gpreg Rd;
 	aarch64_gpreg Rn;
 	uint16_t      imm;
@@ -361,11 +361,11 @@ bool aarch64_alias_mov_sp(struct aarch64_ins_add_im *add_im);
 #define AARCH64_ADD_SR_CLASS_BITS 0x0b000000
 
 struct aarch64_ins_add_sr {
-	enum {
-		AARCH64_INS_ADD_SR_OP_ADD = 0,
-		AARCH64_INS_ADD_SR_OP_SUB = 1,
-	}             op;
-	bool          setflags;
+#define AARCH64_INS_ADD_SR_OP_ADD	0
+#define AARCH64_INS_ADD_SR_OP_SUB	1
+	uint8_t       op:1;
+	uint8_t       setflags:1;
+	uint8_t       _fill:6;
 	aarch64_gpreg Rd;
 	aarch64_gpreg Rn;
 	aarch64_gpreg Rm;
@@ -426,10 +426,10 @@ bool aarch64_alias_negs(struct aarch64_ins_add_sr *subs_sr);
 #define AARCH64_ADR_CLASS_BITS 0x10000000
 
 struct aarch64_ins_adr {
-	enum {
-		AARCH64_INS_ADR_OP_ADR  = 0,
-		AARCH64_INS_ADR_OP_ADRP = 1,
-	}             op;
+#define AARCH64_INS_ADR_OP_ADR	0
+#define AARCH64_INS_ADR_OP_ADRP	1
+	uint8_t       op:1;
+	uint8_t       _fill:7;
 	aarch64_gpreg Xd;
 	uint64_t      label;
 };
@@ -470,11 +470,11 @@ bool aarch64_ins_decode_and_im(uint32_t ins, struct aarch64_ins_and_orr_im *and_
 #define AARCH64_AND_SR_CLASS_BITS 0x0a000000
 
 struct aarch64_ins_and_sr {
-	enum {
-		AARCH64_AND_SR_OP_AND,
-		AARCH64_AND_SR_OP_ORR,
-	}             op;
-	bool          setflags;
+#define AARCH64_AND_SR_OP_AND	0
+#define AARCH64_AND_SR_OP_ORR	1
+	uint8_t       op:1;
+	uint8_t       setflags:1;
+	uint8_t       _fill:6;
 	aarch64_gpreg Rd;
 	aarch64_gpreg Rn;
 	aarch64_gpreg Rm;
@@ -538,7 +538,8 @@ bool aarch64_ins_decode_ands_im(uint32_t ins, struct aarch64_ins_and_orr_im *and
 #define AARCH64_B_CLASS_BITS 0x14000000
 
 struct aarch64_ins_b {
-	bool     link;
+	uint8_t  link:1;
+	uint8_t  _fill:7;
 	uint64_t label;
 };
 
@@ -572,12 +573,12 @@ bool aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b);
 #define AARCH64_BR_CLASS_BITS 0xd61f0000
 
 struct aarch64_ins_br {
-	enum {
-		AARCH64_INS_BR_OP_BR  = 0,
-		AARCH64_INS_BR_OP_RET = 1,
-	}             op;
+#define AARCH64_INS_BR_OP_BR	0
+#define AARCH64_INS_BR_OP_RET	1
+	uint8_t       op:1;
+	uint8_t       link:1;
+	uint8_t       _fill:6;
 	aarch64_gpreg Xn;
-	bool          link;
 };
 
 bool aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br);

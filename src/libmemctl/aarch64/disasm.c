@@ -339,7 +339,7 @@ aarch64_decode_and_sr(uint32_t ins, struct aarch64_ins_and_sr *and_sr) {
 	if (sf == 0 && test(amount, 5)) {
 		return false;
 	}
-	and_sr->op       = (opc == 1 ? AARCH64_AND_SR_OP_ORR : AARCH64_AND_SR_OP_AND);
+	and_sr->op       = (opc == 1);
 	and_sr->setflags = (opc == 3);
 	and_sr->Rd       = gpreg(ins, sf, USE_ZR, 0);
 	and_sr->Rn       = gpreg(ins, sf, USE_ZR, 5);
@@ -400,8 +400,8 @@ aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br) {
 		return false;
 	}
 	br->op   = test(ins, 22);
-	br->Xn   = gpreg(ins, 1, USE_ZR, 5);
 	br->link = test(ins, 21);
+	br->Xn   = gpreg(ins, 1, USE_ZR, 5);
 	return true;
 }
 
