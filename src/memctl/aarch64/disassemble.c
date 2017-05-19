@@ -263,14 +263,29 @@ neg:
 
 static bool
 disassemble_logic(uint32_t ins, char *buf) {
-	struct aarch64_ins_and_orr_im im;
-	struct aarch64_ins_and_sr     sr;
+	struct aarch64_ins_and_im im;
+	struct aarch64_ins_and_sr sr;
 	const char *name;
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
-	if (aarch64_ins_decode_and_im(ins, &im)) {
-		name = "AND";
-		goto im;
+	if (aarch64_decode_and_im(ins, &im)) {
+		if (AARCH64_INS_TYPE(ins, AND_IM_INS)) {
+			name = "AND";
+		} else if (AARCH64_INS_TYPE(ins, ANDS_IM_INS)) {
+			if (aarch64_alias_tst_im(&im)) {
+				W("%-7s %s, #0x%llx", "TST", reg(im.Rn), im.imm);
+				return true;
+			}
+			name = "ANDS";
+		} else if (AARCH64_INS_TYPE(ins, ORR_IM_INS)) {
+			if (aarch64_alias_mov_bi(&im)) {
+				W("%-7s %s, #0x%llx", "MOV", reg(im.Rd), im.imm);
+				return true;
+			}
+			name = "ORR";
+		}
+		W("%-7s %s, %s, #0x%llx", name, reg(im.Rd), reg(im.Rn), im.imm);
+		return true;
 	} else if (aarch64_decode_and_sr(ins, &sr)) {
 		if (AARCH64_INS_TYPE(ins, ORR_SR_INS)) {
 			if (aarch64_alias_mov_r(&sr)) {
@@ -279,7 +294,7 @@ disassemble_logic(uint32_t ins, char *buf) {
 			}
 			name = "ORR";
 		} else if (AARCH64_INS_TYPE(ins, ANDS_SR_INS)) {
-			if (aarch64_alias_tst_im(&im)) {
+			if (aarch64_alias_tst_sr(&sr)) {
 				W("%-7s %s, %s", "TST", reg(sr.Rn), reg(sr.Rm));
 				goto sr_suffix;
 			}
@@ -293,28 +308,8 @@ sr_suffix:
 			W(", %s #%d", shift(sr.shift), sr.amount);
 		}
 		return true;
-	} else if (aarch64_ins_decode_ands_im(ins, &im)) {
-		if (aarch64_alias_tst_im(&im)) {
-			name = "TST";
-			goto c_im;
-		}
-		name = "ANDS";
-		goto im;
-	} else if (aarch64_ins_decode_orr_im(ins, &im)) {
-		if (aarch64_alias_mov_bi(&im)) {
-			W("%-7s %s, %llx", "MOV", reg(im.Rd), im.imm);
-			return true;
-		}
-		name = "ORR";
-		goto im;
 	}
 	return false;
-c_im:
-	W("%-7s %s, #%llx", name, reg(im.Rn), im.imm);
-	return true;
-im:
-	W("%-7s %s, %s, #%llx", name, reg(im.Rd), reg(im.Rn), im.imm);
-	return true;
 #undef W
 }
 
@@ -496,7 +491,7 @@ disassemble1(uint32_t ins, uint64_t pc, char buf[64]) {
 	} else if (disassemble_memory(ins, pc, buf)) {
 	} else if (disassemble_movknz(ins, buf)) {
 	} else if (disassemble_adr_b(ins, pc, buf)) {
-	} else if (aarch64_ins_decode_nop(ins)) {
+	} else if (aarch64_decode_nop(ins)) {
 		W("NOP");
 	} else {
 		W("%-7s %08x", "???", ins);

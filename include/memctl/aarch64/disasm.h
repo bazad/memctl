@@ -447,20 +447,52 @@ bool aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr);
 #define AARCH64_ADRP_INS_BITS 0x90000000
 
 
-// AND immediate
-//   AND <Wd|WSP>, <Wn>, #<imm>
-//   AND <Xd|XSP>, <Xn>, #<imm>
+// ---- AND immediate, ANDS immediate, ORR immediate ----
+// ---- MOV bitmask immediate, TST immediate ----
 
-#define AARCH64_AND_IM_INS_MASK 0x7f800000
-#define AARCH64_AND_IM_INS_BITS 0x12000000
+#define AARCH64_AND_IM_CLASS_MASK 0x5f800000
+#define AARCH64_AND_IM_CLASS_BITS 0x12000000
 
-struct aarch64_ins_and_orr_im {
+struct aarch64_ins_and_im {
+#define AARCH64_INS_AND_IM_OP_AND	0
+#define AARCH64_INS_AND_IM_OP_ORR	1
+	uint8_t       op:1;
+	uint8_t       setflags:1;
+	uint8_t       _fill:6;
 	aarch64_gpreg Rd;
 	aarch64_gpreg Rn;
 	uint64_t      imm;
 };
 
-bool aarch64_ins_decode_and_im(uint32_t ins, struct aarch64_ins_and_orr_im *and_im);
+bool aarch64_decode_and_im(uint32_t ins, struct aarch64_ins_and_im *and_im);
+
+// AND immediate
+//   AND <Wd|WSP>, <Wn>, #<imm>
+//   AND <Xd|XSP>, <Xn>, #<imm>
+#define AARCH64_AND_IM_INS_MASK 0x7f800000
+#define AARCH64_AND_IM_INS_BITS 0x12000000
+
+// ANDS immediate
+//   ANDS <Wd>, <Wn>, #<imm>
+//   ANDS <Xd>, <Xn>, #<imm>
+#define AARCH64_ANDS_IM_INS_MASK 0x7f800000
+#define AARCH64_ANDS_IM_INS_BITS 0x72000000
+
+// MOV bitmask immediate : ORR immediate
+//   MOV <Wd|WSP>, #<imm>
+//   MOV <Xd|SP>, #<imm>
+bool aarch64_alias_mov_bi(struct aarch64_ins_and_im *orr_im);
+
+// ORR immediate
+//   ORR <Wd|WSP>, <Wn>, #<imm>
+//   ORR <Xd|XSP>, <Xn>, #<imm>
+#define AARCH64_ORR_IM_INS_MASK 0x7f800000
+#define AARCH64_ORR_IM_INS_BITS 0x32000000
+
+// TST immediate : ANDS immediate
+//   TST <Wn>, #<imm>
+//   TST <Xn>, #<imm>
+bool aarch64_alias_tst_im(struct aarch64_ins_and_im *ands_im);
 
 
 // ---- AND shifted register, ANDS shifted register, ORR shifted register ----
@@ -470,8 +502,8 @@ bool aarch64_ins_decode_and_im(uint32_t ins, struct aarch64_ins_and_orr_im *and_
 #define AARCH64_AND_SR_CLASS_BITS 0x0a000000
 
 struct aarch64_ins_and_sr {
-#define AARCH64_AND_SR_OP_AND	0
-#define AARCH64_AND_SR_OP_ORR	1
+#define AARCH64_INS_AND_SR_OP_AND	0
+#define AARCH64_INS_AND_SR_OP_ORR	1
 	uint8_t       op:1;
 	uint8_t       setflags:1;
 	uint8_t       _fill:6;
@@ -512,15 +544,6 @@ bool aarch64_alias_mov_r(struct aarch64_ins_and_sr *orr_sr);
 //   ANDS <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
 bool aarch64_alias_tst_sr(struct aarch64_ins_and_sr *ands_sr);
 
-
-// ANDS immediate
-//   ANDS <Wd>, <Wn>, #<imm>
-//   ANDS <Xd>, <Xn>, #<imm>
-
-#define AARCH64_ANDS_IM_INS_MASK 0x7f800000
-#define AARCH64_ANDS_IM_INS_BITS 0x72000000
-
-bool aarch64_ins_decode_ands_im(uint32_t ins, struct aarch64_ins_and_orr_im *ands_im);
 
 // ASR register : ASRV
 
@@ -567,7 +590,7 @@ bool aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b);
 // BICS shifted register
 
 
-// ---- BLR, BR ----
+// ---- BLR, BR, RET ----
 
 #define AARCH64_BR_CLASS_MASK 0xff9ffc1f
 #define AARCH64_BR_CLASS_BITS 0xd61f0000
@@ -881,12 +904,6 @@ bool aarch64_alias_mov_nwi(struct aarch64_ins_movknz *movn);
 
 bool aarch64_alias_mov_wi(struct aarch64_ins_movknz *movz);
 
-// MOV bitmask immediate : ORR immediate
-//   MOV <Wd|WSP>, #<imm>
-//   MOV <Xd|SP>, #<imm>
-
-bool aarch64_alias_mov_bi(struct aarch64_ins_and_orr_im *orr_im);
-
 // MOVK
 //   MOVK <Wd>, #<imm>{, LSL #<shift>}
 //   MOVK <Xd>, #<imm>{, LSL #<shift>}
@@ -932,24 +949,18 @@ bool aarch64_ins_decode_movz(uint32_t ins, struct aarch64_ins_movknz *movz);
 
 // MVN : ORN shifted register
 
+
+// ---- NOP ----
+
 // NOP
 //   NOP
-
 #define AARCH64_NOP_INS_MASK 0xffffffff
 #define AARCH64_NOP_INS_BITS 0xd503201f
 
-bool aarch64_ins_decode_nop(uint32_t ins);
+bool aarch64_decode_nop(uint32_t ins);
+
 
 // ORN shifted register
-
-// ORR immediate
-//   ORR <Wd|WSP>, <Wn>, #<imm>
-//   ORR <Xd|XSP>, <Xn>, #<imm>
-
-#define AARCH64_ORR_IM_INS_MASK 0x7f800000
-#define AARCH64_ORR_IM_INS_BITS 0x32000000
-
-bool aarch64_ins_decode_orr_im(uint32_t ins, struct aarch64_ins_and_orr_im *orr_im);
 
 // PRFM immediate
 
@@ -1117,12 +1128,6 @@ bool aarch64_ins_decode_str_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_r)
 // TBZ
 
 // TLBI : SYS
-
-// TST immediate : ANDS immediate
-//   TST <Wn>, #<imm>
-//   TST <Xn>, #<imm>
-
-bool aarch64_alias_tst_im(struct aarch64_ins_and_orr_im *ands_im);
 
 // UBFIZ : UBFM
 

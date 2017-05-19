@@ -214,8 +214,8 @@ exec_one(struct sim *sim) {
 	struct aarch64_ins_adr adr;
 	struct aarch64_ins_add_im add_im;
 	struct aarch64_ins_movknz movz;
-	struct aarch64_ins_and_orr_im orr_im;
-	struct aarch64_ins_and_sr orr_sr;
+	struct aarch64_ins_and_im and_im;
+	struct aarch64_ins_and_sr and_sr;
 	struct aarch64_ins_b b;
 	struct aarch64_ins_br br;
 	struct aarch64_ins_ldr_str_ui ldr_ui;
@@ -236,13 +236,23 @@ exec_one(struct sim *sim) {
 	} else if (aarch64_ins_decode_movz(ins, &movz)) {
 		uint64_t value = (uint64_t)movz.imm << movz.shift;
 		setreg(sim, movz.Rd, value, VALUE);
-	} else if (aarch64_ins_decode_orr_im(ins, &orr_im)) {
-		uint64_t value = getreg(sim, orr_im.Rn, &state) | orr_im.imm;
-		setreg(sim, orr_im.Rd, value, state);
-	} else if (aarch64_decode_and_sr(ins, &orr_sr) && orr_sr.op == AARCH64_AND_SR_OP_ORR) {
-		uint64_t value = getreg(sim, orr_sr.Rn, &state);
-		value |= shiftreg(sim, orr_sr.Rm, orr_sr.shift, orr_sr.amount, &state);
-		setreg(sim, orr_sr.Rd, value, state);
+	} else if (aarch64_decode_and_im(ins, &and_im)) {
+		uint64_t value = getreg(sim, and_im.Rn, &state);
+		if (and_im.op == AARCH64_INS_AND_IM_OP_AND) {
+			value &= add_im.imm;
+		} else {
+			value |= and_im.imm;
+		}
+		setreg(sim, and_im.Rd, value, state);
+	} else if (aarch64_decode_and_sr(ins, &and_sr)) {
+		uint64_t value = getreg(sim, and_sr.Rn, &state);
+		uint64_t value2 = shiftreg(sim, and_sr.Rm, and_sr.shift, and_sr.amount, &state);
+		if (and_sr.op == AARCH64_INS_AND_SR_OP_AND) {
+			value &= value2;
+		} else {
+			value |= value2;
+		}
+		setreg(sim, and_sr.Rd, value, state);
 	} else if (aarch64_decode_b(ins, pc, &b) && b.link) {
 		sim->bl = b.label;
 	} else if (aarch64_ins_decode_ldr_ui(ins, &ldr_ui)) {
@@ -261,7 +271,7 @@ exec_one(struct sim *sim) {
 		// TODO: This is incomplete. We should abort on B.
 		uint64_t retaddr = getreg(sim, br.Xn, &state);
 		sim->ret = (state == VALUE ? retaddr : 1);
-	} else if (aarch64_ins_decode_nop(ins)) {
+	} else if (aarch64_decode_nop(ins)) {
 		// Nothing to do.
 	} else {
 		memctl_warning("unknown instruction: %x", ins); // TODO
