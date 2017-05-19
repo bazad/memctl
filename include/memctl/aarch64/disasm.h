@@ -13,53 +13,53 @@
  * AARCH64_ZR_INS
  *
  * Description:
- * 	When this flag is set in an aarch64_reg, it indicates that the register should be
+ * 	When this flag is set in an aarch64_gpreg, it indicates that the register should be
  * 	interpreted as ZR rather than SP in the context of the decoded instruction.
  */
-#define AARCH64_ZR_INS 0x80
+#define AARCH64_ZR_INS 0x40
 
 /*
- * aarch64_reg
+ * aarch64_gpreg
  *
  * Description:
- * 	An AArch64 register identifier.
+ * 	An AArch64 general purpose register identifier.
  */
-typedef uint8_t aarch64_reg;
+typedef uint8_t aarch64_gpreg;
 
 enum {
-	AARCH64_R0  =                        0,
-	AARCH64_R1  =                        1,
-	AARCH64_R2  =                        2,
-	AARCH64_R3  =                        3,
-	AARCH64_R4  =                        4,
-	AARCH64_R5  =                        5,
-	AARCH64_R6  =                        6,
-	AARCH64_R7  =                        7,
-	AARCH64_R8  =                        8,
-	AARCH64_R9  =                        9,
-	AARCH64_R10 =                       10,
-	AARCH64_R11 =                       11,
-	AARCH64_R12 =                       12,
-	AARCH64_R13 =                       13,
-	AARCH64_R14 =                       14,
-	AARCH64_R15 =                       15,
-	AARCH64_R16 =                       16,
-	AARCH64_R17 =                       17,
-	AARCH64_R18 =                       18,
-	AARCH64_R19 =                       19,
-	AARCH64_R20 =                       20,
-	AARCH64_R21 =                       21,
-	AARCH64_R22 =                       22,
-	AARCH64_R23 =                       23,
-	AARCH64_R24 =                       24,
-	AARCH64_R25 =                       25,
-	AARCH64_R26 =                       26,
-	AARCH64_R27 =                       27,
-	AARCH64_R28 =                       28,
-	AARCH64_R29 =                       29,
-	AARCH64_R30 =                       30,
-	AARCH64_RZR = AARCH64_ZR_INS |      31,
-	AARCH64_RSP =                       31,
+	AARCH64_X0  =                        0,
+	AARCH64_X1  =                        1,
+	AARCH64_X2  =                        2,
+	AARCH64_X3  =                        3,
+	AARCH64_X4  =                        4,
+	AARCH64_X5  =                        5,
+	AARCH64_X6  =                        6,
+	AARCH64_X7  =                        7,
+	AARCH64_X8  =                        8,
+	AARCH64_X9  =                        9,
+	AARCH64_X10 =                       10,
+	AARCH64_X11 =                       11,
+	AARCH64_X12 =                       12,
+	AARCH64_X13 =                       13,
+	AARCH64_X14 =                       14,
+	AARCH64_X15 =                       15,
+	AARCH64_X16 =                       16,
+	AARCH64_X17 =                       17,
+	AARCH64_X18 =                       18,
+	AARCH64_X19 =                       19,
+	AARCH64_X20 =                       20,
+	AARCH64_X21 =                       21,
+	AARCH64_X22 =                       22,
+	AARCH64_X23 =                       23,
+	AARCH64_X24 =                       24,
+	AARCH64_X25 =                       25,
+	AARCH64_X26 =                       26,
+	AARCH64_X27 =                       27,
+	AARCH64_X28 =                       28,
+	AARCH64_X29 =                       29,
+	AARCH64_X30 =                       30,
+	AARCH64_SP  =                       31,
+	AARCH64_XZR = AARCH64_ZR_INS |      31,
 	AARCH64_W0  =                  32 |  0,
 	AARCH64_W1  =                  32 |  1,
 	AARCH64_W2  =                  32 |  2,
@@ -91,67 +91,34 @@ enum {
 	AARCH64_W28 =                  32 | 28,
 	AARCH64_W29 =                  32 | 29,
 	AARCH64_W30 =                  32 | 30,
-	AARCH64_WZR = AARCH64_ZR_INS | 32 | 31,
 	AARCH64_WSP =                  32 | 31,
-	AARCH64_X0  =                  64 |  0,
-	AARCH64_X1  =                  64 |  1,
-	AARCH64_X2  =                  64 |  2,
-	AARCH64_X3  =                  64 |  3,
-	AARCH64_X4  =                  64 |  4,
-	AARCH64_X5  =                  64 |  5,
-	AARCH64_X6  =                  64 |  6,
-	AARCH64_X7  =                  64 |  7,
-	AARCH64_X8  =                  64 |  8,
-	AARCH64_X9  =                  64 |  9,
-	AARCH64_X10 =                  64 | 10,
-	AARCH64_X11 =                  64 | 11,
-	AARCH64_X12 =                  64 | 12,
-	AARCH64_X13 =                  64 | 13,
-	AARCH64_X14 =                  64 | 14,
-	AARCH64_X15 =                  64 | 15,
-	AARCH64_X16 =                  64 | 16,
-	AARCH64_X17 =                  64 | 17,
-	AARCH64_X18 =                  64 | 18,
-	AARCH64_X19 =                  64 | 19,
-	AARCH64_X20 =                  64 | 20,
-	AARCH64_X21 =                  64 | 21,
-	AARCH64_X22 =                  64 | 22,
-	AARCH64_X23 =                  64 | 23,
-	AARCH64_X24 =                  64 | 24,
-	AARCH64_X25 =                  64 | 25,
-	AARCH64_X26 =                  64 | 26,
-	AARCH64_X27 =                  64 | 27,
-	AARCH64_X28 =                  64 | 28,
-	AARCH64_X29 =                  64 | 29,
-	AARCH64_X30 =                  64 | 30,
-	AARCH64_XZR = AARCH64_ZR_INS | 64 | 31,
-	AARCH64_SP  =                  64 | 31,
+	AARCH64_WZR = AARCH64_ZR_INS | 32 | 31,
 };
 
 /*
- * macro AARCH64_REGSIZE
+ * macro AARCH64_GPREGSIZE
  *
  * Description:
  * 	Return the width of the given register.
  */
-#define AARCH64_REGSIZE(reg)	((reg) & (64 | 32))
+#define AARCH64_GPREGSIZE(reg)	((reg) & 32 ? 32 : 64)
 
 /*
- * macro AARCH64_REGNAME
+ * macro AARCH64_GPREGID
  *
  * Description:
- * 	Return the name of the given register.
+ * 	Return the numeric ID of the given register.
  */
-#define AARCH64_REGNAME(reg)	((reg) & 0x1f)
+#define AARCH64_GPREGID(reg)	((reg) & 0x1f)
 
 /*
- * macro AARCH64_REGZR
+ * macro AARCH64_GPREGZR
  *
  * Description:
  * 	Return nonozero if the given register should be interpreted as ZR in the context of the
  * 	decoded instruction.
  */
-#define AARCH64_REGZR(reg)	((reg) & AARCH64_ZR_INS)
+#define AARCH64_GPREGZR(reg)	((reg) & AARCH64_ZR_INS)
 
 /*
  * aarch64_shift
@@ -224,11 +191,11 @@ struct aarch64_ins_adc {
 	enum {
 		AARCH64_INS_ADC_OP_ADC = 0,
 		AARCH64_INS_ADC_OP_SBC = 1,
-	}           op;
-	bool        setflags;
-	aarch64_reg Rd;
-	aarch64_reg Rn;
-	aarch64_reg Rm;
+	}             op;
+	bool          setflags;
+	aarch64_gpreg Rd;
+	aarch64_gpreg Rn;
+	aarch64_gpreg Rm;
 };
 
 bool aarch64_decode_adc(uint32_t ins, struct aarch64_ins_adc *adc);
@@ -281,9 +248,9 @@ struct aarch64_ins_add_xr {
 		AARCH64_INS_ADD_XR_OP_SUB = 1,
 	}              op;
 	bool           setflags;
-	aarch64_reg    Rd;
-	aarch64_reg    Rn;
-	aarch64_reg    Rm;
+	aarch64_gpreg  Rd;
+	aarch64_gpreg  Rn;
+	aarch64_gpreg  Rm;
 	aarch64_extend extend;
 	uint8_t        amount;
 };
@@ -335,12 +302,12 @@ struct aarch64_ins_add_im {
 	enum {
 		AARCH64_INS_ADD_IM_OP_ADD = 0,
 		AARCH64_INS_ADD_IM_OP_SUB = 1,
-	}           op;
-	bool        setflags;
-	aarch64_reg Rd;
-	aarch64_reg Rn;
-	uint16_t    imm;
-	uint8_t     shift;
+	}             op;
+	bool          setflags;
+	aarch64_gpreg Rd;
+	aarch64_gpreg Rn;
+	uint16_t      imm;
+	uint8_t       shift;
 };
 
 bool aarch64_decode_add_im(uint32_t ins, struct aarch64_ins_add_im *add_im);
@@ -399,9 +366,9 @@ struct aarch64_ins_add_sr {
 		AARCH64_INS_ADD_SR_OP_SUB = 1,
 	}             op;
 	bool          setflags;
-	aarch64_reg   Rd;
-	aarch64_reg   Rn;
-	aarch64_reg   Rm;
+	aarch64_gpreg Rd;
+	aarch64_gpreg Rn;
+	aarch64_gpreg Rm;
 	aarch64_shift shift;
 	uint8_t       amount;
 };
@@ -470,9 +437,9 @@ struct aarch64_ins_adr {
 	enum {
 		AARCH64_INS_ADR_OP_ADR  = 0,
 		AARCH64_INS_ADR_OP_ADRP = 1,
-	}           op;
-	aarch64_reg Xd;
-	uint64_t    label;
+	}             op;
+	aarch64_gpreg Xd;
+	uint64_t      label;
 };
 
 bool aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr);
@@ -498,9 +465,9 @@ bool aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr);
 #define AARCH64_AND_IM_INS_BITS 0x12000000
 
 struct aarch64_ins_and_orr_im {
-	aarch64_reg Rd;
-	aarch64_reg Rn;
-	uint64_t    imm;
+	aarch64_gpreg Rd;
+	aarch64_gpreg Rn;
+	uint64_t      imm;
 };
 
 bool aarch64_ins_decode_and_im(uint32_t ins, struct aarch64_ins_and_orr_im *and_im);
@@ -518,9 +485,9 @@ struct aarch64_ins_and_sr {
 		AARCH64_AND_SR_OP_ORR,
 	}             op;
 	bool          setflags;
-	aarch64_reg   Rd;
-	aarch64_reg   Rn;
-	aarch64_reg   Rm;
+	aarch64_gpreg Rd;
+	aarch64_gpreg Rn;
+	aarch64_gpreg Rm;
 	aarch64_shift shift;
 	uint8_t       amount;
 };
@@ -626,8 +593,8 @@ bool aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b);
 #define AARCH64_BR_INS_BITS 0xd61f0000
 
 struct aarch64_ins_br {
-	aarch64_reg Xn;
-	bool        link;
+	aarch64_gpreg Xn;
+	bool          link;
 };
 
 bool aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br);
@@ -733,10 +700,10 @@ bool aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br);
 #define AARCH64_LDP_POST_INS_BITS 0x28c00000
 
 struct aarch64_ins_ldp_stp {
-	aarch64_reg Rt1;
-	aarch64_reg Rt2;
-	aarch64_reg Xn;
-	int16_t     imm;
+	aarch64_gpreg Rt1;
+	aarch64_gpreg Rt2;
+	aarch64_gpreg Xn;
+	int16_t       imm;
 };
 
 bool aarch64_ins_decode_ldp_post(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_post);
@@ -769,9 +736,9 @@ bool aarch64_ins_decode_ldp_si(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_si)
 #define AARCH64_LDR_POST_INS_BITS 0x28400400
 
 struct aarch64_ins_ldr_str_ix {
-	aarch64_reg Rt;
-	aarch64_reg Xn;
-	int16_t     imm;
+	aarch64_gpreg Rt;
+	aarch64_gpreg Xn;
+	int16_t       imm;
 };
 
 bool aarch64_ins_decode_ldr_post(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_post);
@@ -793,9 +760,9 @@ bool aarch64_ins_decode_ldr_pre(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr
 #define AARCH64_LDR_UI_INS_BITS 0xb9400000
 
 struct aarch64_ins_ldr_str_ui {
-	aarch64_reg Rt;
-	aarch64_reg Xn;
-	uint16_t    imm;
+	aarch64_gpreg Rt;
+	aarch64_gpreg Xn;
+	uint16_t      imm;
 };
 
 bool aarch64_ins_decode_ldr_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *ldr_ui);
@@ -808,8 +775,8 @@ bool aarch64_ins_decode_ldr_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *ldr_
 #define AARCH64_LDR_LIT_INS_BITS 0x18000000
 
 struct aarch64_ins_ldr_lit {
-	aarch64_reg Rt;
-	uint64_t    label;
+	aarch64_gpreg Rt;
+	uint64_t      label;
 };
 
 bool aarch64_ins_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ins_ldr_lit *ldr_lit);
@@ -822,9 +789,9 @@ bool aarch64_ins_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ins_ld
 #define AARCH64_LDR_R_INS_BITS 0xb8600800
 
 struct aarch64_ins_ldr_str_r {
-	aarch64_reg    Rt;
-	aarch64_reg    Xn;
-	aarch64_reg    Rm;
+	aarch64_gpreg  Rt;
+	aarch64_gpreg  Xn;
+	aarch64_gpreg  Rm;
 	aarch64_extend extend;
 	uint8_t        amount;
 };
@@ -929,9 +896,9 @@ bool aarch64_alias_mov_bi(struct aarch64_ins_and_orr_im *orr_im);
 #define AARCH64_MOVK_INS_BITS 0x72800000
 
 struct aarch64_ins_movknz {
-	aarch64_reg Rd;
-	uint16_t    imm;
-	uint8_t     shift;
+	aarch64_gpreg Rd;
+	uint16_t      imm;
+	uint8_t       shift;
 };
 
 bool aarch64_ins_decode_movk(uint32_t ins, struct aarch64_ins_movknz *movk);
@@ -1002,7 +969,7 @@ bool aarch64_ins_decode_orr_im(uint32_t ins, struct aarch64_ins_and_orr_im *orr_
 #define AARCH64_RET_INS_BITS 0xd65f0000
 
 struct aarch64_ins_ret {
-	aarch64_reg Xn;
+	aarch64_gpreg Xn;
 };
 
 bool aarch64_ins_decode_ret(uint32_t ins, struct aarch64_ins_ret *ret);

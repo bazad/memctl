@@ -92,30 +92,30 @@ extract(uint64_t x, unsigned sign, unsigned hi, unsigned lo, unsigned shift) {
 #define USE_SP	0
 
 /*
- * get_reg
+ * gpreg
  *
  * Description:
  * 	Returns the register number at the given index in the instruction.
  */
-static inline aarch64_reg
-get_reg(uint32_t ins, unsigned sf, unsigned zrsp, unsigned lo) {
+static inline aarch64_gpreg
+gpreg(uint32_t ins, unsigned sf, unsigned zrsp, unsigned lo) {
 	assert(sf == 0 || sf == 1);
 	assert(zrsp == USE_ZR || zrsp == USE_SP);
-	aarch64_reg reg     = ((ins >> lo) & 0x1f);
-	aarch64_reg size    = (32 * (sf + 1));
-	aarch64_reg zr_hint = zrsp * (reg == AARCH64_RSP);
+	aarch64_gpreg reg     = ((ins >> lo) & 0x1f);
+	aarch64_gpreg size    = (sf ? 0 : 32);
+	aarch64_gpreg zr_hint = zrsp * (reg == AARCH64_SP);
 	return zr_hint | size | reg;
 }
 
 /*
- * reg_is_zrsp
+ * gpreg_is_zrsp
  *
  * Description:
  * 	Returns true if the given register has the same name as the ZR or SP register.
  */
 static inline bool
-reg_is_zrsp(aarch64_reg reg) {
-	return AARCH64_REGNAME(reg) == AARCH64_RSP;
+gpreg_is_zrsp(aarch64_gpreg reg) {
+	return AARCH64_GPREGID(reg) == AARCH64_SP;
 }
 
 /*
@@ -188,9 +188,9 @@ aarch64_decode_adc(uint32_t ins, struct aarch64_ins_adc *adc) {
 	unsigned sf   = test(ins, 31);
 	adc->op       = test(ins, 30);
 	adc->setflags = test(ins, 29);
-	adc->Rd       = get_reg(ins, sf, USE_ZR, 0);
-	adc->Rn       = get_reg(ins, sf, USE_ZR, 5);
-	adc->Rm       = get_reg(ins, sf, USE_ZR, 16);
+	adc->Rd       = gpreg(ins, sf, USE_ZR, 0);
+	adc->Rn       = gpreg(ins, sf, USE_ZR, 5);
+	adc->Rm       = gpreg(ins, sf, USE_ZR, 16);
 	return true;
 }
 
@@ -215,16 +215,16 @@ aarch64_decode_add_xr(uint32_t ins, struct aarch64_ins_add_xr *add_xr) {
 	unsigned S            = test(ins, 29);
 	aarch64_extend extend = get_extend(ins, 13);
 	unsigned Xm           = (extend & 0x3) == 0x3;
-	aarch64_reg Rd        = get_reg(ins, sf, (S ? USE_ZR : USE_SP), 0);
-	aarch64_reg Rn        = get_reg(ins, sf, USE_SP, 5);
-	if (((!S && reg_is_zrsp(Rd)) || reg_is_zrsp(Rn)) && extend == (AARCH64_EXTEND_UXTW + sf)) {
+	aarch64_gpreg Rd      = gpreg(ins, sf, (S ? USE_ZR : USE_SP), 0);
+	aarch64_gpreg Rn      = gpreg(ins, sf, USE_SP, 5);
+	if (((!S && gpreg_is_zrsp(Rd)) || gpreg_is_zrsp(Rn)) && extend == (AARCH64_EXTEND_UXTW + sf)) {
 		extend |= AARCH64_EXTEND_LSL;
 	}
 	add_xr->op       = test(ins, 30);
 	add_xr->setflags = S;
 	add_xr->Rd       = Rd;
 	add_xr->Rn       = Rn;
-	add_xr->Rm       = get_reg(ins, Xm, USE_ZR, 16);
+	add_xr->Rm       = gpreg(ins, Xm, USE_ZR, 16);
 	add_xr->extend   = extend;
 	add_xr->amount   = shift;
 	return true;
@@ -252,8 +252,8 @@ aarch64_decode_add_im(uint32_t ins, struct aarch64_ins_add_im *add_im) {
 	}
 	add_im->op       = test(ins, 30);
 	add_im->setflags = test(ins, 29);
-	add_im->Rd       = get_reg(ins, sf, (S ? USE_ZR : USE_SP), 0);
-	add_im->Rn       = get_reg(ins, sf, USE_SP, 5);
+	add_im->Rd       = gpreg(ins, sf, (S ? USE_ZR : USE_SP), 0);
+	add_im->Rn       = gpreg(ins, sf, USE_SP, 5);
 	add_im->imm      = imm;
 	add_im->shift    = 12 * shift;
 	return true;
@@ -280,8 +280,8 @@ decode_and_orr_im(uint32_t ins, struct aarch64_ins_and_orr_im *and_orr_im) {
 	if (!decode_bit_masks(sf, N, imms, immr, 1, &wmask, &tmask)) {
 		return false;
 	}
-	and_orr_im->Rd  = get_reg(ins, sf, (S ? USE_ZR : USE_SP), 0);
-	and_orr_im->Rn  = get_reg(ins, sf, USE_ZR, 5);
+	and_orr_im->Rd  = gpreg(ins, sf, (S ? USE_ZR : USE_SP), 0);
+	and_orr_im->Rn  = gpreg(ins, sf, USE_ZR, 5);
 	and_orr_im->imm = lobits(wmask, (sf ? 64 : 32));
 	return true;
 }
@@ -310,9 +310,9 @@ aarch64_decode_add_sr(uint32_t ins, struct aarch64_ins_add_sr *add_sr) {
 	}
 	add_sr->op       = test(ins, 30);
 	add_sr->setflags = test(ins, 29);
-	add_sr->Rd       = get_reg(ins, sf, USE_ZR, 0);
-	add_sr->Rn       = get_reg(ins, sf, USE_ZR, 5);
-	add_sr->Rm       = get_reg(ins, sf, USE_ZR, 16);
+	add_sr->Rd       = gpreg(ins, sf, USE_ZR, 0);
+	add_sr->Rn       = gpreg(ins, sf, USE_ZR, 5);
+	add_sr->Rm       = gpreg(ins, sf, USE_ZR, 16);
 	add_sr->shift    = shift;
 	add_sr->amount   = amount;
 	return true;
@@ -341,9 +341,9 @@ aarch64_decode_and_sr(uint32_t ins, struct aarch64_ins_and_sr *and_sr) {
 	}
 	and_sr->op       = (opc == 1 ? AARCH64_AND_SR_OP_ORR : AARCH64_AND_SR_OP_AND);
 	and_sr->setflags = (opc == 3);
-	and_sr->Rd       = get_reg(ins, sf, USE_ZR, 0);
-	and_sr->Rn       = get_reg(ins, sf, USE_ZR, 5);
-	and_sr->Rm       = get_reg(ins, sf, USE_ZR, 16);
+	and_sr->Rd       = gpreg(ins, sf, USE_ZR, 0);
+	and_sr->Rn       = gpreg(ins, sf, USE_ZR, 5);
+	and_sr->Rm       = gpreg(ins, sf, USE_ZR, 16);
 	and_sr->shift    = get_shift(ins, 22);
 	and_sr->amount   = amount;
 	return true;
@@ -363,7 +363,7 @@ aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr) {
 	unsigned shift  = 12 * test(ins, 31);
 	int64_t imm     = extract(ins, 1, 23, 5, shift + 2) | extract(ins, 0, 30, 29, shift);
 	adr->op    = test(ins, 31);
-	adr->Xd    = get_reg(ins, 1, USE_ZR, 0);
+	adr->Xd    = gpreg(ins, 1, USE_ZR, 0);
 	adr->label = (pc & ~ones(shift)) + imm;
 	return true;
 }
@@ -395,7 +395,7 @@ aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br) {
 	if (!AARCH64_INS_TYPE(ins, BR)) {
 		return false;
 	}
-	br->Xn   = get_reg(ins, 1, USE_ZR, 5);
+	br->Xn   = gpreg(ins, 1, USE_ZR, 5);
 	br->link = test(ins, 21);
 	return true;
 }
@@ -413,9 +413,9 @@ decode_ldp_stp(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_stp) {
 	// +-----+-------+---+-------+---+---------------+-----------+-----------+-----------+
 	//   opc                       L
 	unsigned sf  = test(ins, 31);
-	ldp_stp->Rt1 = get_reg(ins, sf, USE_ZR, 0);
-	ldp_stp->Xn  = get_reg(ins, 1, USE_SP, 5);
-	ldp_stp->Rt2 = get_reg(ins, sf, USE_ZR, 10);
+	ldp_stp->Rt1 = gpreg(ins, sf, USE_ZR, 0);
+	ldp_stp->Xn  = gpreg(ins, 1, USE_SP, 5);
+	ldp_stp->Rt2 = gpreg(ins, sf, USE_ZR, 10);
 	ldp_stp->imm = extract(ins, 1, 21, 15, 2 + sf);
 	return true;
 }
@@ -434,7 +434,7 @@ decode_movknz(uint32_t ins, struct aarch64_ins_movknz *movknz) {
 	if (sf == 0 && test(hw, 1)) {
 		return false;
 	}
-	movknz->Rd    = get_reg(ins, sf, USE_ZR, 0);
+	movknz->Rd    = gpreg(ins, sf, USE_ZR, 0);
 	movknz->imm   = extract(ins, 0, 20, 5, 0);
 	movknz->shift = 16 * hw;
 	return true;
@@ -451,8 +451,8 @@ decode_ldr_str_ix(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_str_ix) {
 	// +-----+-------+---+-----+-----+---+-------------------+-----+-----------+-----------+
 	//  size                     opc
 	unsigned sf     = test(ins, 30);
-	ldr_str_ix->Rt  = get_reg(ins, sf, USE_ZR, 0);
-	ldr_str_ix->Xn  = get_reg(ins, 1, USE_SP, 5);
+	ldr_str_ix->Rt  = gpreg(ins, sf, USE_ZR, 0);
+	ldr_str_ix->Xn  = gpreg(ins, 1, USE_SP, 5);
 	ldr_str_ix->imm = extract(ins, 1, 20, 12, 0);
 	return true;
 }
@@ -466,8 +466,8 @@ decode_ldr_str_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *ldr_str_ui) {
 	// +-----+-------+---+-----+-----+-------------------------+-----------+-----------+
 	//  size                     opc
 	unsigned size     = extract(ins, 0, 31, 30, 0);
-	ldr_str_ui->Rt    = get_reg(ins, size & 1, USE_ZR, 0);
-	ldr_str_ui->Xn    = get_reg(ins, 1, USE_SP, 5);
+	ldr_str_ui->Rt    = gpreg(ins, size & 1, USE_ZR, 0);
+	ldr_str_ui->Xn    = gpreg(ins, 1, USE_SP, 5);
 	ldr_str_ui->imm   = extract(ins, 0, 21, 10, size);
 	return true;
 }
@@ -488,9 +488,9 @@ decode_ldr_str_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_str_r) {
 		extend |= AARCH64_EXTEND_LSL;
 	}
 	unsigned size = extract(ins, 0, 31, 30, 0);
-	ldr_str_r->Rt     = get_reg(ins, size & 1, USE_ZR, 0);
-	ldr_str_r->Xn     = get_reg(ins, 1, USE_SP, 5);
-	ldr_str_r->Rm     = get_reg(ins, extend & 1, USE_ZR, 16);
+	ldr_str_r->Rt     = gpreg(ins, size & 1, USE_ZR, 0);
+	ldr_str_r->Xn     = gpreg(ins, 1, USE_SP, 5);
+	ldr_str_r->Rm     = gpreg(ins, extend & 1, USE_ZR, 16);
 	ldr_str_r->extend = extend;
 	ldr_str_r->amount = test(ins, 12) * size;
 	return true;
@@ -520,7 +520,7 @@ aarch64_alias_cmn_xr(struct aarch64_ins_add_xr *adds_xr) {
 	// Preferred when Rd == '11111'
 	return (adds_xr->op == AARCH64_INS_ADD_XR_OP_ADD
 	        && adds_xr->setflags
-	        && reg_is_zrsp(adds_xr->Rd));
+	        && gpreg_is_zrsp(adds_xr->Rd));
 }
 
 bool
@@ -529,14 +529,14 @@ aarch64_alias_cmn_im(struct aarch64_ins_add_im *adds_im) {
 	// Preferred when Rd == '11111'
 	return (adds_im->op == AARCH64_INS_ADD_IM_OP_ADD
 	        && adds_im->setflags
-	        && reg_is_zrsp(adds_im->Rd));
+	        && gpreg_is_zrsp(adds_im->Rd));
 }
 
 bool
 aarch64_alias_cmn_sr(struct aarch64_ins_add_sr *adds_sr) {
 	// CMN shifted register : ADDS shifted register
 	// Preferred when Rd == '11111'
-	return reg_is_zrsp(adds_sr->Rd);
+	return gpreg_is_zrsp(adds_sr->Rd);
 }
 
 bool
@@ -545,7 +545,7 @@ aarch64_alias_cmp_xr(struct aarch64_ins_add_xr *subs_xr) {
 	// Preferred when Rd == '11111'
 	return (subs_xr->op == AARCH64_INS_ADD_XR_OP_SUB
 	        && subs_xr->setflags
-	        && reg_is_zrsp(subs_xr->Rd));
+	        && gpreg_is_zrsp(subs_xr->Rd));
 }
 
 bool
@@ -554,14 +554,14 @@ aarch64_alias_cmp_im(struct aarch64_ins_add_im *subs_im) {
 	// Preferred when Rd == '11111'
 	return (subs_im->op == AARCH64_INS_ADD_IM_OP_SUB
 	        && subs_im->setflags
-	        && reg_is_zrsp(subs_im->Rd));
+	        && gpreg_is_zrsp(subs_im->Rd));
 }
 
 bool
 aarch64_alias_cmp_sr(struct aarch64_ins_add_sr *subs_sr) {
 	// CMP shifted register : SUBS shifted register
 	// Preferred when Rd == '11111'
-	return reg_is_zrsp(subs_sr->Rd);
+	return gpreg_is_zrsp(subs_sr->Rd);
 }
 
 bool
@@ -623,7 +623,7 @@ aarch64_ins_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ins_ldr_lit
 		return false;
 	}
 	unsigned sf    = test(ins, 30);
-	ldr_lit->Rt    = get_reg(ins, sf, USE_ZR, 0);
+	ldr_lit->Rt    = gpreg(ins, sf, USE_ZR, 0);
 	ldr_lit->label = pc + extract(ins, 1, 23, 5, 2);
 	return true;
 }
@@ -642,7 +642,7 @@ aarch64_alias_mov_sp(struct aarch64_ins_add_im *add_im) {
 	// Preferred when shift == '00' && imm12 == '00' && (Rd == '11111' || Rn == '11111')
 	return (add_im->op == AARCH64_INS_ADD_IM_OP_ADD
 	        && !add_im->setflags
-	        && (reg_is_zrsp(add_im->Rd) || reg_is_zrsp(add_im->Rn))
+	        && (gpreg_is_zrsp(add_im->Rd) || gpreg_is_zrsp(add_im->Rn))
 	        && add_im->imm == 0
 	        && add_im->shift == 0);
 }
@@ -654,7 +654,7 @@ aarch64_alias_mov_nwi(struct aarch64_ins_movknz *movn) {
 	//   32: !(IsZero(imm16) && hw != '00')
 	//   64: !(IsZero(imm16) && hw != '00') && IsOnes(imm16)
 	return !(movn->imm == 0 && movn->shift == 0)
-	       && (AARCH64_REGSIZE(movn->Rd) == 32 || movn->imm == (uint16_t)-1);
+	       && (AARCH64_GPREGSIZE(movn->Rd) == 32 || movn->imm == (uint16_t)-1);
 }
 
 bool
@@ -670,7 +670,7 @@ aarch64_alias_mov_bi(struct aarch64_ins_and_orr_im *orr_im) {
 	// Preferred when Rn == '11111' && !MoveWidePreferred(sf, N, imms, immr)
 	// TODO: Use MoveWidePreferred. It should be possible to use the conditions there to
 	// establish conditions on orr_im->imm.
-	return reg_is_zrsp(orr_im->Rn);
+	return gpreg_is_zrsp(orr_im->Rn);
 }
 
 bool
@@ -678,7 +678,7 @@ aarch64_alias_mov_r(struct aarch64_ins_and_sr *orr_sr) {
 	// MOV register : ORR shifted register
 	// Preferred when shift == '00' && imm6 == '000000' && Rn == '11111'
 	return (orr_sr->op == AARCH64_AND_SR_OP_ORR
-	        && reg_is_zrsp(orr_sr->Rn)
+	        && gpreg_is_zrsp(orr_sr->Rn)
 	        && orr_sr->amount == 0
 	        && orr_sr->shift == AARCH64_SHIFT_LSL);
 }
@@ -711,14 +711,14 @@ bool
 aarch64_alias_neg(struct aarch64_ins_add_sr *sub_sr) {
 	// NEG shifted register : SUB shifted register
 	// Preferred when Rn == '11111'
-	return reg_is_zrsp(sub_sr->Rn);
+	return gpreg_is_zrsp(sub_sr->Rn);
 }
 
 bool
 aarch64_alias_negs(struct aarch64_ins_add_sr *subs_sr) {
 	// NEGS shifted register : SUBS shifted register
 	// Preferred when Rn == '11111'
-	return reg_is_zrsp(subs_sr->Rn);
+	return gpreg_is_zrsp(subs_sr->Rn);
 }
 
 bool
@@ -727,7 +727,7 @@ aarch64_alias_ngc(struct aarch64_ins_adc *sbc) {
 	// Preferred when Rn == '11111'
 	return (sbc->op == AARCH64_INS_ADC_OP_SBC
 	        && !sbc->setflags
-	        && reg_is_zrsp(sbc->Rn));
+	        && gpreg_is_zrsp(sbc->Rn));
 }
 
 bool
@@ -736,7 +736,7 @@ aarch64_alias_ngcs(struct aarch64_ins_adc *sbcs) {
 	// Preferred when Rn == '11111'
 	return (sbcs->op == AARCH64_INS_ADC_OP_SBC
 	        && sbcs->setflags
-	        && reg_is_zrsp(sbcs->Rn));
+	        && gpreg_is_zrsp(sbcs->Rn));
 }
 
 bool
@@ -762,7 +762,7 @@ aarch64_ins_decode_ret(uint32_t ins, struct aarch64_ins_ret *ret) {
 	if (!AARCH64_INS_TYPE(ins, RET_INS)) {
 		return false;
 	}
-	ret->Xn = get_reg(ins, 1, USE_ZR, 5);
+	ret->Xn = gpreg(ins, 1, USE_ZR, 5);
 	return true;
 }
 
@@ -826,7 +826,7 @@ bool
 aarch64_alias_tst_im(struct aarch64_ins_and_orr_im *ands_im) {
 	// TST immediate : ANDS immediate
 	// Preferred when Rd == '11111'
-	return reg_is_zrsp(ands_im->Rd);
+	return gpreg_is_zrsp(ands_im->Rd);
 }
 
 bool
@@ -835,5 +835,5 @@ aarch64_alias_tst_sr(struct aarch64_ins_and_sr *ands_sr) {
 	// Preferred when Rd == '11111'
 	return (ands_sr->op == AARCH64_AND_SR_OP_AND
 	        && ands_sr->setflags
-	        && reg_is_zrsp(ands_sr->Rd));
+	        && gpreg_is_zrsp(ands_sr->Rd));
 }

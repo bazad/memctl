@@ -136,8 +136,8 @@ sim_clear_temporary(struct sim *sim) {
  * 	Get the register mask for the given register.
  */
 static uint64_t
-regmask(aarch64_reg r) {
-	return ((2 << (AARCH64_REGSIZE(r) - 1)) - 1);
+regmask(aarch64_gpreg r) {
+	return ((2 << (AARCH64_GPREGSIZE(r) - 1)) - 1);
 }
 
 /*
@@ -147,12 +147,12 @@ regmask(aarch64_reg r) {
  * 	Get the contents of the given register, and set the register state flags in state.
  */
 static uint64_t
-getreg(struct sim *sim, aarch64_reg r, int *state) {
-	if (AARCH64_REGZR(r)) {
+getreg(struct sim *sim, aarch64_gpreg r, int *state) {
+	if (AARCH64_GPREGZR(r)) {
 		*state |= VALUE;
 		return 0;
 	}
-	unsigned n = AARCH64_REGNAME(r);
+	unsigned n = AARCH64_GPREGID(r);
 	*state |= sim->X[n].state;
 	return sim->X[n].value & regmask(r);
 }
@@ -164,9 +164,9 @@ getreg(struct sim *sim, aarch64_reg r, int *state) {
  * 	Get the shifted register value.
  */
 static uint64_t
-shiftreg(struct sim *sim, aarch64_reg r, aarch64_shift shift, unsigned amount, int *state) {
+shiftreg(struct sim *sim, aarch64_gpreg r, aarch64_shift shift, unsigned amount, int *state) {
 	uint64_t value = getreg(sim, r, state);
-	size_t size = AARCH64_REGSIZE(r);
+	size_t size = AARCH64_GPREGSIZE(r);
 	switch (shift) {
 		case AARCH64_SHIFT_LSL: return lsl(value, amount, size);
 		case AARCH64_SHIFT_LSR: return lsr(value, amount);
@@ -183,9 +183,9 @@ shiftreg(struct sim *sim, aarch64_reg r, aarch64_shift shift, unsigned amount, i
  * 	Set the contents and state of the given register.
  */
 static void
-setreg(struct sim *sim, aarch64_reg d, uint64_t value, int state) {
-	if (!AARCH64_REGZR(d)) {
-		unsigned d0 = AARCH64_REGNAME(d);
+setreg(struct sim *sim, aarch64_gpreg d, uint64_t value, int state) {
+	if (!AARCH64_GPREGZR(d)) {
+		unsigned d0 = AARCH64_GPREGID(d);
 		sim->X[d0].value = value & regmask(d);
 		sim->X[d0].state = state;
 	}

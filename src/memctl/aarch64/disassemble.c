@@ -13,7 +13,7 @@
  * 	Returns a string representation of the given register.
  */
 static const char *
-reg(aarch64_reg r) {
+reg(aarch64_gpreg r) {
 	switch (r) {
 		case AARCH64_W0:		return "W0";
 		case AARCH64_W1:		return "W1";
