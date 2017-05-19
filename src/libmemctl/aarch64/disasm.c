@@ -182,7 +182,7 @@ aarch64_decode_adc(uint32_t ins, struct aarch64_ins_adc *adc) {
 	// | sf | 1 | 1 | 1 1 0 1 0 0 0 0 |    Rm     | 0 0 0 0 0 0 |    Rn     |    Rd     | SBCS
 	// +----+---+---+-----------------+-----------+-------------+-----------+-----------+
 	//       op   S
-	if (!AARCH64_INS_TYPE(ins, ADC)) {
+	if (!AARCH64_INS_TYPE(ins, ADC_CLASS)) {
 		return false;
 	}
 	unsigned sf   = test(ins, 31);
@@ -204,7 +204,7 @@ aarch64_decode_add_xr(uint32_t ins, struct aarch64_ins_add_xr *add_xr) {
 	// | sf | 1 | 1 | 0 1 0 1 1 | 0 0 | 1 |    Rm     | option | imm3  |    Rn     |    Rd     | SUBS extended register
 	// +----+---+---+-----------+-----+---+-----------+--------+-------+-----------+-----------+
 	//       op   S
-	if (!AARCH64_INS_TYPE(ins, ADD_XR)) {
+	if (!AARCH64_INS_TYPE(ins, ADD_XR_CLASS)) {
 		return false;
 	}
 	unsigned shift = extract(ins, 0, 12, 10, 0);
@@ -240,7 +240,7 @@ aarch64_decode_add_im(uint32_t ins, struct aarch64_ins_add_im *add_im) {
 	// | sf | 1 | 1 | 1 0 0 0 1 | shift |          imm12          |    Rn     |    Rd     | SUBS immediate
 	// +----+---+---+-----------+-------+-------------------------+-----------+-----------+
 	//       op   S
-	if (!AARCH64_INS_TYPE(ins, ADD_IM)) {
+	if (!AARCH64_INS_TYPE(ins, ADD_IM_CLASS)) {
 		return false;
 	}
 	unsigned sf    = test(ins, 31);
@@ -296,7 +296,7 @@ aarch64_decode_add_sr(uint32_t ins, struct aarch64_ins_add_sr *add_sr) {
 	// | sf | 1 | 1 | 0 1 0 1 1 | shift | 0 |    Rm     |    imm6     |    Rn     |    Rd     | SUBS shifted register
 	// +----+---+---+-----------+-------+---+-----------+-------------+-----------+-----------+
 	//       op   S
-	if (!AARCH64_INS_TYPE(ins, ADD_SR)) {
+	if (!AARCH64_INS_TYPE(ins, ADD_SR_CLASS)) {
 		return false;
 	}
 	unsigned sf         = test(ins, 31);
@@ -327,7 +327,7 @@ aarch64_decode_and_sr(uint32_t ins, struct aarch64_ins_and_sr *and_sr) {
 	// | sf | 0 1 | 0 1 0 1 0 | shift | 0 |    Rm     |    imm6     |    Rn     |    Rd     | ORR shifted register
 	// +----+-----+-----------+-------+---+-----------+-------------+-----------+-----------+
 	//        opc                       N
-	if (!AARCH64_INS_TYPE(ins, AND_SR)) {
+	if (!AARCH64_INS_TYPE(ins, AND_SR_CLASS)) {
 		return false;
 	}
 	uint8_t opc = extract(ins, 0, 30, 29, 0);
@@ -357,7 +357,7 @@ aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr) {
 	// | 1 | immlo | 1 0 0 0 0 |                 immhi                 |    Rd     | ADRP
 	// +---+-------+-----------+---------------------------------------+-----------+
 	//  op
-	if (!AARCH64_INS_TYPE(ins, ADR)) {
+	if (!AARCH64_INS_TYPE(ins, ADR_CLASS)) {
 		return false;
 	}
 	unsigned shift  = 12 * test(ins, 31);
@@ -376,7 +376,7 @@ aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b) {
 	// | 1 | 0 0 1 0 1 |                        imm26                        | BL
 	// +---+-----------+-----------------------------------------------------+
 	//  op
-	if (!AARCH64_INS_TYPE(ins, B)) {
+	if (!AARCH64_INS_TYPE(ins, B_CLASS)) {
 		return false;
 	}
 	b->link  = test(ins, 31);
@@ -388,13 +388,18 @@ bool
 aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br) {
 	//  31           25 24 23 22 21 20       16 15         10 9         5 4         0
 	// +---------------+-----+-----+-----------+-------------+-----------+-----------+
-	// | 1 1 0 1 0 1 1 | 0 0 | 0 1 | 1 1 1 1 1 | 0 0 0 0 0 0 |    Rn     | 0 0 0 0 0 | BLR
 	// | 1 1 0 1 0 1 1 | 0 0 | 0 0 | 1 1 1 1 1 | 0 0 0 0 0 0 |    Rn     | 0 0 0 0 0 | BR
+	// | 1 1 0 1 0 1 1 | 0 0 | 0 1 | 1 1 1 1 1 | 0 0 0 0 0 0 |    Rn     | 0 0 0 0 0 | BLR
+	// | 1 1 0 1 0 1 1 | 0 0 | 1 0 | 1 1 1 1 1 | 0 0 0 0 0 0 |    Rn     | 0 0 0 0 0 | RET
 	// +---------------+-----+-----+-----------+-------------+-----------+-----------+
 	//                         op
-	if (!AARCH64_INS_TYPE(ins, BR)) {
+	if (!AARCH64_INS_TYPE(ins, BR_CLASS)) {
 		return false;
 	}
+	if (extract(ins, 0, 22, 21, 0) == 0x3) {
+		return false;
+	}
+	br->op   = test(ins, 22);
 	br->Xn   = gpreg(ins, 1, USE_ZR, 5);
 	br->link = test(ins, 21);
 	return true;
@@ -750,20 +755,6 @@ aarch64_ins_decode_orr_im(uint32_t ins, struct aarch64_ins_and_orr_im *orr_im) {
 		return false;
 	}
 	return decode_and_orr_im(ins, orr_im);
-}
-
-bool
-aarch64_ins_decode_ret(uint32_t ins, struct aarch64_ins_ret *ret) {
-	//  31           25 24 23 22 21 20       16 15         10 9         5 4         0
-	// +---------------+-----+-----+-----------+-------------+-----------+-----------+
-	// | 1 1 0 1 0 1 1 | 0 0 | 1 0 | 1 1 1 1 1 | 0 0 0 0 0 0 |    Rn     | 0 0 0 0 0 |
-	// +---------------+-----+-----+-----------+-------------+-----------+-----------+
-	//                         op
-	if (!AARCH64_INS_TYPE(ins, RET_INS)) {
-		return false;
-	}
-	ret->Xn = gpreg(ins, 1, USE_ZR, 5);
-	return true;
 }
 
 bool

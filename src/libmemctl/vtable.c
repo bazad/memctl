@@ -217,11 +217,11 @@ exec_one(struct sim *sim) {
 	struct aarch64_ins_and_orr_im orr_im;
 	struct aarch64_ins_and_sr orr_sr;
 	struct aarch64_ins_b b;
+	struct aarch64_ins_br br;
 	struct aarch64_ins_ldr_str_ui ldr_ui;
 	struct aarch64_ins_ldr_str_ui str_ui;
 	struct aarch64_ins_ldp_stp ldp;
 	struct aarch64_ins_ldp_stp stp;
-	struct aarch64_ins_ret ret;
 	if (aarch64_decode_adr(ins, pc, &adr)) {
 		setreg(sim, adr.Xd, adr.label, VALUE);
 	} else if (aarch64_decode_add_im(ins, &add_im)) {
@@ -257,8 +257,9 @@ exec_one(struct sim *sim) {
 			|| aarch64_ins_decode_stp_pre(ins, &stp)
 			|| aarch64_ins_decode_stp_post(ins, &stp)) {
 		// Ignore.
-	} else if (aarch64_ins_decode_ret(ins, &ret)) {
-		uint64_t retaddr = getreg(sim, ret.Xn, &state);
+	} else if (aarch64_decode_br(ins, &br) && br.op == AARCH64_INS_BR_OP_RET) {
+		// TODO: This is incomplete. We should abort on B.
+		uint64_t retaddr = getreg(sim, br.Xn, &state);
 		sim->ret = (state == VALUE ? retaddr : 1);
 	} else if (aarch64_ins_decode_nop(ins)) {
 		// Nothing to do.

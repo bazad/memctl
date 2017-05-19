@@ -184,8 +184,8 @@ enum {
 // ---- ADC, ADCS, SBC, SBCS ----
 // ---- NGC, NGCS ----
 
-#define AARCH64_ADC_MASK 0x1fe0fc00
-#define AARCH64_ADC_BITS 0x1a000000
+#define AARCH64_ADC_CLASS_MASK 0x1fe0fc00
+#define AARCH64_ADC_CLASS_BITS 0x1a000000
 
 struct aarch64_ins_adc {
 	enum {
@@ -239,8 +239,8 @@ bool aarch64_alias_ngcs(struct aarch64_ins_adc *sbcs);
 //      register ----
 // ---- CMN extended register, CMP extended register ----
 
-#define AARCH64_ADD_XR_MASK 0x1fe00000
-#define AARCH64_ADD_XR_BITS 0x0b200000
+#define AARCH64_ADD_XR_CLASS_MASK 0x1fe00000
+#define AARCH64_ADD_XR_CLASS_BITS 0x0b200000
 
 struct aarch64_ins_add_xr {
 	enum {
@@ -295,8 +295,8 @@ bool aarch64_alias_cmp_xr(struct aarch64_ins_add_xr *subs_xr);
 // ---- ADD immediate, ADDS immediate, SUB immediate, SUBS immediate ----
 // ---- CMN immediate, CMP immediate, MOV to/from SP ----
 
-#define AARCH64_ADD_IM_MASK 0x1f000000
-#define AARCH64_ADD_IM_BITS 0x11000000
+#define AARCH64_ADD_IM_CLASS_MASK 0x1f000000
+#define AARCH64_ADD_IM_CLASS_BITS 0x11000000
 
 struct aarch64_ins_add_im {
 	enum {
@@ -357,8 +357,8 @@ bool aarch64_alias_mov_sp(struct aarch64_ins_add_im *add_im);
 // ---- CMN shifted register, CMP shifted register, NEG shifted register, NEGS shifted
 //      register ----
 
-#define AARCH64_ADD_SR_MASK 0x1f200000
-#define AARCH64_ADD_SR_BITS 0x0b000000
+#define AARCH64_ADD_SR_CLASS_MASK 0x1f200000
+#define AARCH64_ADD_SR_CLASS_BITS 0x0b000000
 
 struct aarch64_ins_add_sr {
 	enum {
@@ -378,60 +378,52 @@ bool aarch64_decode_add_sr(uint32_t ins, struct aarch64_ins_add_sr *add_sr);
 // ADD shifted register
 //   ADD <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
 //   ADD <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
-
 #define AARCH64_ADD_SR_INS_MASK 0x7f200000
 #define AARCH64_ADD_SR_INS_BITS 0x0b000000
 
 // ADDS shifted register
 //   ADDS <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
 //   ADDS <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
-
 #define AARCH64_ADDS_SR_INS_MASK 0x7f200000
 #define AARCH64_ADDS_SR_INS_BITS 0x2b000000
 
 // CMN shifted register : ADDS shifted register
 //   CMN <Wn>, <Wm>{, <shift> #<amount>}
 //   CMN <Xn>, <Xm>{, <shift> #<amount>}
-
 bool aarch64_alias_cmn_sr(struct aarch64_ins_add_sr *adds_sr);
 
 // CMP shifted register : SUBS shifted register
 //   CMP <Wn>, <Wm>{, <shift> #<amount>}
 //   CMP <Xn>, <Xm>{, <shift> #<amount>}
-
 bool aarch64_alias_cmp_sr(struct aarch64_ins_add_sr *subs_sr);
 
 // NEG shifted register : SUB shifted register
 //   NEG <Wd>, <Wm>{, <shift> #<amount>}
 //   NEG <Xd>, <Xm>{, <shift> #<amount>}
-
 bool aarch64_alias_neg(struct aarch64_ins_add_sr *sub_sr);
 
 // NEGS : SUBS shifted register
 //   NEGS <Wd>, <Wm>{, <shift> #<amount>}
 //   NEGS <Xd>, <Xm>{, <shift> #<amount>}
-
 bool aarch64_alias_negs(struct aarch64_ins_add_sr *subs_sr);
 
 // SUB shifted register
 //   SUB <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
 //   SUB <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
-
 #define AARCH64_SUB_SR_INS_MASK 0x7f200000
 #define AARCH64_SUB_SR_INS_BITS 0x4b000000
 
 // SUBS shifted register
 //   SUBS <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
 //   SUBS <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
-
 #define AARCH64_SUBS_SR_INS_MASK 0x7f200000
 #define AARCH64_SUBS_SR_INS_BITS 0x6b000000
 
 
 // ---- ADR, ADRP ----
 
-#define AARCH64_ADR_MASK 0x1f000000
-#define AARCH64_ADR_BITS 0x10000000
+#define AARCH64_ADR_CLASS_MASK 0x1f000000
+#define AARCH64_ADR_CLASS_BITS 0x10000000
 
 struct aarch64_ins_adr {
 	enum {
@@ -446,13 +438,11 @@ bool aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr);
 
 // ADR
 //   ADR <Xd>, <label>
-
 #define AARCH64_ADR_INS_MASK 0x9f000000
 #define AARCH64_ADR_INS_BITS 0x10000000
 
 // ADRP
 //   ADRP <Xd>, <label>
-
 #define AARCH64_ADRP_INS_MASK 0x9f000000
 #define AARCH64_ADRP_INS_BITS 0x90000000
 
@@ -476,8 +466,8 @@ bool aarch64_ins_decode_and_im(uint32_t ins, struct aarch64_ins_and_orr_im *and_
 // ---- AND shifted register, ANDS shifted register, ORR shifted register ----
 // ---- MOV register, TST shifted register ----
 
-#define AARCH64_AND_SR_MASK 0x1f200000
-#define AARCH64_AND_SR_BITS 0x0a000000
+#define AARCH64_AND_SR_CLASS_MASK 0x1f200000
+#define AARCH64_AND_SR_CLASS_BITS 0x0a000000
 
 struct aarch64_ins_and_sr {
 	enum {
@@ -544,8 +534,8 @@ bool aarch64_ins_decode_ands_im(uint32_t ins, struct aarch64_ins_and_orr_im *and
 
 // ---- B, BL ----
 
-#define AARCH64_B_MASK 0x7c000000
-#define AARCH64_B_BITS 0x14000000
+#define AARCH64_B_CLASS_MASK 0x7c000000
+#define AARCH64_B_CLASS_BITS 0x14000000
 
 struct aarch64_ins_b {
 	bool     link;
@@ -556,15 +546,14 @@ bool aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b);
 
 // B
 //   B <label>
-
 #define AARCH64_B_INS_MASK 0xfc000000
 #define AARCH64_B_INS_BITS 0x14000000
 
 // BL
 //   BL <label>
-
 #define AARCH64_BL_INS_MASK 0xfc000000
 #define AARCH64_BL_INS_BITS 0x94000000
+
 
 // BFI : BFM
 
@@ -579,8 +568,19 @@ bool aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b);
 
 // ---- BLR, BR ----
 
-#define AARCH64_BR_MASK 0xffdffc1f
-#define AARCH64_BR_BITS 0xd61f0000
+#define AARCH64_BR_CLASS_MASK 0xff9ffc1f
+#define AARCH64_BR_CLASS_BITS 0xd61f0000
+
+struct aarch64_ins_br {
+	enum {
+		AARCH64_INS_BR_OP_BR  = 0,
+		AARCH64_INS_BR_OP_RET = 1,
+	}             op;
+	aarch64_gpreg Xn;
+	bool          link;
+};
+
+bool aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br);
 
 // BLR
 //   BLR <Xn>
@@ -592,12 +592,10 @@ bool aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b);
 #define AARCH64_BR_INS_MASK 0xfffffc1f
 #define AARCH64_BR_INS_BITS 0xd61f0000
 
-struct aarch64_ins_br {
-	aarch64_gpreg Xn;
-	bool          link;
-};
-
-bool aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br);
+// RET
+//   RET {<Xn>}
+#define AARCH64_RET_INS_MASK 0xfffffc1f
+#define AARCH64_RET_INS_BITS 0xd65f0000
 
 
 // BRK
@@ -961,18 +959,6 @@ bool aarch64_ins_decode_orr_im(uint32_t ins, struct aarch64_ins_and_orr_im *orr_
 // PRFM unscaled offset
 
 // RBIT
-
-// RET
-//   RET {<Xn>}
-
-#define AARCH64_RET_INS_MASK 0xfffffc1f
-#define AARCH64_RET_INS_BITS 0xd65f0000
-
-struct aarch64_ins_ret {
-	aarch64_gpreg Xn;
-};
-
-bool aarch64_ins_decode_ret(uint32_t ins, struct aarch64_ins_ret *ret);
 
 // REV
 
