@@ -213,7 +213,7 @@ exec_one(struct sim *sim) {
 	int state = 0;
 	struct aarch64_ins_adr adr;
 	struct aarch64_ins_add_im add_im;
-	struct aarch64_ins_movknz movz;
+	struct aarch64_ins_mov mov;
 	struct aarch64_ins_and_im and_im;
 	struct aarch64_ins_and_sr and_sr;
 	struct aarch64_ins_b b;
@@ -232,9 +232,17 @@ exec_one(struct sim *sim) {
 			value -= imm;
 		}
 		setreg(sim, add_im.Rd, value, state);
-	} else if (aarch64_ins_decode_movz(ins, &movz)) {
-		uint64_t value = (uint64_t)movz.imm << movz.shift;
-		setreg(sim, movz.Rd, value, VALUE);
+	} else if (aarch64_decode_mov(ins, &mov)) {
+		uint64_t value = 0;
+		if (mov.k) {
+			value = getreg(sim, mov.Rd, &state);
+		}
+		value &= ~((((uint64_t)1 << 16) - 1) << mov.shift);
+		value |= (uint64_t)mov.imm << mov.shift;
+		if (mov.n) {
+			value = ~value;
+		}
+		setreg(sim, mov.Rd, value, VALUE);
 	} else if (aarch64_decode_and_im(ins, &and_im)) {
 		uint64_t value = getreg(sim, and_im.Rn, &state);
 		if (and_im.op == AARCH64_INS_AND_IM_OP_AND) {

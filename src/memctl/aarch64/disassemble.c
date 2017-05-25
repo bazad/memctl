@@ -411,37 +411,38 @@ r_r:
 
 static bool
 disassemble_movknz(uint32_t ins, char *buf) {
-	struct aarch64_ins_movknz movknz;
+	struct aarch64_ins_mov mov;
 	const char *name;
 	uint64_t mov_imm;
-	if (aarch64_ins_decode_movk(ins, &movknz)) {
-		name = "MOVK";
-	} else if (aarch64_ins_decode_movn(ins, &movknz)) {
-		if (aarch64_alias_mov_nwi(&movknz)) {
-			mov_imm = ~((uint64_t)movknz.imm << movknz.shift);
-			goto mov;
-		}
-		name = "MOVN";
-	} else if (aarch64_ins_decode_movz(ins, &movknz)) {
-		if (aarch64_alias_mov_wi(&movknz)) {
-			mov_imm = (uint64_t)movknz.imm << movknz.shift;
-			goto mov;
-		}
-		name = "MOVZ";
-	} else {
-		return false;
-	}
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
-	if (movknz.shift == 0) {
-		W("%-7s %s, #0x%x", name, reg(movknz.Rd), movknz.imm);
+	if (!aarch64_decode_mov(ins, &mov)) {
+		return false;
+	}
+	if (mov.k) {
+		name = "MOVK";
+	} else if (mov.n) {
+		if (aarch64_alias_mov_nwi(&mov)) {
+			mov_imm = ~((uint64_t)mov.imm << mov.shift);
+			goto mov_imm;
+		}
+		name = "MOVN";
 	} else {
-		W("%-7s %s, #0x%x, %s #%d", name, reg(movknz.Rd), movknz.imm,
-				shift(AARCH64_SHIFT_LSL), movknz.shift);
+		if (aarch64_alias_mov_wi(&mov)) {
+			mov_imm = (uint64_t)mov.imm << mov.shift;
+			goto mov_imm;
+		}
+		name = "MOVZ";
+	}
+	if (mov.shift == 0) {
+		W("%-7s %s, #0x%x", name, reg(mov.Rd), mov.imm);
+	} else {
+		W("%-7s %s, #0x%x, %s #%d", name, reg(mov.Rd), mov.imm,
+				shift(AARCH64_SHIFT_LSL), mov.shift);
 	}
 	return true;
-mov:
-	W("%-7s %s, #0x%llx", "MOV", reg(movknz.Rd), mov_imm);
+mov_imm:
+	W("%-7s %s, #0x%llx", "MOV", reg(mov.Rd), mov_imm);
 	return true;
 #undef W
 }

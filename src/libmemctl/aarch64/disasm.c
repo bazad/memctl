@@ -454,8 +454,8 @@ aarch64_decode_ldp(uint32_t ins, struct aarch64_ins_ldp *ldp) {
 	return true;
 }
 
-static bool
-decode_movknz(uint32_t ins, struct aarch64_ins_movknz *movknz) {
+bool
+aarch64_decode_mov(uint32_t ins, struct aarch64_ins_mov *mov) {
 	//  31   30 29 28         23 22 21 20                              5 4         0
 	// +----+-----+-------------+-----+---------------------------------+-----------+
 	// | sf | 1 1 | 1 0 0 1 0 1 | hw  |              imm16              |    Rd     | MOVK
@@ -463,14 +463,20 @@ decode_movknz(uint32_t ins, struct aarch64_ins_movknz *movknz) {
 	// | sf | 1 0 | 1 0 0 1 0 1 | hw  |              imm16              |    Rd     | MOVZ
 	// +----+-----+-------------+-----+---------------------------------+-----------+
 	//        opc
-	unsigned sf = test(ins, 31);
-	unsigned hw = extract(ins, 0, 22, 21, 0);
-	if (sf == 0 && test(hw, 1)) {
+	if (!AARCH64_INS_TYPE(ins, MOV_CLASS)) {
 		return false;
 	}
-	movknz->Rd    = gpreg(ins, sf, USE_ZR, 0);
-	movknz->imm   = extract(ins, 0, 20, 5, 0);
-	movknz->shift = 16 * hw;
+	unsigned sf  = test(ins, 31);
+	unsigned opc = extract(ins, 0, 30, 29, 0);
+	unsigned hw  = extract(ins, 0, 22, 21, 0);
+	if (opc == 1 || (sf == 0 && test(hw, 1))) {
+		return false;
+	}
+	mov->k     = (opc == 3);
+	mov->n     = (opc == 0);
+	mov->Rd    = gpreg(ins, sf, USE_ZR, 0);
+	mov->imm   = extract(ins, 0, 20, 5, 0);
+	mov->shift = 16 * hw;
 	return true;
 }
 
@@ -642,20 +648,22 @@ aarch64_alias_mov_sp(struct aarch64_ins_add_im *add_im) {
 }
 
 bool
-aarch64_alias_mov_nwi(struct aarch64_ins_movknz *movn) {
+aarch64_alias_mov_nwi(struct aarch64_ins_mov *movn) {
 	// MOV inverted wide immediate : MOVN
 	// Preferred when:
 	//   32: !(IsZero(imm16) && hw != '00')
 	//   64: !(IsZero(imm16) && hw != '00') && IsOnes(imm16)
-	return !(movn->imm == 0 && movn->shift == 0)
-	       && (AARCH64_GPREGSIZE(movn->Rd) == 32 || movn->imm == (uint16_t)-1);
+	return (movn->n
+	        && (movn->imm != 0 || movn->shift != 0)
+	        && (AARCH64_GPREGSIZE(movn->Rd) == 32 || movn->imm == (uint16_t)-1));
 }
 
 bool
-aarch64_alias_mov_wi(struct aarch64_ins_movknz *movz) {
+aarch64_alias_mov_wi(struct aarch64_ins_mov *movz) {
 	// MOV wide immediate : MOVZ
 	// Preferred when !(IsZero(imm16) && hw != '00')
-	return (movz->imm != 0 || movz->shift == 0);
+	return ((!movz->k && !movz->n)
+	        && (movz->imm != 0 || movz->shift == 0));
 }
 
 bool
@@ -676,30 +684,6 @@ aarch64_alias_mov_r(struct aarch64_ins_and_sr *orr_sr) {
 	        && gpreg_is_zrsp(orr_sr->Rn)
 	        && orr_sr->amount == 0
 	        && orr_sr->shift == AARCH64_SHIFT_LSL);
-}
-
-bool
-aarch64_ins_decode_movk(uint32_t ins, struct aarch64_ins_movknz *movk) {
-	if (!AARCH64_INS_TYPE(ins, MOVK_INS)) {
-		return false;
-	}
-	return decode_movknz(ins, movk);
-}
-
-bool
-aarch64_ins_decode_movn(uint32_t ins, struct aarch64_ins_movknz *movn) {
-	if (!AARCH64_INS_TYPE(ins, MOVN_INS)) {
-		return false;
-	}
-	return decode_movknz(ins, movn);
-}
-
-bool
-aarch64_ins_decode_movz(uint32_t ins, struct aarch64_ins_movknz *movz) {
-	if (!AARCH64_INS_TYPE(ins, MOVZ_INS)) {
-		return false;
-	}
-	return decode_movknz(ins, movz);
 }
 
 bool

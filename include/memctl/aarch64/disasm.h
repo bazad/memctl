@@ -940,52 +940,52 @@ bool aarch64_ins_decode_ldr_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_r)
 
 // MNEG : MSUB
 
-// MOV inverted wide immediate : MOVN
-//   MOV <Wd>, #<imm>
-//   MOV <Xd>, #<imm>
 
-struct aarch64_ins_movknz;
+// ---- MOVK, MOVN, MOVZ ----
+// ---- MOV inverted wide immediate, MOV wide immediate ----
 
-bool aarch64_alias_mov_nwi(struct aarch64_ins_movknz *movn);
+#define AARCH64_MOV_CLASS_MASK 0x1f800000
+#define AARCH64_MOV_CLASS_BITS 0x12800000
 
-// MOV wide immediate : MOVZ
-//   MOV <Wd>, #<imm>
-//   MOV <Xd>, #<imm>
-
-bool aarch64_alias_mov_wi(struct aarch64_ins_movknz *movz);
-
-// MOVK
-//   MOVK <Wd>, #<imm>{, LSL #<shift>}
-//   MOVK <Xd>, #<imm>{, LSL #<shift>}
-
-#define AARCH64_MOVK_INS_MASK 0x7f800000
-#define AARCH64_MOVK_INS_BITS 0x72800000
-
-struct aarch64_ins_movknz {
+struct aarch64_ins_mov {
+	uint8_t       k:1;
+	uint8_t       n:1;
+	uint8_t       _fill:6;
 	aarch64_gpreg Rd;
 	uint16_t      imm;
 	uint8_t       shift;
 };
 
-bool aarch64_ins_decode_movk(uint32_t ins, struct aarch64_ins_movknz *movk);
+bool aarch64_decode_mov(uint32_t ins, struct aarch64_ins_mov *movk);
+
+// MOV inverted wide immediate : MOVN
+//   MOV <Wd>, #<imm>
+//   MOV <Xd>, #<imm>
+bool aarch64_alias_mov_nwi(struct aarch64_ins_mov *movn);
+
+// MOV wide immediate : MOVZ
+//   MOV <Wd>, #<imm>
+//   MOV <Xd>, #<imm>
+bool aarch64_alias_mov_wi(struct aarch64_ins_mov *movz);
+
+// MOVK
+//   MOVK <Wd>, #<imm>{, LSL #<shift>}
+//   MOVK <Xd>, #<imm>{, LSL #<shift>}
+#define AARCH64_MOVK_INS_MASK 0x7f800000
+#define AARCH64_MOVK_INS_BITS 0x72800000
 
 // MOVN
 //   MOVN <Wd>, #<imm>{, LSL #<shift>}
 //   MOVN <Xd>, #<imm>{, LSL #<shift>}
-
 #define AARCH64_MOVN_INS_MASK 0x7f800000
 #define AARCH64_MOVN_INS_BITS 0x12800000
-
-bool aarch64_ins_decode_movn(uint32_t ins, struct aarch64_ins_movknz *movn);
 
 // MOVZ
 //   MOVZ <Wd>, #<imm>{, LSL #<shift>}
 //   MOVZ <Xd>, #<imm>{, LSL #<shift>}
-
 #define AARCH64_MOVZ_INS_MASK 0x7f800000
 #define AARCH64_MOVZ_INS_BITS 0x52800000
 
-bool aarch64_ins_decode_movz(uint32_t ins, struct aarch64_ins_movknz *movz);
 
 // MRS
 
