@@ -315,7 +315,7 @@ sr_suffix:
 
 static bool
 disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
-	struct aarch64_ins_ldp_stp    p;
+	struct aarch64_ins_ldp        p;
 	struct aarch64_ins_ldr_str_ix ix;
 	struct aarch64_ins_ldr_str_ui ui;
 	struct aarch64_ins_ldr_str_r  r;
@@ -323,15 +323,34 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 	const char *name = NULL;
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
-	if (aarch64_ins_decode_ldp_post(ins, &p)) {
-		name = "LDP";
-		goto p_post;
-	} else if (aarch64_ins_decode_ldp_pre(ins, &p)) {
-		name = "LDP";
-		goto p_pre;
-	} else if (aarch64_ins_decode_ldp_si(ins, &p)) {
-		name = "LDP";
-		goto p_si;
+	if (aarch64_decode_ldp(ins, &p)) {
+		if (p.load) {
+			if (p.nt) {
+				name = "LDNP";
+			} else if (p.sign) {
+				name = "LDPSW";
+			} else {
+				name = "LDP";
+			}
+		} else {
+			if (p.nt) {
+				name = "STNP";
+			} else {
+				name = "STP";
+			}
+		}
+		if (!p.wb) {
+			if (p.imm == 0) {
+				W("%-7s %s, %s, [%s]", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn));
+			} else {
+				W("%-7s %s, %s, [%s, #%d]", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn), p.imm);
+			}
+		} else if (p.post) {
+			W("%-7s %s, %s, [%s], #%d", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn), p.imm);
+		} else {
+			W("%-7s %s, %s, [%s, #%d]!", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn), p.imm);
+		}
+		return true;
 	} else if (aarch64_ins_decode_ldr_post(ins, &ix)) {
 		name = "LDR";
 		goto r_post;
@@ -347,15 +366,6 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 	} else if (aarch64_ins_decode_ldr_lit(ins, pc, &lit)) {
 		W("%-7s %s, #0x%llx", "LDR", reg(lit.Rt), lit.label);
 		return true;
-	} else if (aarch64_ins_decode_stp_post(ins, &p)) {
-		name = "STP";
-		goto p_post;
-	} else if (aarch64_ins_decode_stp_pre(ins, &p)) {
-		name = "STP";
-		goto p_pre;
-	} else if (aarch64_ins_decode_stp_si(ins, &p)) {
-		name = "STP";
-		goto p_si;
 	} else if (aarch64_ins_decode_str_post(ins, &ix)) {
 		name = "STR";
 		goto r_post;
@@ -370,19 +380,6 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 		goto r_r;
 	}
 	return false;
-p_post:
-	W("%-7s %s, %s, [%s], #%d", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn), p.imm);
-	return true;
-p_pre:
-	W("%-7s %s, %s, [%s, #%d]!", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn), p.imm);
-	return true;
-p_si:
-	if (p.imm == 0) {
-		W("%-7s %s, %s, [%s]", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn));
-	} else {
-		W("%-7s %s, %s, [%s, #%d]", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn), p.imm);
-	}
-	return true;
 r_post:
 	W("%-7s %s, [%s], #%d", name, reg(ix.Rt), reg(ix.Xn), ix.imm);
 	return true;

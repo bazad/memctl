@@ -712,43 +712,93 @@ bool aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br);
 
 // LDAXRH
 
-// LDNP
 
-// LDP, post-index
-//   LDP <Wt1>, <Wt2>, [<Xn|SP>], #<imm>
-//   LDP <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
+// ---- LDNP, LDP post-index, LDP pre-index, LDP signed offset,
+//      LDPSW post-index, LDPSW pre-index, LDPSW signed offset,
+//      STNP, STP post-index, STP pre-index, STP signed offset  ----
 
-#define AARCH64_LDP_POST_INS_MASK 0x7fc00000
-#define AARCH64_LDP_POST_INS_BITS 0x28c00000
+#define AARCH64_LDP_CLASS_MASK 0x3e000000
+#define AARCH64_LDP_CLASS_BITS 0x28000000
 
-struct aarch64_ins_ldp_stp {
+struct aarch64_ins_ldp {
+	uint8_t       load:1;
+	uint8_t       size:2;
+	uint8_t       wb:1;
+	uint8_t       post:1;
+	uint8_t       sign:1;
+	uint8_t       nt:1;
+	uint8_t       _fill:1;
 	aarch64_gpreg Rt1;
 	aarch64_gpreg Rt2;
 	aarch64_gpreg Xn;
 	int16_t       imm;
 };
 
-bool aarch64_ins_decode_ldp_post(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_post);
+bool aarch64_decode_ldp(uint32_t ins, struct aarch64_ins_ldp *ldp);
+
+// LDNP
+//   LDNP <Wt1>, <Wt2>, [<Xn|SP>{, #<imm>}]
+//   LDNP <Xt1>, <Xt2>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_LDNP_INS_MASK 0x7fc00000
+#define AARCH64_LDNP_INS_BITS 0x28400000
+
+// LDP, post-index
+//   LDP <Wt1>, <Wt2>, [<Xn|SP>], #<imm>
+//   LDP <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
+#define AARCH64_LDP_POST_INS_MASK 0x7fc00000
+#define AARCH64_LDP_POST_INS_BITS 0x28c00000
 
 // LDP, pre-index
 //   LDP <Wt1>, <Wt2>, [<Xn|SP>, #<imm>]!
 //   LDP <Xt1>, <Xt2>, [<Xn|SP>, #<imm>]!
-
 #define AARCH64_LDP_PRE_INS_MASK 0x7fc00000
 #define AARCH64_LDP_PRE_INS_BITS 0x29c00000
-
-bool aarch64_ins_decode_ldp_pre(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_pre);
 
 // LDP, signed offset
 //   LDP <Wt1>, <Wt2>, [<Xn|SP>{, #<imm>}]
 //   LDP <Xt1>, <Xt2>, [<Xn|SP>{, #<imm>}]
-
 #define AARCH64_LDP_SI_INS_MASK 0x7fc00000
 #define AARCH64_LDP_SI_INS_BITS 0x29400000
 
-bool aarch64_ins_decode_ldp_si(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_si);
+// LDPSW, post-index
+//   LDPSW <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
+#define AARCH64_LDPSW_POST_INS_MASK 0xffc00000
+#define AARCH64_LDPSW_POST_INS_BITS 0x68c00000
 
-// LDPSW
+// LDPSW, pre-index
+//   LDPSW <Xt1>, <Xt2>, [<Xn|SP>, #<imm>]!
+#define AARCH64_LDPSW_PRE_INS_MASK 0xffc00000
+#define AARCH64_LDPSW_PRE_INS_BITS 0x69c00000
+
+// LDPSW, signed offset
+//   LDPSW <Xt1>, <Xt2>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_LDPSW_SOFF_INS_MASK 0xffc00000
+#define AARCH64_LDPSW_SOFF_INS_BITS 0x69400000
+
+// STNP
+//   STNP <Wt1>, <Wt2>, [<Xn|SP>{, #<imm>}]
+//   STNP <Xt1>, <Xt2>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_STNP_INS_MASK 0x7fc00000
+#define AARCH64_STNP_INS_BITS 0x28000000
+
+// STP, post-index
+//   STP <Wt1>, <Wt2>, [<Xn|SP>], #<imm>
+//   STP <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
+#define AARCH64_STP_POST_INS_MASK 0x7fc00000
+#define AARCH64_STP_POST_INS_BITS 0x28800000
+
+// STP, pre-index
+//   STP <Wt1>, <Wt2>, [<Xn|SP>, #<imm>]!
+//   STP <Xt1>, <Xt2>, [<Xn|SP>, #<imm>]!
+#define AARCH64_STP_PRE_INS_MASK 0x7fc00000
+#define AARCH64_STP_PRE_INS_BITS 0x29800000
+
+// STP, signed offset
+//   STP <Wt1>, <Wt2>, [<Xn|SP>, #<imm>]
+//   STP <Xt1>, <Xt2>, [<Xn|SP>, #<imm>]
+#define AARCH64_STP_SI_INS_MASK 0x7fc00000
+#define AARCH64_STP_SI_INS_BITS 0x29000000
+
 
 // LDR immediate, post-index
 //   LDR <Wt>, [<Xn|SP>], #<imm>
@@ -1021,35 +1071,6 @@ bool aarch64_decode_nop(uint32_t ins);
 // STLXRB
 
 // STLXRH
-
-// STNP
-
-// STP, post-index
-//   STP <Wt1>, <Wt2>, [<Xn|SP>], #<imm>
-//   STP <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
-
-#define AARCH64_STP_POST_INS_MASK 0x7fc00000
-#define AARCH64_STP_POST_INS_BITS 0x28800000
-
-bool aarch64_ins_decode_stp_post(uint32_t ins, struct aarch64_ins_ldp_stp *stp_post);
-
-// STP, pre-index
-//   STP <Wt1>, <Wt2>, [<Xn|SP>, #<imm>]!
-//   STP <Xt1>, <Xt2>, [<Xn|SP>, #<imm>]!
-
-#define AARCH64_STP_PRE_INS_MASK 0x7fc00000
-#define AARCH64_STP_PRE_INS_BITS 0x29800000
-
-bool aarch64_ins_decode_stp_pre(uint32_t ins, struct aarch64_ins_ldp_stp *stp_pre);
-
-// STP, signed offset
-//   STP <Wt1>, <Wt2>, [<Xn|SP>, #<imm>]
-//   STP <Xt1>, <Xt2>, [<Xn|SP>, #<imm>]
-
-#define AARCH64_STP_SI_INS_MASK 0x7fc00000
-#define AARCH64_STP_SI_INS_BITS 0x29000000
-
-bool aarch64_ins_decode_stp_si(uint32_t ins, struct aarch64_ins_ldp_stp *stp_si);
 
 // STR immediate, post-index
 //   STR <Wt>, [<Xn|SP>], #<imm>

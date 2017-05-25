@@ -220,8 +220,7 @@ exec_one(struct sim *sim) {
 	struct aarch64_ins_br br;
 	struct aarch64_ins_ldr_str_ui ldr_ui;
 	struct aarch64_ins_ldr_str_ui str_ui;
-	struct aarch64_ins_ldp_stp ldp;
-	struct aarch64_ins_ldp_stp stp;
+	struct aarch64_ins_ldp ldp;
 	if (aarch64_decode_adr(ins, pc, &adr)) {
 		setreg(sim, adr.Xd, adr.label, VALUE);
 	} else if (aarch64_decode_add_im(ins, &add_im)) {
@@ -257,15 +256,12 @@ exec_one(struct sim *sim) {
 		sim->bl = b.label;
 	} else if (aarch64_ins_decode_ldr_ui(ins, &ldr_ui)) {
 		setreg(sim, ldr_ui.Rt, 0, UNKNOWN);
-	} else if (aarch64_ins_decode_ldp_post(ins, &ldp)
-			|| aarch64_ins_decode_ldp_pre(ins, &ldp)
-			|| aarch64_ins_decode_ldp_si(ins, &ldp)) {
-		setreg(sim, ldp.Rt1, 0, UNKNOWN);
-		setreg(sim, ldp.Rt2, 0, UNKNOWN);
-	} else if (aarch64_ins_decode_str_ui(ins, &str_ui)
-			|| aarch64_ins_decode_stp_si(ins, &stp)
-			|| aarch64_ins_decode_stp_pre(ins, &stp)
-			|| aarch64_ins_decode_stp_post(ins, &stp)) {
+	} else if (aarch64_decode_ldp(ins, &ldp)) {
+		if (ldp.load) {
+			setreg(sim, ldp.Rt1, 0, UNKNOWN);
+			setreg(sim, ldp.Rt2, 0, UNKNOWN);
+		}
+	} else if (aarch64_ins_decode_str_ui(ins, &str_ui)) {
 		// Ignore.
 	} else if (aarch64_decode_br(ins, &br) && br.op == AARCH64_INS_BR_OP_RET) {
 		// TODO: This is incomplete. We should abort on B.

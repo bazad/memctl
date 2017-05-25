@@ -411,23 +411,46 @@ aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br) {
 	return true;
 }
 
-static bool
-decode_ldp_stp(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_stp) {
+bool
+aarch64_decode_ldp(uint32_t ins, struct aarch64_ins_ldp *ldp) {
 	//  31 30 29   27 26  25   23 22  21           15 14       10 9         5 4         0
 	// +-----+-------+---+-------+---+---------------+-----------+-----------+-----------+
-	// | x 0 | 1 0 1 | 0 | 0 0 1 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDP, post-index
-	// | x 0 | 1 0 1 | 0 | 0 1 1 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDP, pre-index
-	// | x 0 | 1 0 1 | 0 | 0 1 0 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDP, signed offset
+	// | x 0 | 1 0 1 | 0 | 0 0 0 | 0 |     imm7      |    Rt2    |    Rn     |    Rt1    | STNP
 	// | x 0 | 1 0 1 | 0 | 0 0 1 | 0 |     imm7      |    Rt2    |    Rn     |    Rt1    | STP, post-index
+	// | x 0 | 1 0 1 | 0 | 0 1 0 | 0 |     imm7      |    Rt2    |    Rn     |    Rt1    | STP, signed offset
 	// | x 0 | 1 0 1 | 0 | 0 1 1 | 0 |     imm7      |    Rt2    |    Rn     |    Rt1    | STP, pre-index
-	// | x 0 | 1 0 1 | 0 | 0 0 1 | 0 |     imm7      |    Rt2    |    Rn     |    Rt1    | STP, signed offset
+	// | 0 1 | 1 0 1 | 0 | 0 0 1 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDPSW, post-index
+	// | 0 1 | 1 0 1 | 0 | 0 1 0 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDPSW, signed offset
+	// | 0 1 | 1 0 1 | 0 | 0 1 1 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDPSW, pre-index
+	// | x 0 | 1 0 1 | 0 | 0 0 0 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDNP
+	// | x 0 | 1 0 1 | 0 | 0 0 1 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDP, post-index
+	// | x 0 | 1 0 1 | 0 | 0 1 0 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDP, signed offset
+	// | x 0 | 1 0 1 | 0 | 0 1 1 | 1 |     imm7      |    Rt2    |    Rn     |    Rt1    | LDP, pre-index
 	// +-----+-------+---+-------+---+---------------+-----------+-----------+-----------+
 	//   opc                       L
-	unsigned sf  = test(ins, 31);
-	ldp_stp->Rt1 = gpreg(ins, sf, USE_ZR, 0);
-	ldp_stp->Xn  = gpreg(ins, 1, USE_SP, 5);
-	ldp_stp->Rt2 = gpreg(ins, sf, USE_ZR, 10);
-	ldp_stp->imm = extract(ins, 1, 21, 15, 2 + sf);
+	if (!AARCH64_INS_TYPE(ins, LDP_CLASS)) {
+		return false;
+	}
+	unsigned sf   = test(ins, 31);
+	unsigned sw   = test(ins, 30);
+	unsigned ix   = extract(ins, 0, 24, 23, 0);
+	unsigned wb   = ix & 1;
+	unsigned nt   = ix == 0;
+	unsigned post = ix == 1;
+	unsigned load = test(ins, 22);
+	if (sw && (sf || nt || !load)) {
+		return false;
+	}
+	ldp->load = load;
+	ldp->size = 2 + sf;
+	ldp->wb   = wb;
+	ldp->post = post;
+	ldp->sign = sw;
+	ldp->nt   = nt;
+	ldp->Rt1  = gpreg(ins, sf || sw, USE_ZR,  0);
+	ldp->Rt2  = gpreg(ins, sf || sw, USE_ZR, 10);
+	ldp->Xn   = gpreg(ins,        1, USE_SP,  5);
+	ldp->imm  = extract(ins, 1, 21, 15, 2 + sf);
 	return true;
 }
 
@@ -557,30 +580,6 @@ aarch64_alias_cmp_sr(struct aarch64_ins_add_sr *subs_sr) {
 	// CMP shifted register : SUBS shifted register
 	// Preferred when Rd == '11111'
 	return gpreg_is_zrsp(subs_sr->Rd);
-}
-
-bool
-aarch64_ins_decode_ldp_post(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_post) {
-	if (!AARCH64_INS_TYPE(ins, LDP_POST_INS)) {
-		return false;
-	}
-	return decode_ldp_stp(ins, ldp_post);
-}
-
-bool
-aarch64_ins_decode_ldp_pre(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_pre) {
-	if (!AARCH64_INS_TYPE(ins, LDP_PRE_INS)) {
-		return false;
-	}
-	return decode_ldp_stp(ins, ldp_pre);
-}
-
-bool
-aarch64_ins_decode_ldp_si(uint32_t ins, struct aarch64_ins_ldp_stp *ldp_si) {
-	if (!AARCH64_INS_TYPE(ins, LDP_SI_INS)) {
-		return false;
-	}
-	return decode_ldp_stp(ins, ldp_si);
 }
 
 bool
@@ -738,30 +737,6 @@ aarch64_alias_ngcs(struct aarch64_ins_adc *sbcs) {
 bool
 aarch64_decode_nop(uint32_t ins) {
 	return AARCH64_INS_TYPE(ins, NOP_INS);
-}
-
-bool
-aarch64_ins_decode_stp_post(uint32_t ins, struct aarch64_ins_ldp_stp *stp_post) {
-	if (!AARCH64_INS_TYPE(ins, STP_POST_INS)) {
-		return false;
-	}
-	return decode_ldp_stp(ins, stp_post);
-}
-
-bool
-aarch64_ins_decode_stp_pre(uint32_t ins, struct aarch64_ins_ldp_stp *stp_pre) {
-	if (!AARCH64_INS_TYPE(ins, STP_PRE_INS)) {
-		return false;
-	}
-	return decode_ldp_stp(ins, stp_pre);
-}
-
-bool
-aarch64_ins_decode_stp_si(uint32_t ins, struct aarch64_ins_ldp_stp *stp_si) {
-	if (!AARCH64_INS_TYPE(ins, STP_SI_INS)) {
-		return false;
-	}
-	return decode_ldp_stp(ins, stp_si);
 }
 
 bool
