@@ -471,12 +471,11 @@ disassemble_adr_b(uint32_t ins, uint64_t pc, char *buf) {
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
 	if (aarch64_decode_adr(ins, pc, &adr)) {
-		char *name = (adr.op == AARCH64_INS_ADR_OP_ADR ? "ADR" : "ADRP");
-		W("%-7s %s, #0x%llx", name, reg(adr.Xd), adr.label);
+		W("%-7s %s, #0x%llx", (adr.adrp ? "ADRP" : "ADR"), reg(adr.Xd), adr.label);
 	} else if (aarch64_decode_b(ins, pc, &b)) {
 		W("%-7s #0x%llx", (b.link ? "BL" : "B"), b.label);
 	} else if (aarch64_decode_br(ins, &br)) {
-		if (br.op == AARCH64_INS_BR_OP_BR) {
+		if (!br.ret) {
 			W("%-7s %s", (br.link ? "BLR" : "BR"), reg(br.Xn));
 		} else if (br.Xn == AARCH64_X30) {
 			W("RET");

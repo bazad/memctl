@@ -226,7 +226,7 @@ exec_one(struct sim *sim) {
 	} else if (aarch64_decode_add_im(ins, &add_im)) {
 		uint64_t value = getreg(sim, add_im.Rn, &state);
 		uint64_t imm = (uint64_t)add_im.imm << add_im.shift;
-		if (add_im.op == AARCH64_INS_ADD_IM_OP_ADD) {
+		if (add_im.add) {
 			value += imm;
 		} else {
 			value -= imm;
@@ -245,7 +245,7 @@ exec_one(struct sim *sim) {
 		setreg(sim, mov.Rd, value, VALUE);
 	} else if (aarch64_decode_and_im(ins, &and_im)) {
 		uint64_t value = getreg(sim, and_im.Rn, &state);
-		if (and_im.op == AARCH64_INS_AND_IM_OP_AND) {
+		if (and_im.and) {
 			value &= add_im.imm;
 		} else {
 			value |= and_im.imm;
@@ -254,7 +254,7 @@ exec_one(struct sim *sim) {
 	} else if (aarch64_decode_and_sr(ins, &and_sr)) {
 		uint64_t value = getreg(sim, and_sr.Rn, &state);
 		uint64_t value2 = shiftreg(sim, and_sr.Rm, and_sr.shift, and_sr.amount, &state);
-		if (and_sr.op == AARCH64_INS_AND_SR_OP_AND) {
+		if (and_sr.and) {
 			value &= value2;
 		} else {
 			value |= value2;
@@ -271,7 +271,7 @@ exec_one(struct sim *sim) {
 		}
 	} else if (aarch64_ins_decode_str_ui(ins, &str_ui)) {
 		// Ignore.
-	} else if (aarch64_decode_br(ins, &br) && br.op == AARCH64_INS_BR_OP_RET) {
+	} else if (aarch64_decode_br(ins, &br) && br.ret) {
 		// TODO: This is incomplete. We should abort on B.
 		uint64_t retaddr = getreg(sim, br.Xn, &state);
 		sim->ret = (state == VALUE ? retaddr : 1);

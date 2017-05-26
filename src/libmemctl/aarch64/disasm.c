@@ -186,7 +186,7 @@ aarch64_decode_adc(uint32_t ins, struct aarch64_ins_adc *adc) {
 		return false;
 	}
 	unsigned sf   = test(ins, 31);
-	adc->op       = test(ins, 30);
+	adc->adc      = !test(ins, 30);
 	adc->setflags = test(ins, 29);
 	adc->Rd       = gpreg(ins, sf, USE_ZR, 0);
 	adc->Rn       = gpreg(ins, sf, USE_ZR, 5);
@@ -220,7 +220,7 @@ aarch64_decode_add_xr(uint32_t ins, struct aarch64_ins_add_xr *add_xr) {
 	if (((!S && gpreg_is_zrsp(Rd)) || gpreg_is_zrsp(Rn)) && extend == (AARCH64_EXTEND_UXTW + sf)) {
 		extend |= AARCH64_EXTEND_LSL;
 	}
-	add_xr->op       = test(ins, 30);
+	add_xr->add      = !test(ins, 30);
 	add_xr->setflags = S;
 	add_xr->Rd       = Rd;
 	add_xr->Rn       = Rn;
@@ -250,7 +250,7 @@ aarch64_decode_add_im(uint32_t ins, struct aarch64_ins_add_im *add_im) {
 	if (test(shift, 1)) {
 		return false;
 	}
-	add_im->op       = test(ins, 30);
+	add_im->add      = !test(ins, 30);
 	add_im->setflags = test(ins, 29);
 	add_im->Rd       = gpreg(ins, sf, (S ? USE_ZR : USE_SP), 0);
 	add_im->Rn       = gpreg(ins, sf, USE_SP, 5);
@@ -284,7 +284,7 @@ aarch64_decode_and_im(uint32_t ins, struct aarch64_ins_and_im *and_im) {
 	if (!decode_bit_masks(sf, N, imms, immr, 1, &wmask, &tmask)) {
 		return false;
 	}
-	and_im->op       = (opc == 1);
+	and_im->and      = (opc != 1);
 	and_im->setflags = (opc == 3);
 	and_im->Rd       = gpreg(ins, sf, (S ? USE_ZR : USE_SP), 0);
 	and_im->Rn       = gpreg(ins, sf, USE_ZR, 5);
@@ -314,7 +314,7 @@ aarch64_decode_add_sr(uint32_t ins, struct aarch64_ins_add_sr *add_sr) {
 	if (sf == 0 && test(amount, 5)) {
 		return false;
 	}
-	add_sr->op       = test(ins, 30);
+	add_sr->add      = !test(ins, 30);
 	add_sr->setflags = test(ins, 29);
 	add_sr->Rd       = gpreg(ins, sf, USE_ZR, 0);
 	add_sr->Rn       = gpreg(ins, sf, USE_ZR, 5);
@@ -345,7 +345,7 @@ aarch64_decode_and_sr(uint32_t ins, struct aarch64_ins_and_sr *and_sr) {
 	if (sf == 0 && test(amount, 5)) {
 		return false;
 	}
-	and_sr->op       = (opc == 1);
+	and_sr->and      = (opc != 1);
 	and_sr->setflags = (opc == 3);
 	and_sr->Rd       = gpreg(ins, sf, USE_ZR, 0);
 	and_sr->Rn       = gpreg(ins, sf, USE_ZR, 5);
@@ -366,9 +366,10 @@ aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr) {
 	if (!AARCH64_INS_TYPE(ins, ADR_CLASS)) {
 		return false;
 	}
-	unsigned shift  = 12 * test(ins, 31);
-	int64_t imm     = extract(ins, 1, 23, 5, shift + 2) | extract(ins, 0, 30, 29, shift);
-	adr->op    = test(ins, 31);
+	unsigned adrp  = test(ins, 31);
+	unsigned shift = 12 * adrp;
+	int64_t imm    = extract(ins, 1, 23, 5, shift + 2) | extract(ins, 0, 30, 29, shift);
+	adr->adrp  = adrp;
 	adr->Xd    = gpreg(ins, 1, USE_ZR, 0);
 	adr->label = (pc & ~ones(shift)) + imm;
 	return true;
@@ -405,7 +406,7 @@ aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br) {
 	if (extract(ins, 0, 22, 21, 0) == 0x3) {
 		return false;
 	}
-	br->op   = test(ins, 22);
+	br->ret  = test(ins, 22);
 	br->link = test(ins, 21);
 	br->Xn   = gpreg(ins, 1, USE_ZR, 5);
 	return true;
@@ -573,7 +574,7 @@ bool
 aarch64_alias_cmn_xr(struct aarch64_ins_add_xr *adds_xr) {
 	// CMN extended register : ADDS extended register
 	// Preferred when Rd == '11111'
-	return (adds_xr->op == AARCH64_INS_ADD_XR_OP_ADD
+	return (adds_xr->add
 	        && adds_xr->setflags
 	        && gpreg_is_zrsp(adds_xr->Rd));
 }
@@ -582,7 +583,7 @@ bool
 aarch64_alias_cmn_im(struct aarch64_ins_add_im *adds_im) {
 	// CMN immediate : ADDS immediate
 	// Preferred when Rd == '11111'
-	return (adds_im->op == AARCH64_INS_ADD_IM_OP_ADD
+	return (adds_im->add
 	        && adds_im->setflags
 	        && gpreg_is_zrsp(adds_im->Rd));
 }
@@ -591,14 +592,16 @@ bool
 aarch64_alias_cmn_sr(struct aarch64_ins_add_sr *adds_sr) {
 	// CMN shifted register : ADDS shifted register
 	// Preferred when Rd == '11111'
-	return gpreg_is_zrsp(adds_sr->Rd);
+	return (adds_sr->add
+	        && adds_sr->setflags
+	        && gpreg_is_zrsp(adds_sr->Rd));
 }
 
 bool
 aarch64_alias_cmp_xr(struct aarch64_ins_add_xr *subs_xr) {
 	// CMP extended register : SUBS extended register
 	// Preferred when Rd == '11111'
-	return (subs_xr->op == AARCH64_INS_ADD_XR_OP_SUB
+	return (!subs_xr->add
 	        && subs_xr->setflags
 	        && gpreg_is_zrsp(subs_xr->Rd));
 }
@@ -607,7 +610,7 @@ bool
 aarch64_alias_cmp_im(struct aarch64_ins_add_im *subs_im) {
 	// CMP immediate : SUBS immediate
 	// Preferred when Rd == '11111'
-	return (subs_im->op == AARCH64_INS_ADD_IM_OP_SUB
+	return (!subs_im->add
 	        && subs_im->setflags
 	        && gpreg_is_zrsp(subs_im->Rd));
 }
@@ -616,7 +619,9 @@ bool
 aarch64_alias_cmp_sr(struct aarch64_ins_add_sr *subs_sr) {
 	// CMP shifted register : SUBS shifted register
 	// Preferred when Rd == '11111'
-	return gpreg_is_zrsp(subs_sr->Rd);
+	return (!subs_sr->add
+	        && subs_sr->setflags
+	        && gpreg_is_zrsp(subs_sr->Rd));
 }
 
 bool
@@ -655,7 +660,7 @@ bool
 aarch64_alias_mov_sp(struct aarch64_ins_add_im *add_im) {
 	// MOV to/from SP : ADD immediate
 	// Preferred when shift == '00' && imm12 == '00' && (Rd == '11111' || Rn == '11111')
-	return (add_im->op == AARCH64_INS_ADD_IM_OP_ADD
+	return (add_im->add
 	        && !add_im->setflags
 	        && (gpreg_is_zrsp(add_im->Rd) || gpreg_is_zrsp(add_im->Rn))
 	        && add_im->imm == 0
@@ -687,7 +692,7 @@ aarch64_alias_mov_bi(struct aarch64_ins_and_im *orr_im) {
 	// Preferred when Rn == '11111' && !MoveWidePreferred(sf, N, imms, immr)
 	// TODO: Use MoveWidePreferred. It should be possible to use the conditions there to
 	// establish conditions on orr_im->imm.
-	return (orr_im->op == AARCH64_INS_AND_IM_OP_ORR
+	return (!orr_im->and
 	        && gpreg_is_zrsp(orr_im->Rn));
 }
 
@@ -695,7 +700,7 @@ bool
 aarch64_alias_mov_r(struct aarch64_ins_and_sr *orr_sr) {
 	// MOV register : ORR shifted register
 	// Preferred when shift == '00' && imm6 == '000000' && Rn == '11111'
-	return (orr_sr->op == AARCH64_INS_AND_SR_OP_ORR
+	return (!orr_sr->and
 	        && gpreg_is_zrsp(orr_sr->Rn)
 	        && orr_sr->amount == 0
 	        && orr_sr->shift == AARCH64_SHIFT_LSL);
@@ -705,21 +710,25 @@ bool
 aarch64_alias_neg(struct aarch64_ins_add_sr *sub_sr) {
 	// NEG shifted register : SUB shifted register
 	// Preferred when Rn == '11111'
-	return gpreg_is_zrsp(sub_sr->Rn);
+	return (!sub_sr->add
+	        && !sub_sr->setflags
+	        && gpreg_is_zrsp(sub_sr->Rn));
 }
 
 bool
 aarch64_alias_negs(struct aarch64_ins_add_sr *subs_sr) {
 	// NEGS shifted register : SUBS shifted register
 	// Preferred when Rn == '11111'
-	return gpreg_is_zrsp(subs_sr->Rn);
+	return (!subs_sr->add
+	        && subs_sr->setflags
+	        && gpreg_is_zrsp(subs_sr->Rn));
 }
 
 bool
 aarch64_alias_ngc(struct aarch64_ins_adc *sbc) {
 	// NGC : SBC
 	// Preferred when Rn == '11111'
-	return (sbc->op == AARCH64_INS_ADC_OP_SBC
+	return (!sbc->adc
 	        && !sbc->setflags
 	        && gpreg_is_zrsp(sbc->Rn));
 }
@@ -728,7 +737,7 @@ bool
 aarch64_alias_ngcs(struct aarch64_ins_adc *sbcs) {
 	// NGCS : SBCS
 	// Preferred when Rn == '11111'
-	return (sbcs->op == AARCH64_INS_ADC_OP_SBC
+	return (!sbcs->adc
 	        && sbcs->setflags
 	        && gpreg_is_zrsp(sbcs->Rn));
 }
@@ -758,7 +767,7 @@ bool
 aarch64_alias_tst_im(struct aarch64_ins_and_im *ands_im) {
 	// TST immediate : ANDS immediate
 	// Preferred when Rd == '11111'
-	return (ands_im->op == AARCH64_INS_AND_IM_OP_AND
+	return (ands_im->and
 	        && ands_im->setflags
 	        && gpreg_is_zrsp(ands_im->Rd));
 }
@@ -767,7 +776,7 @@ bool
 aarch64_alias_tst_sr(struct aarch64_ins_and_sr *ands_sr) {
 	// TST shifted register : ANDS shifted register
 	// Preferred when Rd == '11111'
-	return (ands_sr->op == AARCH64_INS_AND_SR_OP_AND
+	return (ands_sr->and
 	        && ands_sr->setflags
 	        && gpreg_is_zrsp(ands_sr->Rd));
 }
