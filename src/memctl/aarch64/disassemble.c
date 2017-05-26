@@ -316,7 +316,7 @@ sr_suffix:
 static bool
 disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 	struct aarch64_ins_ldp        p;
-	struct aarch64_ins_ldr_str_ix ix;
+	struct aarch64_ins_ldr_ix     ix;
 	struct aarch64_ins_ldr_str_ui ui;
 	struct aarch64_ins_ldr_str_r  r;
 	struct aarch64_ins_ldr_lit    lit;
@@ -351,12 +351,40 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 			W("%-7s %s, %s, [%s, #%d]!", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn), p.imm);
 		}
 		return true;
-	} else if (aarch64_ins_decode_ldr_post(ins, &ix)) {
-		name = "LDR";
-		goto r_post;
-	} else if (aarch64_ins_decode_ldr_pre(ins, &ix)) {
-		name = "LDR";
-		goto r_pre;
+	} else if (aarch64_decode_ldr_ix(ins, &ix)) {
+		if (ix.load) {
+			if (ix.sign) {
+				if (ix.size == 0) {
+					name = "LDRSB";
+				} else if (ix.size == 1) {
+					name = "LDRSH";
+				} else {
+					name = "LDRSW";
+				}
+			} else {
+				if (ix.size == 0) {
+					name = "LDRB";
+				} else if (ix.size == 1) {
+					name = "LDRH";
+				} else {
+					name = "LDR";
+				}
+			}
+		} else {
+			if (ix.size == 0) {
+				name = "STRB";
+			} else if (ix.size == 1) {
+				name = "STRH";
+			} else {
+				name = "STR";
+			}
+		}
+		if (ix.post) {
+			W("%-7s %s, [%s], #%d", name, reg(ix.Rt), reg(ix.Xn), ix.imm);
+		} else {
+			W("%-7s %s, [%s, #%d]!", name, reg(ix.Rt), reg(ix.Xn), ix.imm);
+		}
+		return true;
 	} else if (aarch64_ins_decode_ldr_ui(ins, &ui)) {
 		name = "LDR";
 		goto r_ui;
@@ -366,12 +394,6 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 	} else if (aarch64_ins_decode_ldr_lit(ins, pc, &lit)) {
 		W("%-7s %s, #0x%llx", "LDR", reg(lit.Rt), lit.label);
 		return true;
-	} else if (aarch64_ins_decode_str_post(ins, &ix)) {
-		name = "STR";
-		goto r_post;
-	} else if (aarch64_ins_decode_str_pre(ins, &ix)) {
-		name = "STR";
-		goto r_pre;
 	} else if (aarch64_ins_decode_str_ui(ins, &ui)) {
 		name = "STR";
 		goto r_ui;
@@ -380,12 +402,6 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 		goto r_r;
 	}
 	return false;
-r_post:
-	W("%-7s %s, [%s], #%d", name, reg(ix.Rt), reg(ix.Xn), ix.imm);
-	return true;
-r_pre:
-	W("%-7s %s, [%s, #%d]!", name, reg(ix.Rt), reg(ix.Xn), ix.imm);
-	return true;
 r_ui:
 	if (ui.imm == 0) {
 		W("%-7s %s, [%s]", name, reg(ui.Rt), reg(ui.Xn));

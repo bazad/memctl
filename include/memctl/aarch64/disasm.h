@@ -800,29 +800,128 @@ bool aarch64_decode_ldp(uint32_t ins, struct aarch64_ins_ldp *ldp);
 #define AARCH64_STP_SI_INS_BITS 0x29000000
 
 
-// LDR immediate, post-index
-//   LDR <Wt>, [<Xn|SP>], #<imm>
-//   LDR <Xt>, [<Xn|SP>], #<imm>
+// ---- LDR immediate post-index, LDR immediate pre-index, LDRB immediate post-index,
+//      LDRB immediate pre-index, LDRH immediate post-index, LDRH immediate pre-index,
+//      LDRSB immediate post-index, LDRSB immediate pre-index, LDRSH immediate post-index,
+//      LDRSH immediate pre-index, LDRSW immediate post-index, LDRSW immediate pre-index,
+//      STR immediate post-index, STR immediate pre-index, STRB immediate post-index,
+//      STRB immediate pre-index, STRH immediate post-index, STRH immediate pre-index ----
 
-#define AARCH64_LDR_POST_INS_MASK 0xbfe00c00
-#define AARCH64_LDR_POST_INS_BITS 0x28400400
+#define AARCH64_LDR_IX_CLASS_MASK 0x3f200400
+#define AARCH64_LDR_IX_CLASS_BITS 0x38000400
 
-struct aarch64_ins_ldr_str_ix {
+struct aarch64_ins_ldr_ix {
+	uint8_t       load:1;
+	uint8_t       size:2;
+	uint8_t       wb:1;
+	uint8_t       post:1;
+	uint8_t       sign:1;
+	uint8_t       _fill:2;
 	aarch64_gpreg Rt;
 	aarch64_gpreg Xn;
 	int16_t       imm;
 };
 
-bool aarch64_ins_decode_ldr_post(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_post);
+bool aarch64_decode_ldr_ix(uint32_t ins, struct aarch64_ins_ldr_ix *ldr);
+
+// LDR immediate, post-index
+//   LDR <Wt>, [<Xn|SP>], #<imm>
+//   LDR <Xt>, [<Xn|SP>], #<imm>
+#define AARCH64_LDR_POST_INS_MASK 0xbfe00c00
+#define AARCH64_LDR_POST_INS_BITS 0xb8400400
 
 // LDR immediate, pre-index
 //   LDR <Wt>, [<Xn|SP>, #<imm>]!
 //   LDR <Xt>, [<Xn|SP>, #<imm>]!
-
 #define AARCH64_LDR_PRE_INS_MASK 0xbfe00c00
 #define AARCH64_LDR_PRE_INS_BITS 0xb8400c00
 
-bool aarch64_ins_decode_ldr_pre(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_pre);
+// LDRB immediate, post-index
+//   LDRB <Wt>, [<Xn|SP>], #<imm>
+#define AARCH64_LDRB_POST_INS_MASK 0xffe00c00
+#define AARCH64_LDRB_POST_INS_BITS 0x38400400
+
+// LDRB immediate, pre-index
+//   LDRB <Wt>, [<Xn|SP>, #<imm>]!
+#define AARCH64_LDRB_PRE_INS_MASK 0xffe00c00
+#define AARCH64_LDRB_PRE_INS_BITS 0x38400c00
+
+// LDRH immediate, post-index
+//   LDRH <Wt>, [<Xn|SP>], #<imm>
+#define AARCH64_LDRH_POST_INS_MASK 0xffe00c00
+#define AARCH64_LDRH_POST_INS_BITS 0x78400400
+
+// LDRH immediate, pre-index
+//   LDRH <Wt>, [<Xn|SP>, #<imm>]!
+#define AARCH64_LDRH_PRE_INS_MASK 0xffe00c00
+#define AARCH64_LDRH_PRE_INS_BITS 0x78400c00
+
+// LDRSB immediate, post-index
+//   LDRSB <Wt>, [<Xn|SP>], #<imm>
+//   LDRSB <Xt>, [<Xn|SP>], #<imm>
+#define AARCH64_LDRSB_POST_INS_MASK 0xffa00c00
+#define AARCH64_LDRSB_POST_INS_BITS 0x38800400
+
+// LDRSB immediate, pre-index
+//   LDRSB <Wt>, [<Xn|SP>, #<imm>]!
+//   LDRSB <Xt>, [<Xn|SP>, #<imm>]!
+#define AARCH64_LDRSB_PRE_INS_MASK 0xffa00c00
+#define AARCH64_LDRSB_PRE_INS_BITS 0x38800c00
+
+// LDRSH immediate, post-index
+//   LDRSH <Wt>, [<Xn|SP>], #<imm>
+//   LDRSH <Xt>, [<Xn|SP>], #<imm>
+#define AARCH64_LDRSH_POST_INS_MASK 0xffa00c00
+#define AARCH64_LDRSH_POST_INS_BITS 0x78800400
+
+// LDRSH immediate, pre-index
+//   LDRSH <Wt>, [<Xn|SP>, #<imm>]!
+//   LDRSH <Xt>, [<Xn|SP>, #<imm>]!
+#define AARCH64_LDRSH_PRE_INS_MASK 0xffa00c00
+#define AARCH64_LDRSH_PRE_INS_BITS 0x78800c00
+
+// LDRSW immediate, post-index
+//   LDRSW <Xt>, [<Xn|SP>], #<imm>
+#define AARCH64_LDRSW_POST_INS_MASK 0xffe00c00
+#define AARCH64_LDRSW_POST_INS_BITS 0xb8800400
+
+// LDRSW immediate, pre-index
+//   LDRSW <Xt>, [<Xn|SP>, #<imm>]!
+#define AARCH64_LDRSW_PRE_INS_MASK 0xffe00c00
+#define AARCH64_LDRSW_PRE_INS_BITS 0xb8800c00
+
+// STR immediate, post-index
+//   STR <Wt>, [<Xn|SP>], #<imm>
+//   STR <Xt>, [<Xn|SP>], #<imm>
+#define AARCH64_STR_POST_INS_MASK 0xbfe00c00
+#define AARCH64_STR_POST_INS_BITS 0xb8000400
+
+// STR immediate, pre-index
+//   STR <Wt>, [<Xn|SP>, #<imm>]!
+//   STR <Xt>, [<Xn|SP>, #<imm>]!
+#define AARCH64_STR_PRE_INS_MASK 0xbfe00c00
+#define AARCH64_STR_PRE_INS_BITS 0xb8000c00
+
+// STRB immediate, post-index
+//   STRB <Wt>, [<Xn|SP>], #<imm>
+#define AARCH64_STRB_POST_INS_MASK 0xffe00c00
+#define AARCH64_STRB_POST_INS_BITS 0x38000400
+
+// STRB immediate, pre-index
+//   STRB <Wt>, [<Xn|SP>, #<imm>]!
+#define AARCH64_STRB_PRE_INS_MASK 0xffe00c00
+#define AARCH64_STRB_PRE_INS_BITS 0x38000c00
+
+// STRH immediate, post-index
+//   STRH <Wt>, [<Xn|SP>], #<imm>
+#define AARCH64_STRH_POST_INS_MASK 0xffe00c00
+#define AARCH64_STRH_POST_INS_BITS 0x78000400
+
+// STRH immediate, pre-index
+//   STRH <Wt>, [<Xn|SP>, #<imm>]!
+#define AARCH64_STRH_PRE_INS_MASK 0xffe00c00
+#define AARCH64_STRH_PRE_INS_BITS 0x78000c00
+
 
 // LDR immediate, unsigned offset
 //   LDR <Wt>, [<Xn|SP>{, #<imm>}]
@@ -870,23 +969,13 @@ struct aarch64_ins_ldr_str_r {
 
 bool aarch64_ins_decode_ldr_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_r);
 
-// LDRB immediate
-
 // LDRB register
-
-// LDRH immediate
 
 // LDRH register
 
-// LDRSB immediate
-
 // LDRSB register
 
-// LDRSH immediate
-
 // LDRSH register
-
-// LDRSW immediate
 
 // LDRSW literal
 
@@ -1072,24 +1161,6 @@ bool aarch64_decode_nop(uint32_t ins);
 
 // STLXRH
 
-// STR immediate, post-index
-//   STR <Wt>, [<Xn|SP>], #<imm>
-//   STR <Xt>, [<Xn|SP>], #<imm>
-
-#define AARCH64_STR_POST_INS_MASK 0xbfe00c00
-#define AARCH64_STR_POST_INS_BITS 0xb8000400
-
-bool aarch64_ins_decode_str_post(uint32_t ins, struct aarch64_ins_ldr_str_ix *str_post);
-
-// STR immediate, pre-index
-//   STR <Wt>, [<Xn|SP>, #<imm>]!
-//   STR <Xt>, [<Xn|SP>, #<imm>]!
-
-#define AARCH64_STR_PRE_INS_MASK 0xbfe00c00
-#define AARCH64_STR_PRE_INS_BITS 0xb8000c00
-
-bool aarch64_ins_decode_str_pre(uint32_t ins, struct aarch64_ins_ldr_str_ix *str_pre);
-
 // STR immediate, unsigned offset
 //   STR <Wt>, [<Xn|SP>, #<imm>]
 //   STR <Xt>, [<Xn|SP>, #<imm>]
@@ -1108,11 +1179,7 @@ bool aarch64_ins_decode_str_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *str_
 
 bool aarch64_ins_decode_str_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_r);
 
-// STRB immediate
-
 // STRB register
-
-// STRH immediate
 
 // STRH register
 

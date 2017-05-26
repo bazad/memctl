@@ -480,20 +480,51 @@ aarch64_decode_mov(uint32_t ins, struct aarch64_ins_mov *mov) {
 	return true;
 }
 
-static bool
-decode_ldr_str_ix(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_str_ix) {
+bool
+aarch64_decode_ldr_ix(uint32_t ins, struct aarch64_ins_ldr_ix *ldr_ix) {
 	//  31 30 29   27 26  25 24 23 22 21  20               12 11 10 9         5 4         0
 	// +-----+-------+---+-----+-----+---+-------------------+-----+-----------+-----------+
-	// | 1 x | 1 1 1 | 0 | 0 0 | 0 1 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | LDR immediate, post-index
-	// | 1 x | 1 1 1 | 0 | 0 0 | 0 1 | 0 |       imm9        | 1 1 |    Rn     |    Rt     | LDR immedate, pre-index
+	// | 0 0 | 1 1 1 | 0 | 0 0 | 0 0 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | STRB immediate, post-index
+	// | 0 0 | 1 1 1 | 0 | 0 0 | 0 0 | 0 |       imm9        | 1 1 |    Rn     |    Rt     | STRB immediate, pre-index
+	// | 0 1 | 1 1 1 | 0 | 0 0 | 0 0 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | STRH immediate, post-index
+	// | 0 1 | 1 1 1 | 0 | 0 0 | 0 0 | 0 |       imm9        | 1 1 |    Rn     |    Rt     | STRH immediate, pre-index
 	// | 1 x | 1 1 1 | 0 | 0 0 | 0 0 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | STR immediate, post-index
 	// | 1 x | 1 1 1 | 0 | 0 0 | 0 0 | 0 |       imm9        | 1 1 |    Rn     |    Rt     | STR immedate, pre-index
+	// | 0 0 | 1 1 1 | 0 | 0 0 | 0 1 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | LDRB immediate, post-index
+	// | 0 0 | 1 1 1 | 0 | 0 0 | 0 1 | 0 |       imm9        | 1 1 |    Rn     |    Rt     | LDRB immediate, pre-index
+	// | 0 1 | 1 1 1 | 0 | 0 0 | 0 1 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | LDRH immediate, post-index
+	// | 0 1 | 1 1 1 | 0 | 0 0 | 0 1 | 0 |       imm9        | 1 1 |    Rn     |    Rt     | LDRH immediate, post-index
+	// | 1 x | 1 1 1 | 0 | 0 0 | 0 1 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | LDR immediate, post-index
+	// | 1 x | 1 1 1 | 0 | 0 0 | 0 1 | 0 |       imm9        | 1 1 |    Rn     |    Rt     | LDR immedate, pre-index
+	// | 0 0 | 1 1 1 | 0 | 0 0 | 1 x | 0 |       imm9        | 0 1 |    Rn     |    Rt     | LDRSB immediate, post-index
+	// | 0 0 | 1 1 1 | 0 | 0 0 | 1 x | 0 |       imm9        | 1 1 |    Rn     |    Rt     | LDRSB immediate, pre-index
+	// | 0 1 | 1 1 1 | 0 | 0 0 | 1 x | 0 |       imm9        | 0 1 |    Rn     |    Rt     | LDRSH immediate, post-index
+	// | 0 1 | 1 1 1 | 0 | 0 0 | 1 x | 0 |       imm9        | 1 1 |    Rn     |    Rt     | LDRSH immediate, pre-index
+	// | 1 0 | 1 1 1 | 0 | 0 0 | 1 0 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | LDRSW immediate, post-index
+	// | 1 0 | 1 1 1 | 0 | 0 0 | 1 0 | 0 |       imm9        | 1 1 |    Rn     |    Rt     | LDRSW immediate, pre-index
 	// +-----+-------+---+-----+-----+---+-------------------+-----+-----------+-----------+
 	//  size                     opc
-	unsigned sf     = test(ins, 30);
-	ldr_str_ix->Rt  = gpreg(ins, sf, USE_ZR, 0);
-	ldr_str_ix->Xn  = gpreg(ins, 1, USE_SP, 5);
-	ldr_str_ix->imm = extract(ins, 1, 20, 12, 0);
+	if (!AARCH64_INS_TYPE(ins, LDR_IX_CLASS)) {
+		return false;
+	}
+	unsigned size = extract(ins, 0, 31, 30, 0);
+	unsigned opc  = extract(ins, 0, 23, 22, 0);
+	unsigned sign = test(opc, 1);
+	unsigned load = (opc != 0);
+	unsigned type = extract(ins, 0, 11, 10, 0);
+	unsigned post = (type == 1);
+	unsigned r64  = (size == 3 || opc == 2);
+	if (sign && (!load || size == 3 || (size == 2 && opc == 3))) {
+		return false;
+	}
+	ldr_ix->load = load;
+	ldr_ix->size = size;
+	ldr_ix->wb   = 1;
+	ldr_ix->post = post;
+	ldr_ix->sign = sign;
+	ldr_ix->Rt   = gpreg(ins, r64, USE_ZR, 0);
+	ldr_ix->Xn   = gpreg(ins,   1, USE_SP, 5);
+	ldr_ix->imm  = extract(ins, 1, 20, 12, 0);
 	return true;
 }
 
@@ -586,22 +617,6 @@ aarch64_alias_cmp_sr(struct aarch64_ins_add_sr *subs_sr) {
 	// CMP shifted register : SUBS shifted register
 	// Preferred when Rd == '11111'
 	return gpreg_is_zrsp(subs_sr->Rd);
-}
-
-bool
-aarch64_ins_decode_ldr_post(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_post) {
-	if (!AARCH64_INS_TYPE(ins, LDR_POST_INS)) {
-		return false;
-	}
-	return decode_ldr_str_ix(ins, ldr_post);
-}
-
-bool
-aarch64_ins_decode_ldr_pre(uint32_t ins, struct aarch64_ins_ldr_str_ix *ldr_pre) {
-	if (!AARCH64_INS_TYPE(ins, LDR_PRE_INS)) {
-		return false;
-	}
-	return decode_ldr_str_ix(ins, ldr_pre);
 }
 
 bool
@@ -721,22 +736,6 @@ aarch64_alias_ngcs(struct aarch64_ins_adc *sbcs) {
 bool
 aarch64_decode_nop(uint32_t ins) {
 	return AARCH64_INS_TYPE(ins, NOP_INS);
-}
-
-bool
-aarch64_ins_decode_str_post(uint32_t ins, struct aarch64_ins_ldr_str_ix *str_post) {
-	if (!AARCH64_INS_TYPE(ins, STR_POST_INS)) {
-		return false;
-	}
-	return decode_ldr_str_ix(ins, str_post);
-}
-
-bool
-aarch64_ins_decode_str_pre(uint32_t ins, struct aarch64_ins_ldr_str_ix *str_pre) {
-	if (!AARCH64_INS_TYPE(ins, STR_PRE_INS)) {
-		return false;
-	}
-	return decode_ldr_str_ix(ins, str_pre);
 }
 
 bool
