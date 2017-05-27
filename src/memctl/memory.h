@@ -1,5 +1,5 @@
-#ifndef MEMCTL__CLI__MEMORY_H_
-#define MEMCTL__CLI__MEMORY_H_
+#ifndef MEMCTL_CLI__MEMORY_H_
+#define MEMCTL_CLI__MEMORY_H_
 
 #include "memctl/kernel_memory.h"
 

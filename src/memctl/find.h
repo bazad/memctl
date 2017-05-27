@@ -1,5 +1,5 @@
-#ifndef MEMCTL__CLI__FIND_H_
-#define MEMCTL__CLI__FIND_H_
+#ifndef MEMCTL_CLI__FIND_H_
+#define MEMCTL_CLI__FIND_H_
 
 #include "memctl/memctl_types.h"
 

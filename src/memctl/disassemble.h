@@ -1,5 +1,5 @@
-#ifndef MEMCTL__CLI__DISASSEMBLE_H_
-#define MEMCTL__CLI__DISASSEMBLE_H_
+#ifndef MEMCTL_CLI__DISASSEMBLE_H_
+#define MEMCTL_CLI__DISASSEMBLE_H_
 
 #include <stdbool.h>
 #include <stdint.h>

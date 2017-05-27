@@ -1,5 +1,5 @@
-#ifndef MEMCTL__CLI__READ_H_
-#define MEMCTL__CLI__READ_H_
+#ifndef MEMCTL_CLI__READ_H_
+#define MEMCTL_CLI__READ_H_
 
 #include "memctl/memctl_types.h"
 
