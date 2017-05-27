@@ -79,3 +79,13 @@ memctl_vmmap(kaddr_t kaddr, kaddr_t end, uint32_t depth) {
 	}
 	return true;
 }
+
+bool
+memctl_vmprotect(kaddr_t address, size_t size, int prot) {
+	kern_return_t kr = mach_vm_protect(kernel_task, address, size, FALSE, prot);
+	if (kr != KERN_SUCCESS) {
+		error_internal("mach_vm_protect failed: %s", mach_error_string(kr));
+		return false;
+	}
+	return true;
+}

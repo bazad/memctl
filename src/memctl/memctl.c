@@ -17,7 +17,6 @@
 #include "memctl/platform.h"
 #include "memctl/vtable.h"
 
-#include <mach/mach_vm.h>
 #include <stdio.h>
 
 #if MEMCTL_REPL
@@ -715,12 +714,7 @@ vmp_command(kaddr_t address, size_t length, int prot) {
 	if (!check_address(address, length, false)) {
 		return false;
 	}
-	kern_return_t kr = mach_vm_protect(kernel_task, address, length, false, prot);
-	if (kr != KERN_SUCCESS) {
-		error_internal("mach_vm_protect failed: %s", mach_error_string(kr));
-		return false;
-	}
-	return true;
+	return memctl_vmprotect(address, length, prot);
 }
 
 bool
