@@ -491,7 +491,7 @@ disassemble_adr_b(uint32_t ins, uint64_t pc, char *buf) {
 
 static bool
 disassemble1(uint32_t ins, uint64_t pc, char buf[64]) {
-	int idx = sprintf(buf, "%llx  ", pc);
+	int idx = sprintf(buf, "%016llx  ", pc);
 	if (idx <= 0) {
 		*buf = 0;
 		return false;

@@ -2,22 +2,24 @@
 
 # Compilation options.
 
-ARCH     ?= arm64
-SDK      ?= iphoneos
-CORE_DIR ?= core
-CORE_LIB ?= $(CORE_DIR)/libmemctl_core.a
+ARCH              ?= arm64
+SDK               ?= iphoneos
+CORE_DIR          ?= core
+CORE_LIB          ?= $(CORE_DIR)/libmemctl_core.a
 CORE_ENTITLEMENTS ?= $(CORE_DIR)/entitlements.plist
 
-REPL     ?= YES
+REPL              ?= YES
+
+TEST_DETAIL       ?= 0
 
 ifneq ($(ARCH),x86_64)
-CLANG   := $(shell xcrun --sdk $(SDK) --find clang)
-AR      := $(shell xcrun --sdk $(SDK) --find ar)
+CLANG    := $(shell xcrun --sdk $(SDK) --find clang)
+AR       := $(shell xcrun --sdk $(SDK) --find ar)
 ifeq ($(CLANG),)
 $(error Could not find clang for SDK $(SDK))
 endif
-SYSROOT := $(shell xcrun --sdk $(SDK) --show-sdk-path)
-CC      := $(CLANG) -isysroot $(SYSROOT) -arch $(ARCH)
+SYSROOT  := $(shell xcrun --sdk $(SDK) --show-sdk-path)
+CC       := $(CLANG) -isysroot $(SYSROOT) -arch $(ARCH)
 endif
 CODESIGN := codesign
 
@@ -29,6 +31,7 @@ OBJ_DIR = obj
 BIN_DIR = bin
 LIB_DIR = lib
 EXTERNAL_HDR_DIR = external
+TEST_DIR = test
 
 LIBMEMCTL_DIR     = libmemctl
 LIBMEMCTL_INC_DIR = memctl
@@ -163,9 +166,40 @@ MEMCTL_OBJS := $(MEMCTL_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 MEMCTL_BIN := $(BIN_DIR)/memctl
 
+# Tests.
+
+aarch64_disasm_SRCS = $(SRC_DIR)/$(LIBMEMCTL_DIR)/aarch64/disasm.c \
+		      $(SRC_DIR)/$(MEMCTL_DIR)/aarch64/disassemble.c \
+		      $(TEST_DIR)/aarch64_disasm/aarch64_disasm.c
+
+aarch64_disasm_CFLAGS = -I$(INC_DIR)/$(LIBMEMCTL_INC_DIR) \
+			-I$(SRC_DIR)/$(MEMCTL_DIR) \
+			-DMEMCTL_DISASSEMBLY=1
+
+TESTS = aarch64_disasm
+
+define make_test_rules
+
+$(1)_OBJS := $$($(1)_SRCS:$$(SRC_DIR)/%.c=$$(OBJ_DIR)/%.o)
+$(1)_OBJS := $$($(1)_OBJS:$$(TEST_DIR)/%.c=$$(OBJ_DIR)/%.o)
+
+$$(OBJ_DIR)/$(1)/%.o: $$(TEST_DIR)/$(1)/%.c
+	@mkdir -p $$(@D)
+	$$(CC) $$(CFLAGS) $$($(1)_CFLAGS) -c $$< -o $$@
+
+$$(BIN_DIR)/$(1): $$($(1)_OBJS)
+	@mkdir -p $$(@D)
+	$$(CC) $$(LDFLAGS) $$(FRAMEWORKS) $$^ -o $$@
+	$$(CODESIGN) $$(CODESIGN_FLAGS) -s - $$@
+
+test_$(1): $$(BIN_DIR)/$(1)
+	$$(TEST_DIR)/$(1)/test.sh "$$(BIN_DIR)/$(1)" "$$(TEST_DIR)/$(1)" $$(TEST_DETAIL)
+
+endef
+
 # Targets.
 
-.PHONY: all clean
+.PHONY: all clean test
 
 all: $(MEMCTL_BIN)
 
@@ -193,6 +227,10 @@ $(MEMCTL_BIN): $(MEMCTL_LIB) $(CORE_LIB) $(MEMCTL_OBJS)
 $(MEMCTL_LIB): $(LIBMEMCTL_OBJS)
 	@mkdir -p $(@D)
 	$(AR) $(ARFLAGS) $@ $^
+
+test: $(TESTS:%=test_%)
+
+$(foreach test,$(TESTS),$(eval $(call make_test_rules,$(test))))
 
 clean:
 	rm -rf -- $(OBJ_DIR) $(BIN_DIR) $(LIB_DIR)

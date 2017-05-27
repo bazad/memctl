@@ -1,0 +1,9 @@
+fffffff0071c5d28  STP     X22, X21, [SP, #-48]!
+fffffff0071c5d2c  STP     X20, X19, [SP, #16]
+fffffff0071c5d30  STP     X29, X30, [SP, #32]
+fffffff0071c5d34  ADD     X29, SP, #0x20
+fffffff0071c5d38  MOV     X20, X1
+fffffff0071c5d3c  MOV     X19, X0
+fffffff0071c5d40  ADRP    X21, #0xfffffff007554000
+fffffff0071c5d44  LDR     X8, [X21, #2128]
+fffffff0071c5d48  CMP     X8, X19
