@@ -355,6 +355,10 @@ static bool kcd_handler(const struct argument *arguments) {
 	return kcd_command(kernelcache, output);
 }
 
+static bool root_handler(const struct argument *arguments) {
+	return root_command();
+}
+
 static struct command commands[] = {
 	{
 		"i", NULL, i_handler,
@@ -542,6 +546,10 @@ static struct command commands[] = {
 			{ ARGUMENT, "file",   ARG_STRING, "kernelcache file" },
 #endif
 		},
+	}, {
+		"root", NULL, root_handler,
+		"exec a root shell",
+		0, NULL,
 	}
 };
 

@@ -98,6 +98,7 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 memctl_signal.c \
 		 oskext.c \
 		 platform.c \
+		 privilege_escalation.c \
 		 vtable.c
 
 LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
@@ -120,6 +121,7 @@ LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
 		 offset.h \
 		 oskext.h \
 		 platform.h \
+		 privilege_escalation.h \
 		 utility.h \
 		 vtable.h
 

@@ -15,6 +15,7 @@
 #include "memctl/memctl_offsets.h"
 #include "memctl/memctl_signal.h"
 #include "memctl/platform.h"
+#include "memctl/privilege_escalation.h"
 #include "memctl/vtable.h"
 
 #include <stdio.h>
@@ -38,6 +39,7 @@ typedef enum {
 	OFFSETS             = 0x10,
 	KERNEL_CALL         = 0x20 | KERNEL_MEMORY_BASIC | KERNEL_SYMBOLS | OFFSETS,
 	KERNEL_MEMORY       = 0x40 | KERNEL_CALL,
+	PRIVESC             = KERNEL_CALL | KERNEL_MEMORY_BASIC | KERNEL_SYMBOLS | KERNEL_TASK,
 } feature_t;
 
 /*
@@ -895,6 +897,21 @@ fail1:
 	}
 fail0:
 	return success;
+}
+
+bool
+root_command() {
+	if (!initialize(PRIVESC)) {
+		return false;
+	}
+	if (!setuid_root()) {
+		error_message("could not elevate privileges");
+		return false;
+	}
+	deinitialize(false);
+	char *argv[] = { "/bin/sh", NULL };
+	execve(argv[0], argv, NULL);
+	exit(1);
 }
 
 int

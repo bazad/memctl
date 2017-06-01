@@ -34,5 +34,6 @@ bool a_command(const char *symbol, const char *kext);
 bool ap_command(kaddr_t address, bool unpermute);
 bool s_command(kaddr_t address);
 bool kcd_command(const char *kernelcache, const char *output);
+bool root_command(void);
 
 #endif
