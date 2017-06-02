@@ -1,0 +1,7 @@
+fffffff0070c0000  STR     XZR, [SP, #24]
+fffffff0070c0004  STRH    W9, [SP, #16]
+fffffff0070c0008  STR     X8, [X0]
+fffffff0070c000c  STRB    W9, [SP, #14]
+fffffff0070c0010  STR     WZR, [X19, #180]!
+fffffff0070c0014  STR     W9, [X1], #4
+fffffff0070c0018  STR     X6, [X4, #-8]!

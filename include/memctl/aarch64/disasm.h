@@ -794,7 +794,7 @@ bool aarch64_decode_ldp(uint32_t ins, struct aarch64_ins_ldp *ldp);
 #define AARCH64_LDR_IX_CLASS_MASK 0x3f200400
 #define AARCH64_LDR_IX_CLASS_BITS 0x38000400
 
-struct aarch64_ins_ldr_ix {
+struct aarch64_ins_ldr_im {
 	uint8_t       load:1;
 	uint8_t       size:2;
 	uint8_t       wb:1;
@@ -803,10 +803,10 @@ struct aarch64_ins_ldr_ix {
 	uint8_t       _fill:2;
 	aarch64_gpreg Rt;
 	aarch64_gpreg Xn;
-	int16_t       imm;
+	int32_t       imm;
 };
 
-bool aarch64_decode_ldr_ix(uint32_t ins, struct aarch64_ins_ldr_ix *ldr);
+bool aarch64_decode_ldr_ix(uint32_t ins, struct aarch64_ins_ldr_im *ldr_ix);
 
 // LDR immediate, post-index
 //   LDR <Wt>, [<Xn|SP>], #<imm>
@@ -907,20 +907,66 @@ bool aarch64_decode_ldr_ix(uint32_t ins, struct aarch64_ins_ldr_ix *ldr);
 #define AARCH64_STRH_PRE_INS_BITS 0x78000c00
 
 
+// ---- LDR immediate unsigned offset, LDRB immediate unsigned offset,
+//      LDRH immediate unsigned offset, LDRSB immediate unsigned offset,
+//      LDRSH immediate unsigned offset, LDRSW immediate unsigned offset,
+//      STR immediate unsigned offset, STRB immediate unsigned offset,
+//      STRH immediate unsigned offset ----
+
+#define AARCH64_LDR_UI_CLASS_MASK 0x3f000000
+#define AARCH64_LDR_UI_CLASS_BITS 0x39000000
+
+bool aarch64_decode_ldr_ui(uint32_t ins, struct aarch64_ins_ldr_im *ldr_ui);
+
 // LDR immediate, unsigned offset
 //   LDR <Wt>, [<Xn|SP>{, #<imm>}]
 //   LDR <Xt>, [<Xn|SP>{, #<imm>}]
-
 #define AARCH64_LDR_UI_INS_MASK 0xbfc00000
 #define AARCH64_LDR_UI_INS_BITS 0xb9400000
 
-struct aarch64_ins_ldr_str_ui {
-	aarch64_gpreg Rt;
-	aarch64_gpreg Xn;
-	uint16_t      imm;
-};
+// LDRB immediate, unsigned offset
+//   LDRB <Wt>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_LDRB_UI_INS_MASK 0xffc00000
+#define AARCH64_LDRB_UI_INS_BITS 0x39400000
 
-bool aarch64_ins_decode_ldr_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *ldr_ui);
+// LDRH immediate, unsigned offset
+//   LDRH <Wt>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_LDRH_UI_INS_MASK 0xffc00000
+#define AARCH64_LDRH_UI_INS_BITS 0x79400000
+
+// LDRSB immediate, unsigned offset
+//   LDRSB <Wt>, [<Xn|SP>{, #<imm>}]
+//   LDRSB <Xt>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_LDRSB_UI_INS_MASK 0xff800000
+#define AARCH64_LDRSB_UI_INS_BITS 0x39800000
+
+// LDRSH immediate, unsigned offset
+//   LDRSH <Wt>, [<Xn|SP>{, #<imm>}]
+//   LDRSH <Xt>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_LDRSH_UI_INS_MASK 0xff800000
+#define AARCH64_LDRSH_UI_INS_BITS 0x79800000
+
+// LDRSW immediate, unsigned offset
+//   LDRSW <Xt>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_LDRSW_UI_INS_MASK 0xffc00000
+#define AARCH64_LDRSW_UI_INS_BITS 0xb9800000
+
+// STR immediate, unsigned offset
+//   STR <Wt>, [<Xn|SP>{, #<imm>}]
+//   STR <Xt>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_STR_UI_INS_MASK 0xbfc00000
+#define AARCH64_STR_UI_INS_BITS 0xb9000000
+
+// STRB immediate, unsigned offset
+//   STRB <Wt>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_STRB_UI_INS_MASK 0xffc00000
+#define AARCH64_STRB_UI_INS_BITS 0x39000000
+
+// STRH immediate, unsigned offset
+//   STRH <Wt>, [<Xn|SP>{, #<imm>}]
+#define AARCH64_STRH_UI_INS_MASK 0xffc00000
+#define AARCH64_STRH_UI_INS_BITS 0x79000000
+
 
 // LDR literal
 //   LDR <Wt>, <label>
@@ -1144,15 +1190,6 @@ bool aarch64_decode_nop(uint32_t ins);
 // STLXRB
 
 // STLXRH
-
-// STR immediate, unsigned offset
-//   STR <Wt>, [<Xn|SP>, #<imm>]
-//   STR <Xt>, [<Xn|SP>, #<imm>]
-
-#define AARCH64_STR_UI_INS_MASK 0xbfc00000
-#define AARCH64_STR_UI_INS_BITS 0xb9000000
-
-bool aarch64_ins_decode_str_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *str_ui);
 
 // STR register
 //   STR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]

@@ -1,0 +1,2 @@
+fffffff0070c0000  SUB     SP, SP, #0x20
+fffffff0070c0004  SUB     X8, X8, W22, UXTW

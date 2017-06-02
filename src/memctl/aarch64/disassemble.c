@@ -316,8 +316,7 @@ sr_suffix:
 static bool
 disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 	struct aarch64_ins_ldp        p;
-	struct aarch64_ins_ldr_ix     ix;
-	struct aarch64_ins_ldr_str_ui ui;
+	struct aarch64_ins_ldr_im     im;
 	struct aarch64_ins_ldr_str_r  r;
 	struct aarch64_ins_ldr_lit    lit;
 	const char *name = NULL;
@@ -351,64 +350,56 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 			W("%-7s %s, %s, [%s, #%d]!", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn), p.imm);
 		}
 		return true;
-	} else if (aarch64_decode_ldr_ix(ins, &ix)) {
-		if (ix.load) {
-			if (ix.sign) {
-				if (ix.size == 0) {
+	} else if (aarch64_decode_ldr_ix(ins, &im)
+			|| aarch64_decode_ldr_ui(ins, &im)) {
+		if (im.load) {
+			if (im.sign) {
+				if (im.size == 0) {
 					name = "LDRSB";
-				} else if (ix.size == 1) {
+				} else if (im.size == 1) {
 					name = "LDRSH";
 				} else {
 					name = "LDRSW";
 				}
 			} else {
-				if (ix.size == 0) {
+				if (im.size == 0) {
 					name = "LDRB";
-				} else if (ix.size == 1) {
+				} else if (im.size == 1) {
 					name = "LDRH";
 				} else {
 					name = "LDR";
 				}
 			}
 		} else {
-			if (ix.size == 0) {
+			if (im.size == 0) {
 				name = "STRB";
-			} else if (ix.size == 1) {
+			} else if (im.size == 1) {
 				name = "STRH";
 			} else {
 				name = "STR";
 			}
 		}
-		if (ix.post) {
-			W("%-7s %s, [%s], #%d", name, reg(ix.Rt), reg(ix.Xn), ix.imm);
+		if (im.post) {
+			W("%-7s %s, [%s], #%d", name, reg(im.Rt), reg(im.Xn), im.imm);
+		} else if (im.wb) {
+			W("%-7s %s, [%s, #%d]!", name, reg(im.Rt), reg(im.Xn), im.imm);
+		} else if (im.imm == 0) {
+			W("%-7s %s, [%s]", name, reg(im.Rt), reg(im.Xn));
 		} else {
-			W("%-7s %s, [%s, #%d]!", name, reg(ix.Rt), reg(ix.Xn), ix.imm);
+			W("%-7s %s, [%s, #%u]", name, reg(im.Rt), reg(im.Xn), im.imm);
 		}
 		return true;
-	} else if (aarch64_ins_decode_ldr_ui(ins, &ui)) {
-		name = "LDR";
-		goto r_ui;
 	} else if (aarch64_ins_decode_ldr_r(ins, &r)) {
 		name = "LDR";
 		goto r_r;
 	} else if (aarch64_ins_decode_ldr_lit(ins, pc, &lit)) {
 		W("%-7s %s, #0x%llx", "LDR", reg(lit.Rt), lit.label);
 		return true;
-	} else if (aarch64_ins_decode_str_ui(ins, &ui)) {
-		name = "STR";
-		goto r_ui;
 	} else if (aarch64_ins_decode_str_r(ins, &r)) {
 		name = "STR";
 		goto r_r;
 	}
 	return false;
-r_ui:
-	if (ui.imm == 0) {
-		W("%-7s %s, [%s]", name, reg(ui.Rt), reg(ui.Xn));
-	} else {
-		W("%-7s %s, [%s, #%u]", name, reg(ui.Rt), reg(ui.Xn), ui.imm);
-	}
-	return true;
 r_r:
 	if (r.amount == 0) {
 		if (AARCH64_EXTEND_IS_LSL(r.extend)) {

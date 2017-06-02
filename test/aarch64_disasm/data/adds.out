@@ -1,0 +1,3 @@
+fffffff0070c0000  ADDS    W14, W14, #0x1
+fffffff0070c0004  ADDS    W8, W9, W8
+fffffff0070c0008  ADDS    X9, X8, W10, UXTW

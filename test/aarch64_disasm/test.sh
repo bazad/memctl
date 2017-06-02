@@ -9,7 +9,7 @@ result=0
 
 for testcase in "$DATA"/*.in; do
 	expected="${testcase%.*}".out
-	diff="$(diff "$expected" <("$BINARY" < "$testcase"))"
+	diff="$(diff "$expected" <("$BINARY" -t < "$testcase"))"
 	if [ $? -ne 0 ]; then
 		result=1
 		echo "$TEST: fail: $(basename "$testcase")"

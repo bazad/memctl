@@ -482,7 +482,7 @@ aarch64_decode_mov(uint32_t ins, struct aarch64_ins_mov *mov) {
 }
 
 bool
-aarch64_decode_ldr_ix(uint32_t ins, struct aarch64_ins_ldr_ix *ldr_ix) {
+aarch64_decode_ldr_ix(uint32_t ins, struct aarch64_ins_ldr_im *ldr_ix) {
 	//  31 30 29   27 26  25 24 23 22 21  20               12 11 10 9         5 4         0
 	// +-----+-------+---+-----+-----+---+-------------------+-----+-----------+-----------+
 	// | 0 0 | 1 1 1 | 0 | 0 0 | 0 0 | 0 |       imm9        | 0 1 |    Rn     |    Rt     | STRB immediate, post-index
@@ -529,18 +529,40 @@ aarch64_decode_ldr_ix(uint32_t ins, struct aarch64_ins_ldr_ix *ldr_ix) {
 	return true;
 }
 
-static bool
-decode_ldr_str_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *ldr_str_ui) {
+bool
+aarch64_decode_ldr_ui(uint32_t ins, struct aarch64_ins_ldr_im *ldr_ui) {
 	//  31 30 29   27 26  25 24 23 22 21                     10 9         5 4         0
 	// +-----+-------+---+-----+-----+-------------------------+-----------+-----------+
-	// | 1 x | 1 1 1 | 0 | 0 1 | 0 1 |          imm12          |    Rn     |    Rt     | LDR unsigned offset
+	// | 0 0 | 1 1 1 | 0 | 0 1 | 0 0 |          imm12          |    Rn     |    Rt     | STRB unsigned offset
+	// | 0 1 | 1 1 1 | 0 | 0 1 | 0 0 |          imm12          |    Rn     |    Rt     | STRH unsigned offset
 	// | 1 x | 1 1 1 | 0 | 0 1 | 0 0 |          imm12          |    Rn     |    Rt     | STR unsigned offset
+	// | 0 0 | 1 1 1 | 0 | 0 1 | 0 1 |          imm12          |    Rn     |    Rt     | LDRB unsigned offset
+	// | 0 1 | 1 1 1 | 0 | 0 1 | 0 1 |          imm12          |    Rn     |    Rt     | LDRH unsigned offset
+	// | 1 x | 1 1 1 | 0 | 0 1 | 0 1 |          imm12          |    Rn     |    Rt     | LDR unsigned offset
+	// | 0 0 | 1 1 1 | 0 | 0 1 | 1 x |          imm12          |    Rn     |    Rt     | LDRSB unsigned offset
+	// | 0 1 | 1 1 1 | 0 | 0 1 | 1 x |          imm12          |    Rn     |    Rt     | LDRSH unsigned offset
+	// | 1 0 | 1 1 1 | 0 | 0 1 | 1 0 |          imm12          |    Rn     |    Rt     | LDRSW unsigned offset
 	// +-----+-------+---+-----+-----+-------------------------+-----------+-----------+
 	//  size                     opc
-	unsigned size     = extract(ins, 0, 31, 30, 0);
-	ldr_str_ui->Rt    = gpreg(ins, size & 1, USE_ZR, 0);
-	ldr_str_ui->Xn    = gpreg(ins, 1, USE_SP, 5);
-	ldr_str_ui->imm   = extract(ins, 0, 21, 10, size);
+	if (!AARCH64_INS_TYPE(ins, LDR_UI_CLASS)) {
+		return false;
+	}
+	unsigned size = extract(ins, 0, 31, 30, 0);
+	unsigned opc  = extract(ins, 0, 23, 22, 0);
+	unsigned sign = test(opc, 1);
+	unsigned load = (opc != 0);
+	unsigned r64  = (size == 3 || opc == 2);
+	if (sign && (!load || size == 3 || (size == 2 && opc == 3))) {
+		return false;
+	}
+	ldr_ui->load = load;
+	ldr_ui->size = size;
+	ldr_ui->wb   = 0;
+	ldr_ui->post = 0;
+	ldr_ui->sign = sign;
+	ldr_ui->Rt   = gpreg(ins, r64, USE_ZR, 0);
+	ldr_ui->Xn   = gpreg(ins,   1, USE_SP, 5);
+	ldr_ui->imm  = extract(ins, 0, 21, 10, size);
 	return true;
 }
 
@@ -622,14 +644,6 @@ aarch64_alias_cmp_sr(struct aarch64_ins_add_sr *subs_sr) {
 	return (!subs_sr->add
 	        && subs_sr->setflags
 	        && gpreg_is_zrsp(subs_sr->Rd));
-}
-
-bool
-aarch64_ins_decode_ldr_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *ldr_ui) {
-	if (!AARCH64_INS_TYPE(ins, LDR_UI_INS)) {
-		return false;
-	}
-	return decode_ldr_str_ui(ins, ldr_ui);
 }
 
 bool
@@ -745,14 +759,6 @@ aarch64_alias_ngcs(struct aarch64_ins_adc *sbcs) {
 bool
 aarch64_decode_nop(uint32_t ins) {
 	return AARCH64_INS_TYPE(ins, NOP_INS);
-}
-
-bool
-aarch64_ins_decode_str_ui(uint32_t ins, struct aarch64_ins_ldr_str_ui *str_ui) {
-	if (!AARCH64_INS_TYPE(ins, STR_UI_INS)) {
-		return false;
-	}
-	return decode_ldr_str_ui(ins, str_ui);
 }
 
 bool

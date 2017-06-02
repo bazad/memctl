@@ -1,0 +1,10 @@
+fffffff0070c0000  LDR     X9, [X23, #224]
+fffffff0070c0004  LDR     X8, [X19]
+fffffff0070c0008  LDRH    W9, [SP, #16]
+fffffff0070c000c  LDRB    W9, [X8, #6]
+fffffff0070c0010  LDR     X11, [X9, #8]!
+fffffff0070c0014  LDRSW   X8, [X20, #544]
+fffffff0070c0018  LDR     W13, [X0], #4
+fffffff0070c001c  LDRSW   X8, [SP, #12]
+fffffff0070c0020  LDRSB   W10, [X9, #9]
+fffffff0070c0024  LDRSH   W9, [X20, #736]

@@ -171,6 +171,7 @@ MEMCTL_BIN := $(BIN_DIR)/memctl
 # Tests.
 
 aarch64_disasm_SRCS = $(SRC_DIR)/$(LIBMEMCTL_DIR)/aarch64/disasm.c \
+		      $(SRC_DIR)/$(LIBMEMCTL_DIR)/macho.c \
 		      $(SRC_DIR)/$(MEMCTL_DIR)/aarch64/disassemble.c \
 		      $(TEST_DIR)/aarch64_disasm/aarch64_disasm.c
 
@@ -185,7 +186,7 @@ define make_test_rules
 $(1)_OBJS := $$($(1)_SRCS:$$(SRC_DIR)/%.c=$$(OBJ_DIR)/%.o)
 $(1)_OBJS := $$($(1)_OBJS:$$(TEST_DIR)/%.c=$$(OBJ_DIR)/%.o)
 
-$$(OBJ_DIR)/$(1)/%.o: $$(TEST_DIR)/$(1)/%.c
+$$(OBJ_DIR)/$(1)/%.o: $$(TEST_DIR)/$(1)/%.c $$(LIBMEMCTL_INCS)
 	@mkdir -p $$(@D)
 	$$(CC) $$(CFLAGS) $$($(1)_CFLAGS) -c $$< -o $$@
 
