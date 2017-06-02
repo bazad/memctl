@@ -1,1 +1,7 @@
 fffffff0070c0000  MOV     X29, SP
+fffffff0070c0004  MOV     X19, X2
+fffffff0070c0008  MOV     X3, #0xffffffe000000000
+fffffff0070c000c  MOV     X11, #0xfffffffff9ddffff
+fffffff0070c0010  MOV     X9, #0x2a20000000000000
+fffffff0070c0014  MOVK    X9, #0xc08, LSL #32
+fffffff0070c0018  MOVK    X9, #0x5

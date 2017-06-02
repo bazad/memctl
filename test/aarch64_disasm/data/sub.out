@@ -1,2 +1,5 @@
 fffffff0070c0000  SUB     SP, SP, #0x20
 fffffff0070c0004  SUB     X8, X8, W22, UXTW
+fffffff0070c0008  SUBS    X5, X5, #0x100
+fffffff0070c000c  SUBS    X14, X9, X8
+fffffff0070c0010  SUBS    W8, W8, W10, UXTB

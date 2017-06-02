@@ -1,0 +1,3 @@
+fffffff0070c0000  AND     W3, W1, #0xfc000000
+fffffff0070c0004  AND     X12, X11, X10
+fffffff0070c0008  ANDS    X16, X0, X2, ASR #31

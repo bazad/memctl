@@ -685,11 +685,11 @@ bool
 aarch64_alias_mov_nwi(struct aarch64_ins_mov *movn) {
 	// MOV inverted wide immediate : MOVN
 	// Preferred when:
-	//   32: !(IsZero(imm16) && hw != '00')
-	//   64: !(IsZero(imm16) && hw != '00') && IsOnes(imm16)
+	//   32: !(IsZero(imm16) && hw != '00') && !IsOnes(imm16)
+	//   64: !(IsZero(imm16) && hw != '00')
 	return (movn->n
-	        && (movn->imm != 0 || movn->shift != 0)
-	        && (AARCH64_GPREGSIZE(movn->Rd) == 32 || movn->imm == (uint16_t)-1));
+	        && (movn->imm != 0 || movn->shift == 0)
+	        && (AARCH64_GPREGSIZE(movn->Rd) == 64 || movn->imm != (uint16_t)-1));
 }
 
 bool

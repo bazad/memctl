@@ -1,1 +1,2 @@
-fffffff0070cd04c  ADC     X7, X7, X9
+fffffff0070c0000  ADC     X7, X7, X9
+fffffff0070c0004  ADCS    X7, X7, X10

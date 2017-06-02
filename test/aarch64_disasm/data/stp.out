@@ -1,0 +1,4 @@
+fffffff0070c0000  STP     X20, X19, [SP, #-32]!
+fffffff0070c0004  STP     X29, X30, [SP, #16]
+fffffff0070c0008  STNP    X8, X9, [X3]
+fffffff0070c000c  STP     XZR, XZR, [X9], #16

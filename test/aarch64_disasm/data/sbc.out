@@ -1,1 +1,2 @@
-fffffff0063743e0  SBC     W0, W0, W0
+fffffff0070c0000  SBC     W0, W0, W0
+fffffff0070c0004  SBCS    X16, X16, X17

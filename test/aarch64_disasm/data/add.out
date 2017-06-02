@@ -3,3 +3,6 @@ fffffff0070c0004  ADD     X8, X19, X20, LSL #12
 fffffff0070c0008  ADD     X10, X22, W10, UXTW #1
 fffffff0070c000c  ADD     X10, X0, #0x80
 fffffff0070c0010  ADD     X5, X2, #0x1, LSL #12
+fffffff0070c0014  ADDS    W14, W14, #0x1
+fffffff0070c0018  ADDS    W8, W9, W8
+fffffff0070c001c  ADDS    X9, X8, W10, UXTW

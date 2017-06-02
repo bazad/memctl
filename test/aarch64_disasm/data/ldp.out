@@ -1,0 +1,5 @@
+fffffff0070c0000  LDP     X29, X30, [SP, #16]
+fffffff0070c0004  LDP     X20, X19, [SP], #32
+fffffff0070c0008  LDP     W8, W9, [X0]
+fffffff0070c000c  LDNP    X8, X9, [X1]
+fffffff0070c0010  LDPSW   X6, X17, [X12, #88]!

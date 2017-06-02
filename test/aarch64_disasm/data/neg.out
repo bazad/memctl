@@ -1,2 +1,3 @@
 fffffff0070c0000  NEG     W8, W24
 fffffff0070c0004  NEG     W8, W8, LSR #7
+fffffff0070c0008  NEGS    W8, W21
