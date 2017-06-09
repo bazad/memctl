@@ -31,7 +31,6 @@ static const char *kext_name        = "com.apple.driver.AppleKeyStore";
 #endif
 static const char *IOUserClient_getExternalTrapForIndex = "__ZN12IOUserClient23getExternalTrapForIndexEj";
 static const char *IORegistryEntry_getRegistryEntryID   = "__ZN15IORegistryEntry18getRegistryEntryIDEv";
-static CFStringRef kIOUserClientCreatorKey = CFSTR("IOUserClientCreator");
 
 /*
  * hook
@@ -73,21 +72,13 @@ typedef struct {
 } IOExternalTrap;
 
 /*
- * find_user_client_id
+ * get_child_ids
  *
  * Description:
- * 	Get the registry entry ID of the first user client that is a child of parent and created
- * 	by process with PID owner_pid.
+ * 	Get the registry entry IDs of the children of the given IORegistryEntry.
  */
 static bool
-find_user_client_id(io_registry_entry_t parent, pid_t owner_pid, uint64_t *user_client_id) {
-	// Get a string to match the user client property against.
-	char creator_match[16];
-	int match_len = snprintf(creator_match, sizeof(creator_match), "pid %d,", owner_pid);
-	if (match_len < 0 || match_len >= sizeof(creator_match)) {
-		error_internal("buffer too small");
-		return false;
-	}
+get_child_ids(io_registry_entry_t parent, size_t *count, uint64_t **child_ids) {
 	// Create an iterator over the children of the parent service.
 	io_iterator_t child_iterator = IO_OBJECT_NULL;
 	kern_return_t kr = IORegistryEntryGetChildIterator(parent, "IOService", &child_iterator);
@@ -95,43 +86,132 @@ find_user_client_id(io_registry_entry_t parent, pid_t owner_pid, uint64_t *user_
 		error_internal("could not create child iterator: %x", kr);
 		return false;
 	}
+	bool success = false;
+	uint64_t *ids = NULL;
+	size_t capacity = 0;
+	size_t found = 0;
 	for (;;) {
 		io_registry_entry_t child = IOIteratorNext(child_iterator);
 		if (child == IO_OBJECT_NULL) {
-			error_internal("could not find child user client");
-			IOObjectRelease(child_iterator);
+			success = true;
+			goto success;
+		}
+		// Allocate more space if needed.
+		if (found == capacity) {
+			capacity += 16;
+			uint64_t *ids2 = realloc(ids, capacity * sizeof(*ids));
+			if (ids2 == NULL) {
+				error_out_of_memory();
+				goto fail;
+			}
+			ids = ids2;
+		}
+		// Get the registry entry ID.
+		uint64_t id;
+		kr = IORegistryEntryGetRegistryEntryID(child, &id);
+		IOObjectRelease(child);
+		if (kr != KERN_SUCCESS) {
+			error_internal("could not get ID of user client: %x", kr);
+			goto fail;
+		}
+		// Store the ID in the array.
+		ids[found] = id;
+		found++;
+	}
+fail:
+	free(ids);
+	ids = NULL;
+success:
+	IOObjectRelease(child_iterator);
+	*count = found;
+	*child_ids = ids;
+	return success;
+}
+
+/*
+ * open_service_with_known_connection_id_once
+ *
+ * Description:
+ * 	Open a connection to the service and find the registry entry ID of the client.
+ */
+static bool
+open_service_with_known_connection_id_once(io_service_t service,
+		io_connect_t *connection, uint64_t *connection_id, bool *retry) {
+	bool successful = false;
+	io_connect_t connect;
+	// Get the current set of IDs.
+	size_t    old_child_count;
+	uint64_t *old_child_ids;
+	bool success = get_child_ids(service, &old_child_count, &old_child_ids);
+	if (!success) {
+		goto fail_1;
+	}
+	// Open a connection to the service.
+	kern_return_t kr = IOServiceOpen(service, mach_task_self(), 0, &connect);
+	if (kr != KERN_SUCCESS) {
+		error_internal("could not open service: %x", kr);
+		goto fail_2;
+	}
+	// Get the new set of IDs.
+	size_t    new_child_count;
+	uint64_t *new_child_ids;
+	success = get_child_ids(service, &new_child_count, &new_child_ids);
+	if (!success) {
+		goto fail_3;
+	}
+	// Try to find a single new child. This will be the connection ID.
+	uint64_t connect_id = 0;
+	for (size_t i = 0; i < new_child_count; i++) {
+		uint64_t candidate = new_child_ids[i];
+		for (size_t j = 0; j < old_child_count; j++) {
+			if (candidate == old_child_ids[j]) {
+				goto next;
+			}
+		}
+		if (connect_id != 0) {
+			*retry = true;
+			goto fail_4;
+		}
+		connect_id = candidate;
+next:;
+	}
+	assert(connect_id != 0);
+	*connection    = connect;
+	*connection_id = connect_id;
+	successful = true;
+fail_4:
+	free(new_child_ids);
+fail_3:
+	if (!successful) {
+		IOServiceClose(connect);
+	}
+fail_2:
+	free(old_child_ids);
+fail_1:
+	return successful;
+}
+
+/*
+ * open_service_with_known_connection_id
+ *
+ * Description:
+ * 	Open a connection to the service and find the registry entry ID of the client.
+ */
+static bool
+open_service_with_known_connection_id(io_service_t service,
+		io_connect_t *connection, uint64_t *connection_id) {
+	bool success = false;
+	bool retry   = true;
+	for (size_t tries = 0; !success && retry; tries++) {
+		if (tries == 5) {
+			error_internal("could not open a connection to service with known "
+			               "connection id: retry limit exceeded");
 			return false;
 		}
-		// Get the IOUserClientCreator property.
-		CFStringRef cfcreator = IORegistryEntryCreateCFProperty(child,
-				kIOUserClientCreatorKey, NULL, 0);
-		if (cfcreator == NULL) {
-			// Property missing; skip.
-			goto next;
-		}
-		char creator_buf[sizeof(creator_match) + 16];
-		const char *creator = CFStringGetCStringOrConvert(cfcreator, creator_buf,
-				sizeof(creator_buf));
-		// Check if the property is a match.
-		bool found = false;
-		if (creator != NULL) {
-			found = (strncmp(creator, creator_match, match_len) == 0);
-		}
-		CFRelease(cfcreator);
-		if (found) {
-			IOObjectRelease(child_iterator);
-			// Get the registry entry ID.
-			kr = IORegistryEntryGetRegistryEntryID(child, user_client_id);
-			IOObjectRelease(child);
-			if (kr != KERN_SUCCESS) {
-				error_internal("could not get ID of user client: %x", kr);
-				return false;
-			}
-			return true;
-		}
-next:
-		IOObjectRelease(child);
+		success = open_service_with_known_connection_id_once(service,
+				connection, connection_id, &retry);
 	}
+	return success;
 }
 
 /*
@@ -263,36 +343,30 @@ create_user_client() {
 	// Get the user client's vtable and size.
 	bool success = get_user_client_vtable();
 	if (!success) {
-		goto fail_1;
+		goto fail;
 	}
-	// Connect to the service.
+	// Get the service.
 	io_service_t service = IOServiceGetMatchingService(kIOMasterPortDefault,
 			IOServiceMatching(service_name));
 	if (service == IO_OBJECT_NULL) {
 		error_internal("could not find service matching %s", service_name);
-		goto fail_1;
+		goto fail;
 	}
-	kern_return_t kr = IOServiceOpen(service, mach_task_self(), 0, &hook.connection);
-	if (kr != KERN_SUCCESS) {
-		error_internal("could not open service %s: %x", service_name, kr);
-		goto fail_2;
-	}
-	// Get the ID of the user client.
-	success = find_user_client_id(service, getpid(), &hook.user_client_id);
+	// Open a connection to the service with a known registry entry ID.
+	success = open_service_with_known_connection_id(service, &hook.connection,
+			&hook.user_client_id);
 	IOObjectRelease(service);
 	if (!success) {
-		goto fail_1;
+		goto fail;
 	}
 	// Find the address of the user client.
 	success = find_registry_entry_with_id(hook.vtable, hook.user_client_id, &hook.user_client,
 			&hook.user_client_id_address);
 	if (!success) {
-		goto fail_1;
+		goto fail;
 	}
 	return true;
-fail_2:
-	IOObjectRelease(service);
-fail_1:
+fail:
 	// We don't need to clean up the connection, it will be taken care of in kernel_call_init.
 	return false;
 }
