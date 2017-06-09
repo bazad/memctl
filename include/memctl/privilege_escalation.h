@@ -10,12 +10,27 @@
  * 	Set the real, saved, and effective UIDs and GIDs of the current process to 0.
  *
  * Returns:
- * 	True if no errors were encountered.:w
+ * 	True if no errors were encountered.
  *
  * Dependencies:
  * 	kernel_task
- * 	kernel_call
+ * 	process_init
  */
 bool setuid_root(void);
+
+/*
+ * use_kernel_credentials
+ *
+ * Description:
+ * 	Set the current process's credentials to the kernel's credentials.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ *
+ * Dependencies:
+ * 	kernel_task
+ * 	process_init
+ */
+bool use_kernel_credentials(bool kernel);
 
 #endif

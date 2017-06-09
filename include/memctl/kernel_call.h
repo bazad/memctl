@@ -2,6 +2,10 @@
 #define MEMCTL__KERNEL_CALL_H_
 
 #include "memctl/memctl_types.h"
+#include "memctl/offset.h"
+
+DECLARE_OFFSET(IORegistryEntry, reserved);
+DECLARE_OFFSET(IORegistryEntry__ExpansionData, fRegistryEntryID);
 
 /*
  * kernel_call_init

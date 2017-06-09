@@ -89,16 +89,31 @@ typedef kernel_io_result (*kernel_write_fn)(
 		kaddr_t *next);
 
 /*
- * kernel_memory_init
+ * kernel_allocate
  *
  * Description:
- * 	Initialize the kernel memory functions based on currently available functionality. This
- * 	function can be called multiple times.
+ * 	A wrapper around mach_vm_allocate with kernel_task.
+ *
+ * Parameters:
+ * 	out	addr			On return, the address of the allocated region.
+ * 		size			The size of the region to allocate.
  *
  * Returns:
- * 	True if there were no errors.
+ * 	True if no errors were encountered.
  */
-bool kernel_memory_init(void);
+bool kernel_allocate(kaddr_t *addr, size_t size);
+
+/*
+ * kernel_deallocate
+ *
+ * Description:
+ * 	A wrapper around mach_vm_deallocate with kernel_task.
+ *
+ * Parameters:
+ * 		addr			The address of the allocated region.
+ * 		size			The size of the region to deallocate.
+ */
+void kernel_deallocate(kaddr_t addr, size_t size);
 
 /*
  * kernel_read_word
@@ -129,7 +144,7 @@ kernel_io_result kernel_read_word(kernel_read_fn read, kaddr_t kaddr, void *valu
  * Parameters:
  * 		write			The kernel_write_fn to use.
  * 		kaddr			The kernel virtual address to write
- * 	out	value			The value to write
+ * 		value			The value to write
  * 		width			The width of the value to write in bytes. width must be
  * 					1, 2, 4, or 8.
  * 		access_width		The access width. See kernel_read.
@@ -257,5 +272,17 @@ extern kernel_write_fn physical_write_unsafe;
  * 	True if no errors were encountered.
  */
 bool kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr);
+
+/*
+ * kernel_memory_init
+ *
+ * Description:
+ * 	Initialize the kernel memory functions based on currently available functionality. This
+ * 	function can be called multiple times.
+ *
+ * Returns:
+ * 	True if there were no errors.
+ */
+bool kernel_memory_init(void);
 
 #endif

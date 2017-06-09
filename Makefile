@@ -94,11 +94,11 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 macho.c \
 		 memctl_common.c \
 		 memctl_error.c \
-		 memctl_offsets.c \
 		 memctl_signal.c \
 		 oskext.c \
 		 platform.c \
 		 privilege_escalation.c \
+		 process.c \
 		 vtable.c
 
 LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
@@ -114,7 +114,6 @@ LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
 		 kernelcache.h \
 		 macho.h \
 		 memctl_error.h \
-		 memctl_offsets.h \
 		 memctl_signal.h \
 		 memctl_types.h \
 		 memory_region.h \
@@ -122,6 +121,7 @@ LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
 		 oskext.h \
 		 platform.h \
 		 privilege_escalation.h \
+		 process.h \
 		 utility.h \
 		 vtable.h
 

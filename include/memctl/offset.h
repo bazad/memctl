@@ -55,4 +55,40 @@ struct offset {
 	({ assert(ADDRESS(kext, object).valid > 0);		\
 	   ADDRESS(kext, object).offset; })
 
+/*
+ * macro DECLARE_OFFSET
+ *
+ * Description:
+ * 	Declare an offset object.
+ */
+#define DECLARE_OFFSET(base, object)	\
+extern struct offset OFFSET(base, object)
+
+/*
+ * macro DEFINE_OFFSET
+ *
+ * Description:
+ * 	Define the offset object.
+ */
+#define DEFINE_OFFSET(base, object)	\
+struct offset OFFSET(base, object)
+
+/*
+ * macro DECLARE_ADDRESS
+ *
+ * Description:
+ * 	Declare the offset object for an address.
+ */
+#define DECLARE_ADDRESS(kext, object)	\
+extern struct offset ADDRESS(kext, object)
+
+/*
+ * macro DEFINE_ADDRESS
+ *
+ * Description:
+ * 	Define the offset object for an address.
+ */
+#define DEFINE_ADDRESS(kext, object)	\
+struct offset ADDRESS(kext, object)
+
 #endif

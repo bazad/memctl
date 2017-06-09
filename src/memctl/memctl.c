@@ -12,10 +12,10 @@
 #include "memctl/kernel_call.h"
 #include "memctl/kernel_slide.h"
 #include "memctl/kernelcache.h"
-#include "memctl/memctl_offsets.h"
 #include "memctl/memctl_signal.h"
 #include "memctl/platform.h"
 #include "memctl/privilege_escalation.h"
+#include "memctl/process.h"
 #include "memctl/vtable.h"
 
 #include <stdio.h>
@@ -36,10 +36,10 @@ typedef enum {
 	KERNEL_IMAGE        = 0x04,
 	KERNEL_SLIDE        = 0x08 | KERNEL_TASK | KERNEL_IMAGE,
 	KERNEL_SYMBOLS      = KERNEL_IMAGE | KERNEL_SLIDE,
-	OFFSETS             = 0x10,
-	KERNEL_CALL         = 0x20 | KERNEL_MEMORY_BASIC | KERNEL_SYMBOLS | OFFSETS,
-	KERNEL_MEMORY       = 0x40 | KERNEL_CALL,
-	PRIVESC             = KERNEL_CALL | KERNEL_MEMORY_BASIC | KERNEL_SYMBOLS | KERNEL_TASK,
+	KERNEL_CALL         = 0x10 | KERNEL_MEMORY_BASIC | KERNEL_SYMBOLS,
+	KERNEL_MEMORY       = 0x20 | KERNEL_CALL,
+	PROCESS             = 0x40 | KERNEL_CALL | KERNEL_SYMBOLS,
+	PRIVESC             = PROCESS | KERNEL_MEMORY_BASIC,
 } feature_t;
 
 /*
@@ -179,10 +179,6 @@ initialize(feature_t features) {
 		kernel_init(NULL);
 		LOADED(KERNEL_SLIDE);
 	}
-	if (NEED(OFFSETS)) {
-		offsets_default_init();
-		LOADED(OFFSETS);
-	}
 	if (NEED(KERNEL_CALL)) {
 		printf("setting up kernel function call...\n");
 		if (!kernel_call_init()) {
@@ -197,6 +193,10 @@ initialize(feature_t features) {
 			return false;
 		}
 		LOADED(KERNEL_MEMORY);
+	}
+	if (NEED(PROCESS)) {
+		process_init();
+		LOADED(PROCESS);
 	}
 	assert(ALL_SET(features, loaded_features));
 	return true;
@@ -220,6 +220,7 @@ initialize(feature_t features) {
 static void
 deinitialize(bool critical) {
 #define LOADED(feature)	(ALL_SET(feature, loaded_features))
+	use_kernel_credentials(false);
 	if (LOADED(KERNEL_CALL)) {
 		kernel_call_deinit();
 	}
@@ -611,24 +612,20 @@ f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical
 
 bool
 fpr_command(pid_t pid) {
-	if (!initialize(KERNEL_CALL)) {
+	if (!initialize(PROCESS)) {
 		return false;
 	}
-	static kword_t _proc_find = 0;
-	if (_proc_find == 0) {
-		kext_result kr = kernel_symbol("_proc_find", &_proc_find, NULL);
-		if (kext_error(kr, KERNEL_ID, "_proc_find", 0)) {
-			return false;
-		}
+	if (proc_find == NULL) {
+		error_functionality_unavailable("proc_find unavailable");
+		return false;
 	}
-	kword_t args[] = { pid };
-	kaddr_t address;
-	bool success = kernel_call(&address, sizeof(address), _proc_find, 1, args);
+	kaddr_t proc;
+	bool success = proc_find(&proc, pid, true);
 	if (!success) {
 		error_message("proc_find(%d) failed", pid);
 		return false;
 	}
-	printf(KADDR_XFMT"\n", address);
+	printf(KADDR_XFMT"\n", proc);
 	return true;
 }
 
@@ -646,7 +643,7 @@ fi_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle
 
 bool
 kp_command(kaddr_t address) {
-	if (!initialize(KERNEL_CALL)) {
+	if (!initialize(KERNEL_MEMORY)) {
 		return false;
 	}
 	paddr_t paddr;
@@ -660,7 +657,7 @@ kp_command(kaddr_t address) {
 
 bool
 kpm_command(kaddr_t start, kaddr_t end) {
-	if (!initialize(KERNEL_CALL)) {
+	if (!initialize(KERNEL_MEMORY)) {
 		return false;
 	}
 	for (kaddr_t page = start & ~page_mask; page <= end; page += page_size) {

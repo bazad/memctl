@@ -341,7 +341,6 @@
 #include "memctl/memctl_signal.h"
 #include "memctl/utility.h"
 
-#include <mach/mach_vm.h>
 
 _Static_assert(sizeof(kword_t) == sizeof(uint64_t),
                "unexpected kernel word size for kernel_call_aarch64");
@@ -879,14 +878,9 @@ kernel_call_init_aarch64() {
 	if (!choose_strategy()) {
 		goto fail;
 	}
-	mach_vm_address_t address;
-	kern_return_t kr = mach_vm_allocate(kernel_task, &address, strategy->payload_size,
-			VM_FLAGS_ANYWHERE);
-	if (kr != KERN_SUCCESS) {
-		error_internal("mach_vm_allocate failed: %s", mach_error_string(kr));
+	if (!kernel_allocate(&jop_payload, strategy->payload_size)) {
 		goto fail;
 	}
-	jop_payload = address;
 	return true;
 fail:
 	kernel_call_deinit_aarch64();
@@ -896,7 +890,7 @@ fail:
 void
 kernel_call_deinit_aarch64() {
 	if (jop_payload != 0) {
-		mach_vm_deallocate(kernel_task, jop_payload, strategy->payload_size);
+		kernel_deallocate(jop_payload, strategy->payload_size);
 		jop_payload = 0;
 	}
 }

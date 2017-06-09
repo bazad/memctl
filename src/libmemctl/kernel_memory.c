@@ -78,8 +78,12 @@ static kaddr_t _IOMappedWrite64;
  * 	Generate an internal error due to the given mach call returning an unexpected error code.
  */
 static void
-mach_unexpected(const char *function, kern_return_t kr) {
-	error_internal("%s returned %d: %s", function, kr, mach_error_string(kr));
+mach_unexpected(bool error, const char *function, kern_return_t kr) {
+	if (error) {
+		error_internal("%s returned %d: %s", function, kr, mach_error_string(kr));
+	} else {
+		memctl_warning("%s returned %d: %s", function, kr, mach_error_string(kr));
+	}
 }
 
 /*
@@ -97,6 +101,26 @@ ilog2(uint64_t n) {
 			return log;
 		}
 		log += 1;
+	}
+}
+
+bool
+kernel_allocate(kaddr_t *addr, size_t size) {
+	mach_vm_address_t address = 0;
+	kern_return_t kr = mach_vm_allocate(kernel_task, &address, size, VM_FLAGS_ANYWHERE);
+	if (kr != KERN_SUCCESS) {
+		mach_unexpected(true, "mach_vm_allocate", kr);
+		return false;
+	}
+	*addr = address;
+	return true;
+}
+
+void
+kernel_deallocate(kaddr_t addr, size_t size) {
+	kern_return_t kr = mach_vm_deallocate(kernel_task, addr, size);
+	if (kr != KERN_SUCCESS) {
+		mach_unexpected(false, "mach_vm_deallocate", kr);
 	}
 }
 
@@ -130,7 +154,7 @@ transfer_unsafe(kaddr_t kaddr, size_t size, void *data, size_t access, bool into
 			} else {
 				const char *fn = (into_kernel ? "mach_vm_write"
 				                              : "mach_vm_read_overwrite");
-				mach_unexpected(fn, kr);
+				mach_unexpected(true, fn, kr);
 				return KERNEL_IO_ERROR;
 			}
 		}
@@ -285,7 +309,7 @@ transfer_range_heap(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, 
 				break;
 			}
 			next_viable = (kaddr & ~page_mask) + page_size;
-			mach_unexpected("mach_vm_region_recurse", kr);
+			mach_unexpected(true, "mach_vm_region_recurse", kr);
 			result = KERNEL_IO_ERROR;
 			break;
 		}
@@ -363,7 +387,7 @@ transfer_range_safe(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, 
 				break;
 			}
 			next_viable = (kaddr & ~page_mask) + page_size;
-			mach_unexpected("mach_vm_region_recurse", kr);
+			mach_unexpected(true, "mach_vm_region_recurse", kr);
 			result = KERNEL_IO_ERROR;
 			break;
 		}
@@ -626,6 +650,7 @@ physical_write_unsafe_(paddr_t paddr, size_t *size, const void *data, size_t acc
 
 bool
 kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr) {
+	assert(_pmap_find_phys != 0);
 	ppnum_t ppnum;
 	kword_t args[] = { kernel_pmap, kaddr };
 	bool success = kernel_call(&ppnum, sizeof(ppnum), _pmap_find_phys, 2, args);

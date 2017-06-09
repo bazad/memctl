@@ -3,7 +3,6 @@
 #include "memctl/core.h"
 #include "memctl/kernel.h"
 #include "memctl/kernel_memory.h"
-#include "memctl/memctl_offsets.h"
 #include "memctl/memctl_signal.h"
 #include "memctl/utility.h"
 #include "memctl/vtable.h"
@@ -12,14 +11,16 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
-#include <mach/mach_vm.h>
-#include <mach/vm_region.h>
 
 #if __arm64__
 #include "aarch64/kernel_call_aarch64.h"
 #elif __x86_64__
 #include "memctl/x86_64/kernel_call_syscall_x86_64.h"
 #endif
+
+
+DEFINE_OFFSET(IORegistryEntry, reserved);
+DEFINE_OFFSET(IORegistryEntry__ExpansionData, fRegistryEntryID);
 
 static const char *service_name     = "AppleKeyStore";
 static const char *user_client_name = "AppleKeyStoreUserClient";
@@ -51,7 +52,7 @@ static struct iokit_trap_hook {
 	kaddr_t vtable;
 	// The size of the vtable.
 	size_t vtable_size;
-	// The hooked vtable, allocated with mach_vm_allocate.
+	// The hooked vtable, allocated with kernel_allocate.
 	kaddr_t hooked_vtable;
 	// The address of the IOExternalTrap in the kernel.
 	kaddr_t trap;
@@ -350,16 +351,12 @@ create_hooked_vtable() {
 		goto fail_2;
 	}
 	// Allocate a replacement vtable in the kernel.
-	mach_vm_address_t new_vtable = 0;
-	kern_return_t kr = mach_vm_allocate(kernel_task, &new_vtable, vtable_size,
-			VM_FLAGS_ANYWHERE);
-	if (kr != KERN_SUCCESS) {
-		error_internal("mach_vm_allocate failed: %s", mach_error_string(kr));
+	bool success = kernel_allocate(&hook.hooked_vtable, vtable_size);
+	if (!success) {
 		goto fail_2;
 	}
-	hook.hooked_vtable = new_vtable;
 	// Write the hooked vtable into the kernel.
-	ior = kernel_write_unsafe(new_vtable, &vtable_size, vtable_copy, 0, NULL);
+	ior = kernel_write_unsafe(hook.hooked_vtable, &vtable_size, vtable_copy, 0, NULL);
 	free(vtable_copy);
 	if (ior != KERNEL_IO_SUCCESS) {
 		error_internal("could not write new vtable into kernel memory");
@@ -387,14 +384,10 @@ fail_1:
 bool
 patch_user_client() {
 	// Allocate the trap in the kernel.
-	mach_vm_address_t trap = 0;
-	kern_return_t kr = mach_vm_allocate(kernel_task, &trap, sizeof(IOExternalTrap),
-			VM_FLAGS_ANYWHERE);
-	if (kr != KERN_SUCCESS) {
-		error_internal("mach_vm_allocate failed: %s", mach_error_string(kr));
+	bool success = kernel_allocate(&hook.trap, sizeof(IOExternalTrap));
+	if (!success) {
 		goto fail;
 	}
-	hook.trap = trap;
 	// Set the registry entry ID of the user client to the trap.
 	kernel_io_result ior = kernel_write_word(kernel_write_heap, hook.user_client_id_address,
 			hook.trap, sizeof(hook.trap), 0);
@@ -468,11 +461,24 @@ kernel_call(void *result, unsigned result_size,
 	return false;
 }
 
+static void
+initialize_offsets() {
+#define DEFAULT(base, object, value)			\
+	if (OFFSET(base, object).valid == 0) {		\
+		OFFSET(base, object).offset = value;	\
+		OFFSET(base, object).valid  = 1;	\
+	}
+	DEFAULT(IORegistryEntry,                reserved,         2 * sizeof(kword_t));
+	DEFAULT(IORegistryEntry__ExpansionData, fRegistryEntryID, 1 * sizeof(kword_t));
+#undef DEFAULT
+}
+
 bool
 kernel_call_init() {
 	if (hook.hooked) {
 		return true;
 	}
+	initialize_offsets();
 	if (!create_user_client()) {
 		error_internal("could not create a user client at a known address");
 		goto fail;
@@ -519,11 +525,11 @@ kernel_call_deinit() {
 		hook.connection = IO_OBJECT_NULL;
 	}
 	if (hook.hooked_vtable != 0) {
-		mach_vm_deallocate(kernel_task, hook.hooked_vtable, hook.vtable_size);
+		kernel_deallocate(hook.hooked_vtable, hook.vtable_size);
 		hook.hooked_vtable = 0;
 	}
 	if (hook.trap != 0) {
-		mach_vm_deallocate(kernel_task, hook.trap, sizeof(IOExternalTrap));
+		kernel_deallocate(hook.trap, sizeof(IOExternalTrap));
 		hook.trap = 0;
 	}
 }
