@@ -154,6 +154,9 @@ extern bool (*kauth_cred_proc_ref)(kaddr_t *cred, kaddr_t proc);
  * Parameters:
  * 		cred			The ucred struct.
  *
+ * Returns:
+ * 	True if no errors were encountered.
+ *
  * Notes:
  * 	The kauth_cred_unref function in XNU takes a pointer to the cred pointer and zeroes out the
  * 	cred pointer on return. This function handles this layer of indirection by allocating
@@ -175,10 +178,44 @@ extern bool (*kauth_cred_unref)(kaddr_t cred);
  * 		uid			The saved UID to set in the new credentials.
  * 		gid			The saved GID to set in the new credentials.
  *
+ * Returns:
+ * 	True if no errors were encountered.
+ *
  * Notes:
  * 	This function is known not to be available on iOS.
  */
 extern bool (*kauth_cred_setsvuidgid)(kaddr_t *newcred, kaddr_t cred, uid_t uid, gid_t gid);
+
+/*
+ * task_reference
+ *
+ * Description:
+ * 	XNU's task_reference. Add a reference on a task.
+ *
+ * Parameters:
+ * 		task			The task to reference.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*task_reference)(kaddr_t task);
+
+/*
+ * convert_task_to_port
+ *
+ * Description:
+ * 	XNU's convert_task_to_port. Converts from a task to a port, consuming a reference on the
+ * 	task and producing a naked send right.
+ *
+ * Parameters:
+ * 	out	ipc_port		The ipc_port_t object representing a send right to the
+ * 					task.
+ * 		task			The task.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*convert_task_to_port)(kaddr_t *ipc_port, kaddr_t task);
 
 /*
  * proc_to_task_port
