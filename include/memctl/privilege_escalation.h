@@ -19,10 +19,15 @@
 bool setuid_root(void);
 
 /*
- * use_kernel_credentials
+ * proc_copy_credentials
  *
  * Description:
- * 	Set the current process's credentials to the kernel's credentials.
+ * 	Copy the in-kernel credentials structure from the source process to the destination
+ * 	process.
+ *
+ * Parameters:
+ * 		from_proc			The proc struct of the source process.
+ * 		to_proc				The proc struct of the destination process.
  *
  * Returns:
  * 	True if no errors were encountered.
@@ -31,6 +36,6 @@ bool setuid_root(void);
  * 	kernel_task
  * 	process_init
  */
-bool use_kernel_credentials(bool kernel);
+bool proc_copy_credentials(kaddr_t from_proc, kaddr_t to_proc);
 
 #endif

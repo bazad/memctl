@@ -220,7 +220,6 @@ initialize(feature_t features) {
 static void
 deinitialize(bool critical) {
 #define LOADED(feature)	(ALL_SET(feature, loaded_features))
-	use_kernel_credentials(false);
 	if (LOADED(KERNEL_CALL)) {
 		kernel_call_deinit();
 	}

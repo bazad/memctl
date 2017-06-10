@@ -76,49 +76,30 @@ setuid_root() {
 	return false;
 }
 
-// The saved (original) credentials of the current process, or 0 if the current process has its
-// original credentials.
-static kaddr_t saved_cred;
-
 bool
-use_kernel_credentials(bool kernel) {
-	if (saved_cred == 0 && kernel) {
-		NEED_VAL(currentproc);
-		NEED_FN(proc_ucred);
-		NEED_VAL(kernproc);
-		NEED_FN(kauth_cred_proc_ref);
-		NEED_FN(proc_set_ucred);
-		NEED_FN(kauth_cred_unref);
-		kaddr_t current_cred;
-		bool success = proc_ucred(&current_cred, currentproc);
-		if (!success) {
-			return false;
-		}
-		kaddr_t kern_cred;
-		success = kauth_cred_proc_ref(&kern_cred, kernproc);
-		if (!success) {
-			return false;
-		}
-		success = proc_set_ucred(currentproc, kern_cred);
-		if (!success) {
-			return false;
-		}
-		saved_cred = current_cred;
-	} else if (saved_cred != 0 && !kernel) {
-		bool success = proc_set_ucred(currentproc, saved_cred);
-		if (!success) {
-			return false;
-		}
-		saved_cred = 0;
-		// Remove the additional reference on the kernel credentials.
-		error_stop();
-		kaddr_t kern_cred;
-		success = proc_ucred(&kern_cred, kernproc)
-			&& kauth_cred_unref(kern_cred);
-		error_start();
-		if (!success) {
-			memctl_warning("could not remove reference from kernel credentials");
-		}
+proc_copy_credentials(kaddr_t from_proc, kaddr_t to_proc) {
+	assert(from_proc != 0 && to_proc != 0);
+	NEED_FN(proc_ucred);
+	NEED_FN(kauth_cred_proc_ref);
+	NEED_FN(proc_set_ucred);
+	NEED_FN(kauth_cred_unref);
+	kaddr_t to_cred = 0;
+	error_stop();
+	proc_ucred(&to_cred, to_proc);
+	error_start();
+	kaddr_t from_cred;
+	bool success = kauth_cred_proc_ref(&from_cred, from_proc);
+	if (!success) {
+		return false;
 	}
+	success = proc_set_ucred(to_proc, from_cred);
+	if (!success) {
+		return false;
+	}
+	error_stop();
+	if (to_cred != 0) {
+		kauth_cred_unref(to_cred);
+	}
+	error_start();
 	return true;
 }
