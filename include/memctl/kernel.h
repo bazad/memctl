@@ -185,6 +185,68 @@ kext_result kext_init(struct kext *kext, const char *bundle_id);
 void kext_deinit(struct kext *kext);
 
 /*
+ * kext_find_symbol_fn
+ *
+ * Description:
+ * 	The type for a kext analyzer function to find a symbol. Pass a function of this type to
+ * 	kext_add_symbol_finder to add additional symbol finding strategies to kext_find_symbol.
+ *
+ * Parameters:
+ * 		kext			The kext.
+ * 		symbol			The symbol being resolved.
+ * 	out	addr			On return, the runtime address of the symbol, if found.
+ * 	out	size			On return, a guess of the size of the symbol, if found.
+ *
+ * Returns:
+ * 	KEXT_SUCCESS, KEXT_ERROR, or KEXT_NOT_FOUND.
+ */
+typedef kext_result (*kext_find_symbol_fn)(
+		const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size);
+
+/*
+ * kext_add_symbol_finder
+ *
+ * Description:
+ * 	Add a special kext symbol finding function to be associated with the specified kext or with
+ * 	all kexts if bundle_id is NULL. This allows clients to specify specialized strategies for
+ * 	finding symbols that are not present in the symbol table. See kext_find_symbol.
+ *
+ * Parameters:
+ * 		bundle_id		The bundle ID to associate this resolver with, or NULL for
+ * 					all kexts. The caller is responsible for ensuring the
+ * 					string is live.
+ * 		find_symbol		The special symbol finding function.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ *
+ * Notes:
+ * 	Currently there is no way to remove a symbol finder added with this function.
+ */
+bool kext_add_symbol_finder(const char *bundle_id, kext_find_symbol_fn find_symbol);
+
+/*
+ * kext_find_symbol
+ *
+ * Description:
+ * 	Try to find the address of a symbol by running additional kext analyzers after traditional
+ * 	symbol resolution. If kext_resolve_symbol returns KEXT_NOT_FOUND or KEXT_NO_SYMBOLS, then
+ * 	kext_find_symbol will run each registered symbol finder matching the specified kext in turn
+ * 	until some finder returns KEXT_SUCCESS or KEXT_ERROR.
+ *
+ * Parameters:
+ * 		kext			The kext.
+ * 		symbol			The (mangled) symbol name.
+ * 	out	addr			The runtime address of the symbol.
+ * 	out	size			A guess of the size of the symbol.
+ *
+ * Returns:
+ * 	KEXT_SUCCESS, KEXT_ERROR, or KEXT_NOT_FOUND.
+ */
+kext_result kext_find_symbol(const struct kext *kext, const char *symbol,
+		kaddr_t *addr, size_t *size);
+
+/*
  * kext_resolve_symbol
  *
  * Description:
@@ -193,7 +255,7 @@ void kext_deinit(struct kext *kext);
  * Parameters:
  * 		kext			The kext struct for the kernel extension to search.
  * 		symbol			The (mangled) symbol name.
- * 	out	addr			The address of the symbol.
+ * 	out	addr			The runtime address of the symbol.
  * 	out	size			A guess of the size of the symbol.
  *
  * Returns:

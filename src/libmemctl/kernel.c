@@ -27,12 +27,28 @@ struct kernelcache kernelcache;
 #endif
 
 /*
- * initialized_kernel
+ * struct kext_analyzers
  *
  * Description:
- * 	The path of the currently initialized kernel.
+ * 	A struct to keep track of the analyzers for a particular kernel extension.
  */
+struct kext_analyzers {
+	// The bundle ID. This string is managed by the caller who created this analyzer.
+	const char *bundle_id;
+	// An array of symbol finders.
+	kext_find_symbol_fn *find_symbol_fn;
+	// The number of elements in the find_symbol_fn array.
+	size_t find_symbol_count;
+};
+
+// The path of the currently initialized kernel.
 static const char *initialized_kernel = NULL;
+
+// The array of kext analyzers.
+struct kext_analyzers *all_analyzers;
+
+// The number of kext analyzers.
+size_t all_analyzers_count;
 
 /*
  * is_kernel_id
@@ -43,6 +59,35 @@ static const char *initialized_kernel = NULL;
 static bool
 is_kernel_id(const char *bundle_id) {
 	return (strcmp(bundle_id, KERNEL_ID) == 0);
+}
+
+/*
+ * clear_kext_analyzers
+ *
+ * Description:
+ * 	Clear the specified kext_analyzers struct and free associated resources.
+ */
+static void
+clear_kext_analyzers(struct kext_analyzers *ka) {
+	free(ka->find_symbol_fn);
+	ka->find_symbol_fn    = NULL;
+	ka->find_symbol_count = 0;
+}
+
+/*
+ * clear_all_analyzers
+ *
+ * Description:
+ * 	Remove all analyzers and free associated resources.
+ */
+static void
+clear_all_analyzers() {
+	for (size_t i = 0; i < all_analyzers_count; i++) {
+		clear_kext_analyzers(&all_analyzers[i]);
+	}
+	free(all_analyzers);
+	all_analyzers       = NULL;
+	all_analyzers_count = 0;
 }
 
 #if KERNELCACHE
@@ -149,6 +194,7 @@ kernel_deinit() {
 		kernel.macho.mh = NULL;
 	}
 #endif
+	clear_all_analyzers();
 }
 
 
@@ -236,6 +282,155 @@ kext_deinit(struct kext *kext) {
 	}
 	kext_deinit_macho(&kext->macho);
 	free((char *)kext->bundle_id);
+}
+
+/*
+ * find_kext_analyzers
+ *
+ * Description:
+ * 	Find the existing kext_analyzers struct for the given bundle ID.
+ */
+static struct kext_analyzers *
+find_kext_analyzers(const char *bundle_id, size_t *insert_index) {
+	struct kext_analyzers *ka = all_analyzers;
+	size_t count = all_analyzers_count;
+	ssize_t left  = 0;
+	ssize_t right = count - 1;
+	for (;;) {
+		if (right < left) {
+			if (insert_index != NULL) {
+				*insert_index = left;
+			}
+			return NULL;
+		}
+		ssize_t mid = (left + right) / 2;
+		int cmp = strcmp(bundle_id, ka[mid].bundle_id);
+		if (cmp < 0) {
+			right = mid - 1;
+		} else if (cmp > 0) {
+			left = mid + 1;
+		} else {
+			// There's only one value that's equal.
+			return &ka[mid];
+		}
+	}
+}
+
+/*
+ * create_kext_analyzers
+ *
+ * Description:
+ * 	Find the kext_analyzers struct for the given bundle ID, or create one if it doesn't already
+ * 	exist.
+ */
+static struct kext_analyzers *
+create_kext_analyzers(const char *bundle_id) {
+	if (bundle_id == NULL) {
+		bundle_id = "";
+	}
+	// Try to find the kext_analyzers struct if it already exists.
+	size_t insert_index;
+	struct kext_analyzers *ka = find_kext_analyzers(bundle_id, &insert_index);
+	if (ka != NULL) {
+		return ka;
+	}
+	// Grow the all_analyzers array by one.
+	size_t count = all_analyzers_count + 1;
+	struct kext_analyzers *analyzers = realloc(all_analyzers, count * sizeof(*analyzers));
+	if (analyzers == NULL) {
+		error_out_of_memory();
+		return NULL;
+	}
+	all_analyzers = analyzers;
+	all_analyzers_count = count;
+	// Make room for the new kext_analyzers in the array.
+	ka = &analyzers[insert_index];
+	size_t shift_count = (count - 1) - insert_index;
+	memmove(ka + 1, ka, shift_count * sizeof(*analyzers));
+	// Fill in the new kext_analyzers.
+	ka->bundle_id         = bundle_id;
+	ka->find_symbol_fn    = NULL;
+	ka->find_symbol_count = 0;
+	return ka;
+}
+
+/*
+ * kext_analyzers_insert_symbol_finder
+ *
+ * Description:
+ * 	Add a symbol finder to the kext_analyzers struct.
+ */
+static bool
+kext_analyzers_insert_symbol_finder(struct kext_analyzers *ka, kext_find_symbol_fn find_symbol) {
+	// Allocate space for the new symbol finder.
+	size_t count = ka->find_symbol_count + 1;
+	kext_find_symbol_fn *fn = realloc(ka->find_symbol_fn, count * sizeof(*fn));
+	if (fn == NULL) {
+		error_out_of_memory();
+		return false;
+	}
+	// Insert the symbol finder.
+	ka->find_symbol_fn    = fn;
+	ka->find_symbol_count = count;
+	fn[count - 1] = find_symbol;
+	return true;
+}
+
+bool
+kext_add_symbol_finder(const char *bundle_id, kext_find_symbol_fn find_symbol) {
+	struct kext_analyzers *ka = create_kext_analyzers(bundle_id);
+	if (ka == NULL) {
+		return false;
+	}
+	return kext_analyzers_insert_symbol_finder(ka, find_symbol);
+}
+
+/*
+ * run_symbol_finders
+ *
+ * Description:
+ * 	Run the symbol finders from the given kext_analyzers struct.
+ */
+static kext_result
+run_symbol_finders(const struct kext_analyzers *ka, const struct kext *kext,
+		const char *symbol, kaddr_t *addr, size_t *size) {
+	kext_find_symbol_fn *find_symbol = ka->find_symbol_fn;
+	kext_find_symbol_fn *end = find_symbol + ka->find_symbol_count;
+	kext_result kr = KEXT_NOT_FOUND;
+	for (; kr == KEXT_NOT_FOUND && find_symbol < end; find_symbol++) {
+		kr = (*find_symbol)(kext, symbol, addr, size);
+	}
+	return kr;
+}
+
+/*
+ * run_matching_symbol_finders
+ *
+ * Description:
+ * 	Run the symbol finders matching the given kext.
+ */
+static kext_result
+run_matching_symbol_finders(const struct kext *kext, const char *symbol,
+		kaddr_t *addr, size_t *size) {
+	assert(kext->bundle_id != NULL);
+	const char *bundle_ids[2] = { kext->bundle_id, "" };
+	kext_result kr = KEXT_NOT_FOUND;
+	for (size_t i = 0; kr == KEXT_NOT_FOUND && i < 2; i++) {
+		struct kext_analyzers *ka = find_kext_analyzers(bundle_ids[i], NULL);
+		if (ka != NULL) {
+			kr = run_symbol_finders(ka, kext, symbol, addr, size);
+		}
+	}
+	return kr;
+}
+
+kext_result
+kext_find_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
+	kext_result kr = kext_resolve_symbol(kext, symbol, addr, size);
+	if (kr == KEXT_NOT_FOUND || kr == KEXT_NO_SYMBOLS) {
+		kr = run_matching_symbol_finders(kext, symbol, addr, size);
+	}
+	return kr;
 }
 
 kext_result
