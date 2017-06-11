@@ -617,7 +617,7 @@ struct kernel_and_kexts_search_data_context {
 };
 
 /*
- * kernel_and_kexts_resolve_symbol_callback
+ * kernel_and_kexts_search_data_callback
  *
  * Description:
  * 	A callback for kernel_and_kexts_search_data that tries to find the data in the given

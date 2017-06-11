@@ -4,7 +4,6 @@
 #include "memctl/memctl_types.h"
 
 #include <mach/mach.h>
-#include <stdint.h>
 
 /*
  * The core is responsible for obtaining the kernel task, possibly using libmemctl's functionality.

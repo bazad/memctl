@@ -395,14 +395,14 @@ kext_result kext_id_resolve_symbol(const char *bundle_id, const char *symbol, ka
  * kernel_symbol
  *
  * Description:
- * 	Resolve a kernel symbol, returning the address and size.
+ * 	Find a kernel symbol, returning the address and size.
  *
  * Returns:
- * 	True if the symbol was successfully resolved.
+ * 	KEXT_SUCCESS, KEXT_ERROR, or KEXT_NOT_FOUND.
  */
 static inline kext_result
 kernel_symbol(const char *symbol, kaddr_t *addr, size_t *size) {
-	return kext_resolve_symbol(&kernel, symbol, addr, size);
+	return kext_find_symbol(&kernel, symbol, addr, size);
 }
 
 /*

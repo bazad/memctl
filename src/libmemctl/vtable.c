@@ -636,42 +636,6 @@ find_vtable_by_static_analysis(struct context *c, const struct macho *macho) {
 }
 
 /*
- * find_vtable_by_symbol
- *
- * Description:
- * 	Find the vtable for the given class in the given kext by looking up the vtable's symbol.
- *
- * Returns:
- * 	KEXT_SUCCESS, KEXT_ERROR, or KEXT_NOT_FOUND.
- */
-static kext_result
-find_vtable_by_symbol(struct context *c, const struct macho *macho) {
-	const struct symtab_command *symtab = (const struct symtab_command *)
-		macho_find_load_command(macho, NULL, LC_SYMTAB);
-	if (symtab == NULL) {
-		return KEXT_NOT_FOUND;
-	}
-	char *symbol = vtable_symbol(c->class_name);
-	if (symbol == NULL) {
-		return KEXT_ERROR;
-	}
-	uint64_t vtable_addr;
-	macho_result mr = macho_resolve_symbol(macho, symtab, symbol, &vtable_addr,
-			c->vtable_size);
-	free(symbol);
-	if (mr == MACHO_SUCCESS) {
-		*c->vtable = vtable_addr + kernel_slide;
-		adjust_vtable_from_symbol(c->vtable, c->vtable_size);
-		return KEXT_SUCCESS;
-	} else if (mr == MACHO_ERROR) {
-		return KEXT_ERROR;
-	} else {
-		assert(mr == MACHO_NOT_FOUND);
-		return KEXT_NOT_FOUND;
-	}
-}
-
-/*
  * check_kext_for_vtable
  *
  * Description:
@@ -699,13 +663,7 @@ check_kext_for_vtable(void *context, CFDictionaryRef info, const char *bundle_id
 		assert(kr == KEXT_NO_KEXT);
 		goto not_found;
 	}
-	// See if we can find the vtable symbol.
-	kr = find_vtable_by_symbol(c, &macho);
-	if (kr != KEXT_NOT_FOUND) {
-		c->kr = kr;
-		return true;
-	}
-	// Symbol resolution failed, so try to find the vtable by static analysis.
+	// Try to find the vtable by static analysis.
 	if (!find_vtable_by_static_analysis(c, &macho)) {
 		goto not_found;
 	}
@@ -733,13 +691,13 @@ vtable_for_class_disassemble(const char *class_name, const char *bundle_id, kadd
 	return context.kr;
 }
 
-#else
+#endif
 
 /*
  * vtable_for_class_symbol
  *
  * Description:
- * 	Look up the vtable for the given class in the macOS kernel by its symbol.
+ * 	Look up the vtable for the given class by its symbol.
  *
  * Returns:
  * 	KEXT_SUCCESS, KEXT_ERROR, KEXT_NO_KEXT, or KEXT_NOT_FOUND
@@ -752,6 +710,7 @@ vtable_for_class_symbol(const char *class_name, const char *bundle_id, kaddr_t *
 	if (symbol == NULL) {
 		return KEXT_ERROR;
 	}
+	// Search all the kexts.
 	kext_result kr = resolve_symbol(bundle_id, symbol, vtable, size);
 	free(symbol);
 	if (kr == KEXT_SUCCESS) {
@@ -762,13 +721,13 @@ vtable_for_class_symbol(const char *class_name, const char *bundle_id, kaddr_t *
 	return kr;
 }
 
-#endif
-
 kext_result
 vtable_for_class(const char *class_name, const char *bundle_id, kaddr_t *vtable, size_t *size) {
+	kext_result kr = vtable_for_class_symbol(class_name, bundle_id, vtable, size);
 #if VTABLE_FOR_CLASS_DISASSEMBLE
-	return vtable_for_class_disassemble(class_name, bundle_id, vtable, size);
-#else
-	return vtable_for_class_symbol(class_name, bundle_id, vtable, size);
+	if (kr == KEXT_NOT_FOUND) {
+		kr = vtable_for_class_disassemble(class_name, bundle_id, vtable, size);
+	}
 #endif
+	return kr;
 }
