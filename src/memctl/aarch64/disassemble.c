@@ -392,8 +392,13 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 	} else if (aarch64_ins_decode_ldr_r(ins, &r)) {
 		name = "LDR";
 		goto r_r;
-	} else if (aarch64_ins_decode_ldr_lit(ins, pc, &lit)) {
-		W("%-7s %s, #0x%llx", "LDR", reg(lit.Rt), lit.label);
+	} else if (aarch64_decode_ldr_lit(ins, pc, &lit)) {
+		if (lit.sign) {
+			name = "LDRSW";
+		} else {
+			name = "LDR";
+		}
+		W("%-7s %s, #0x%llx", name, reg(lit.Rt), lit.label);
 		return true;
 	} else if (aarch64_ins_decode_str_r(ins, &r)) {
 		name = "STR";

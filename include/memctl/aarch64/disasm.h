@@ -968,19 +968,33 @@ bool aarch64_decode_ldr_ui(uint32_t ins, struct aarch64_ins_ldr_im *ldr_ui);
 #define AARCH64_STRH_UI_INS_BITS 0x79000000
 
 
-// LDR literal
-//   LDR <Wt>, <label>
-//   LDR <Xt>, <label>
+// ---- LDR literal, STR literal ----
 
-#define AARCH64_LDR_LIT_INS_MASK 0xbf000000
-#define AARCH64_LDR_LIT_INS_BITS 0x18000000
+#define AARCH64_LDR_LIT_CLASS_MASK 0x3f000000
+#define AARCH64_LDR_LIT_CLASS_BITS 0x18000000
 
 struct aarch64_ins_ldr_lit {
+	uint8_t       load:1;
+	uint8_t       size:2;
+	uint8_t       sign:1;
+	uint8_t       _fill:4;
 	aarch64_gpreg Rt;
 	uint64_t      label;
 };
 
-bool aarch64_ins_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ins_ldr_lit *ldr_lit);
+bool aarch64_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ins_ldr_lit *ldr_lit);
+
+// LDR literal
+//   LDR <Wt>, <label>
+//   LDR <Xt>, <label>
+#define AARCH64_LDR_LIT_INS_MASK 0xbf000000
+#define AARCH64_LDR_LIT_INS_BITS 0x18000000
+
+// LDRSW literal
+//   LDRSW <Xt>, <label>
+#define AARCH64_LDRSW_LIT_INS_MASK 0xff000000
+#define AARCH64_LDRSW_LIT_INS_BITS 0x98000000
+
 
 // LDR register
 //   LDR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]

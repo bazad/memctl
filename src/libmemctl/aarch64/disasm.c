@@ -590,6 +590,31 @@ decode_ldr_str_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_str_r) {
 	return true;
 }
 
+bool
+aarch64_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ins_ldr_lit *ldr_lit) {
+	//  31 30 29   27 26  25 24 23                                    5 4         0
+	// +-----+-------+---+-----+---------------------------------------+-----------+
+	// | 0 x | 0 1 1 | 0 | 0 0 |                 imm19                 |    Rt     | LDR literal
+	// | 1 0 | 0 1 1 | 0 | 0 0 |                 imm19                 |    Rt     | LDRSW literal
+	// +-----+-------+---+-----+---------------------------------------+-----------+
+	//   opc
+	if (!AARCH64_INS_TYPE(ins, LDR_LIT_CLASS)) {
+		return false;
+	}
+	unsigned opc   = extract(ins, 0, 31, 30, 0);
+	if (opc == 0x3) {
+		return false;
+	}
+	unsigned sf    = test(opc, 0);
+	unsigned sign  = (opc == 0x2);
+	ldr_lit->load  = 1;
+	ldr_lit->size  = (sf ? 3 : 2);
+	ldr_lit->sign  = sign;
+	ldr_lit->Rt    = gpreg(ins, (sf || sign), USE_ZR, 0);
+	ldr_lit->label = pc + extract(ins, 1, 23, 5, 2);
+	return true;
+}
+
 // Disassembly
 
 bool
@@ -644,22 +669,6 @@ aarch64_alias_cmp_sr(struct aarch64_ins_add_sr *subs_sr) {
 	return (!subs_sr->add
 	        && subs_sr->setflags
 	        && gpreg_is_zrsp(subs_sr->Rd));
-}
-
-bool
-aarch64_ins_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ins_ldr_lit *ldr_lit) {
-	//  31 30 29   27 26  25 24 23                                    5 4         0
-	// +-----+-------+---+-----+---------------------------------------+-----------+
-	// | 0 x | 0 1 1 | 0 | 0 0 |                 imm19                 |    Rt     |
-	// +-----+-------+---+-----+---------------------------------------+-----------+
-	//   opc
-	if (!AARCH64_INS_TYPE(ins, LDR_LIT_INS)) {
-		return false;
-	}
-	unsigned sf    = test(ins, 30);
-	ldr_lit->Rt    = gpreg(ins, sf, USE_ZR, 0);
-	ldr_lit->label = pc + extract(ins, 1, 23, 5, 2);
-	return true;
 }
 
 bool

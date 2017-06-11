@@ -8,3 +8,5 @@ fffffff0070c0018  LDR     W13, [X0], #4
 fffffff0070c001c  LDRSW   X8, [SP, #12]
 fffffff0070c0020  LDRSB   W10, [X9, #9]
 fffffff0070c0024  LDRSH   W9, [X20, #736]
+fffffff0070c0028  LDR     X8, #0xfffffff007070734
+fffffff0070c002c  LDRSW   X0, #0xfffffff0071a8f50
