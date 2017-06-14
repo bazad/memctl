@@ -269,44 +269,71 @@ disassemble_logic(uint32_t ins, char *buf) {
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
 	if (aarch64_decode_and_im(ins, &im)) {
-		if (AARCH64_INS_TYPE(ins, AND_IM_INS)) {
-			name = "AND";
-		} else if (AARCH64_INS_TYPE(ins, ANDS_IM_INS)) {
-			if (aarch64_alias_tst_im(&im)) {
-				W("%-7s %s, #0x%llx", "TST", reg(im.Rn), im.imm);
-				return true;
-			}
-			name = "ANDS";
-		} else if (AARCH64_INS_TYPE(ins, ORR_IM_INS)) {
+		if (im.or) {
 			if (aarch64_alias_mov_bi(&im)) {
 				W("%-7s %s, #0x%llx", "MOV", reg(im.Rd), im.imm);
 				return true;
 			}
 			name = "ORR";
+		} else if (im.xor) {
+			name = "EOR";
+		} else if (im.setflags) {
+			if (aarch64_alias_tst_im(&im)) {
+				W("%-7s %s, #0x%llx", "TST", reg(im.Rn), im.imm);
+				return true;
+			}
+			name = "ANDS";
+		} else {
+			name = "AND";
 		}
 		W("%-7s %s, %s, #0x%llx", name, reg(im.Rd), reg(im.Rn), im.imm);
 		return true;
 	} else if (aarch64_decode_and_sr(ins, &sr)) {
-		if (AARCH64_INS_TYPE(ins, ORR_SR_INS)) {
-			if (aarch64_alias_mov_r(&sr)) {
-				W("%-7s %s, %s", "MOV", reg(sr.Rd), reg(sr.Rm));
-				return true;
+		if (sr.or) {
+			if (sr.not) {
+				if (aarch64_alias_mvn(&sr)) {
+					name = "MVN";
+					goto sr_mov;
+				}
+				name = "ORN";
+			} else {
+				if (aarch64_alias_mov_r(&sr)) {
+					name = "MOV";
+					goto sr_mov;
+				}
+				name = "ORR";
 			}
-			name = "ORR";
-		} else if (AARCH64_INS_TYPE(ins, ANDS_SR_INS)) {
-			if (aarch64_alias_tst_sr(&sr)) {
-				W("%-7s %s, %s", "TST", reg(sr.Rn), reg(sr.Rm));
-				goto sr_suffix;
+		} else if (sr.xor) {
+			if (sr.not) {
+				name = "EON";
+			} else {
+				name = "EOR";
 			}
-			name = "ANDS";
-		} else { // AARCH64_INS_TYPE(ins, AND_SR_INS)
-			name = "AND";
+		} else if (sr.setflags) {
+			if (sr.not) {
+				name = "BICS";
+			} else {
+				if (aarch64_alias_tst_sr(&sr)) {
+					W("%-7s %s, %s", "TST", reg(sr.Rn), reg(sr.Rm));
+					goto sr_suffix;
+				}
+				name = "ANDS";
+			}
+		} else {
+			if (sr.not) {
+				name = "BIC";
+			} else {
+				name = "AND";
+			}
 		}
 		W("%-7s %s, %s, %s", name, reg(sr.Rd), reg(sr.Rn), reg(sr.Rm));
 sr_suffix:
 		if (sr.amount > 0) {
 			W(", %s #%d", shift(sr.shift), sr.amount);
 		}
+		return true;
+sr_mov:
+		W("%-7s %s, %s", name, reg(sr.Rd), reg(sr.Rm));
 		return true;
 	}
 	return false;

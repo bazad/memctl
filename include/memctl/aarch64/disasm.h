@@ -1,5 +1,5 @@
-#ifndef MEMCTL__AARCH64__DISASM__H_
-#define MEMCTL__AARCH64__DISASM__H_
+#ifndef MEMCTL__AARCH64__DISASM_H_
+#define MEMCTL__AARCH64__DISASM_H_
 
 // Source:
 //     ARM Architecture Reference Manual
@@ -162,6 +162,22 @@ enum {
  * 	Returns the type of extension.
  */
 #define AARCH64_EXTEND_TYPE(ext)	((ext) & 0x7)
+
+/*
+ * macro AARCH64_EXTEND_LEN
+ *
+ * Description:
+ * 	Returns the log of the byte length of the extension.
+ */
+#define AARCH64_EXTEND_LEN(ext)		((ext) & 0x3)
+
+/*
+ * macro AARCH64_EXTEND_SIGN
+ *
+ * Description:
+ * 	Returns 1 if the extension is signed, 0 if unsigned.
+ */
+#define AARCH64_EXTEND_SIGN(ext)	(((ext) >> 2) & 1)
 
 /*
  * macro AARCH64_EXTEND_IS_LSL
@@ -437,7 +453,7 @@ bool aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr);
 #define AARCH64_ADRP_INS_BITS 0x90000000
 
 
-// ---- AND immediate, ANDS immediate, ORR immediate ----
+// ---- AND immediate, ANDS immediate, EOR immediate, ORR immediate ----
 // ---- MOV bitmask immediate, TST immediate ----
 
 #define AARCH64_AND_IM_CLASS_MASK 0x5f800000
@@ -445,8 +461,10 @@ bool aarch64_decode_adr(uint32_t ins, uint64_t pc, struct aarch64_ins_adr *adr);
 
 struct aarch64_ins_and_im {
 	uint8_t       and:1;
+	uint8_t       or:1;
+	uint8_t       xor:1;
 	uint8_t       setflags:1;
-	uint8_t       _fill:6;
+	uint8_t       _fill:4;
 	aarch64_gpreg Rd;
 	aarch64_gpreg Rn;
 	uint64_t      imm;
@@ -471,6 +489,12 @@ bool aarch64_decode_and_im(uint32_t ins, struct aarch64_ins_and_im *and_im);
 //   MOV <Xd|SP>, #<imm>
 bool aarch64_alias_mov_bi(struct aarch64_ins_and_im *orr_im);
 
+// EOR immediate
+//   EOR <Wd|WSP>, <Wn>, #<imm>
+//   EOR <Xd|SP>, <Xn>, #<imm>
+#define AARCH64_EOR_IM_INS_MASK 0x7f800000
+#define AARCH64_EOR_IM_INS_BITS 0x52000000
+
 // ORR immediate
 //   ORR <Wd|WSP>, <Wn>, #<imm>
 //   ORR <Xd|XSP>, <Xn>, #<imm>
@@ -483,16 +507,20 @@ bool aarch64_alias_mov_bi(struct aarch64_ins_and_im *orr_im);
 bool aarch64_alias_tst_im(struct aarch64_ins_and_im *ands_im);
 
 
-// ---- AND shifted register, ANDS shifted register, ORR shifted register ----
-// ---- MOV register, TST shifted register ----
+// ---- AND shifted register, ANDS shifted register, BIC shifted register, BICS shifted register,
+//      EON shifted register, EOR shifted register, ORN shifted register, ORR shifted register ----
+// ---- MOV register, MVN, TST shifted register ----
 
-#define AARCH64_AND_SR_CLASS_MASK 0x1f200000
+#define AARCH64_AND_SR_CLASS_MASK 0x1f000000
 #define AARCH64_AND_SR_CLASS_BITS 0x0a000000
 
 struct aarch64_ins_and_sr {
 	uint8_t       and:1;
+	uint8_t       or:1;
+	uint8_t       xor:1;
+	uint8_t       not:1;
 	uint8_t       setflags:1;
-	uint8_t       _fill:6;
+	uint8_t       _fill:3;
 	aarch64_gpreg Rd;
 	aarch64_gpreg Rn;
 	aarch64_gpreg Rm;
@@ -514,6 +542,36 @@ bool aarch64_decode_and_sr(uint32_t ins, struct aarch64_ins_and_sr *and_sr);
 #define AARCH64_ANDS_SR_INS_MASK 0x7f200000
 #define AARCH64_ANDS_SR_INS_BITS 0x6a000000
 
+// BIC shifted register
+//   BIC <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+//   BIC <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+#define AARCH64_BIC_SR_INS_MASK 0x7f200000
+#define AARCH64_BIC_SR_INS_BITS 0x0a200000
+
+// BICS shifted register
+//   BICS <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+//   BICS <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+#define AARCH64_BICS_SR_INS_MASK 0x7f200000
+#define AARCH64_BICS_SR_INS_BITS 0x6a200000
+
+// EON shifted register
+//   EON <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+//   EON <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+#define AARCH64_EON_SR_INS_MASK 0x7f200000
+#define AARCH64_EON_SR_INS_BITS 0x4a200000
+
+// EOR shifted register
+//   EOR <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+//   EOR <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+#define AARCH64_EOR_SR_INS_MASK 0x7f200000
+#define AARCH64_EOR_SR_INS_BITS 0x4a000000
+
+// ORN shifted register
+//   ORN <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+//   ORN <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+#define AARCH64_ORN_SR_INS_MASK 0x7f200000
+#define AARCH64_ORN_SR_INS_BITS 0x2a200000
+
 // ORR shifted register
 //   ORR <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
 //   ORR <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
@@ -524,6 +582,11 @@ bool aarch64_decode_and_sr(uint32_t ins, struct aarch64_ins_and_sr *and_sr);
 //   MOV <Wd>, <Wm>
 //   MOV <Xd>, <Xm>
 bool aarch64_alias_mov_r(struct aarch64_ins_and_sr *orr_sr);
+
+// MVN : ORN shifted register
+//   MVN <Wd>, <Wm>{, <shift> #<amount>}
+//   MVN <Xd>, <Xm>{, <shift> #<amount>}
+bool aarch64_alias_mvn(struct aarch64_ins_and_sr *orn_sr);
 
 // TST shifted register : ANDS shifted register
 //   ANDS <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
@@ -570,10 +633,6 @@ bool aarch64_decode_b(uint32_t ins, uint64_t pc, struct aarch64_ins_b *b);
 // BFM
 
 // BFXIL : BFM
-
-// BIC shifted register
-
-// BICS shifted register
 
 
 // ---- BLR, BR, RET ----
@@ -662,11 +721,7 @@ bool aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br);
 
 // DSB
 
-// EON shifted register
-
 // EOR immediate
-
-// EOR shifted register
 
 // ERET
 
@@ -1130,8 +1185,6 @@ bool aarch64_alias_mov_wi(struct aarch64_ins_mov *movz);
 
 // MUL : MADD
 
-// MVN : ORN shifted register
-
 
 // ---- NOP ----
 
@@ -1142,8 +1195,6 @@ bool aarch64_alias_mov_wi(struct aarch64_ins_mov *movz);
 
 bool aarch64_decode_nop(uint32_t ins);
 
-
-// ORN shifted register
 
 // PRFM immediate
 

@@ -1,3 +1,0 @@
-fffffff0070c0000  ORR     W9, W8, W20
-fffffff0070c0004  ORR     X8, X8, X10, LSL #48
-fffffff0070c0008  ORR     W11, W3, #0x80

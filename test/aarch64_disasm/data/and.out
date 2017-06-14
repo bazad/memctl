@@ -1,3 +1,19 @@
 fffffff0070c0000  AND     W3, W1, #0xfc000000
 fffffff0070c0004  AND     X12, X11, X10
 fffffff0070c0008  ANDS    X16, X0, X2, ASR #31
+fffffff0070c000c  ORR     W9, W8, W20
+fffffff0070c0010  ORR     X8, X8, X10, LSL #48
+fffffff0070c0014  ORR     W11, W3, #0x80
+fffffff0070c0018  TST     X6, X6
+fffffff0070c001c  MOV     X0, X28
+fffffff0070c0020  MOV     W3, #0xf0
+fffffff0070c0024  AND     W21, W8, #0x2
+fffffff0070c0028  BIC     W20, W20, W9
+fffffff0070c002c  TST     W8, W9
+fffffff0070c0030  EOR     W8, W8, W20
+fffffff0070c0034  EOR     W8, W8, W11, LSL #8
+fffffff0070c0038  MVN     W0, W0
+fffffff0070c003c  ORN     W9, W9, W10
+fffffff0070c0040  BICS    WZR, W8, W9
+fffffff0070c0044  EON     W8, W9, W8
+fffffff0070c0048  ANDS    X29, X25, X1, LSL #35
