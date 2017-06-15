@@ -13,10 +13,10 @@
  * Parameters:	a			The total size
  * 		b			The size of each element
  */
-#define howmany_up(a, b)					\
-	({ __typeof__(a) a0 = (a);				\
-	   __typeof__(b) b0 = (b);				\
-	   (a0 % b0 == 0) ? (a0 / b0) : (a0 / b0) + 1; })
+#define howmany_up(a, b)						\
+	({ __typeof__(a) _a = (a);					\
+	   __typeof__(b) _b = (b);					\
+	   (_a % _b == 0) ? (_a / _b) : (_a / _b) + 1; })
 
 /*
  * MACRO howmany2_up
@@ -28,9 +28,10 @@
  * Parameters:	a			The total size
  * 		b			The size of each element, which must be a power of 2
  */
-#define howmany2_up(a, b)					\
-	({ __typeof__(b) b0 = (b);				\
-	   ((a) + b0 - 1) / b0; })
+#define howmany2_up(a, b)						\
+	({ __typeof__(a) _a = (a);					\
+	   __typeof__(b) _b = (b);					\
+	   (_a + _b - 1) / _b; })
 
 /*
  * MACRO round2_down
@@ -52,9 +53,10 @@
  * Parameters:	a			The value to round
  * 		b			The rounding granularity
  */
-#define round2_up(a, b)						\
-	({ __typeof__(b) b0 = (b);				\
-	   round2_down((a) + b0 - 1, b0); })
+#define round2_up(a, b)							\
+	({ __typeof__(a) _a = (a);					\
+	   __typeof__(b) _b = (b);					\
+	   round2_down(_a + _b - 1, _b); })
 
 /*
  * MACRO min
@@ -62,10 +64,10 @@
  * Description:
  * 	Return the minimum of the two arguments.
  */
-#define min(a, b)						\
-	({ __typeof__(a) a0 = (a);				\
-	   __typeof__(b) b0 = (b);				\
-	   (a0 < b0 ? a0 : b0); })
+#define min(a, b)							\
+	({ __typeof__(a) _a = (a);					\
+	   __typeof__(b) _b = (b);					\
+	   (_a < _b ? _a : _b); })
 
 /*
  * MACRO max
@@ -73,10 +75,10 @@
  * Description:
  * 	Return the maximum of the two arguments.
  */
-#define max(a, b)						\
-	({ __typeof__(a) a0 = (a);				\
-	   __typeof__(b) b0 = (b);				\
-	   (a0 > b0 ? a0 : b0); })
+#define max(a, b)							\
+	({ __typeof__(a) _a = (a);					\
+	   __typeof__(b) _b = (b);					\
+	   (_a > _b ? _a : _b); })
 
 /*
  * MACRO ispow2
@@ -84,9 +86,20 @@
  * Description:
  * 	Returns whether the argument is a power of 2 or 0.
  */
-#define ispow2(x)						\
-	({ __typeof__(x) x0 = (x);				\
-	   ((x0 & (x0 - 1)) == 0); })
+#define ispow2(x)							\
+	({ __typeof__(x) _x = (x);					\
+	   ((_x & (_x - 1)) == 0); })
+
+/*
+ * MACRO ones
+ *
+ * Description:
+ * 	Returns a mask of the given number of bits.
+ */
+#define ones(n)								\
+	({ unsigned _n = (n);						\
+	   unsigned _bits = sizeof(uintmax_t) * 8;			\
+	   (_n == _bits ? (uintmax_t)(-1) : ((uintmax_t)1 << _n) - 1); })
 
 /*
  * MACRO testbit
@@ -94,7 +107,26 @@
  * Description:
  * 	Returns true if bit n is set in x.
  */
-#define testbit(x, n)		(((x) & (1ULL << (n))) != 0)
+#define testbit(x, n)		(((x) & ((uintmax_t)1 << (n))) != 0)
+
+/*
+ * MACRO bext
+ *
+ * Description:
+ * 	Extract bits lo to hi of x, inclusive, sign extending the result if sign is 1. Return the
+ * 	extracted value shifted left by shift bits.
+ */
+#define bext(x, sign, hi, lo, shift)					\
+	({ __typeof__(x) _x = (x);					\
+	   unsigned _sign = (sign);					\
+	   unsigned _hi = (hi);						\
+	   unsigned _lo = (lo);						\
+	   unsigned _shift = (shift);					\
+	   unsigned _bits = sizeof(uintmax_t) * 8;			\
+	   unsigned _d = _bits - (_hi - _lo + 1);			\
+	   (_sign							\
+	    ? ((((intmax_t)  _x) >> _lo) << _d) >> (_d - _shift)	\
+	    : ((((uintmax_t) _x) >> _lo) << _d) >> (_d - _shift)); })
 
 /*
  * MACRO popcount
@@ -109,7 +141,7 @@
 #endif
 
 /*
- * lsl
+ * MACRO lsl
  *
  * Description:
  * 	Logical shift left.
@@ -119,13 +151,10 @@
  * 		shift			The amount to shift.
  * 		width			The width of x in bits. Cannot be 0.
  */
-static inline uint64_t
-lsl(uint64_t x, unsigned shift, unsigned width) {
-	return (x << shift) & ((2 << (width - 1)) - 1);
-}
+#define lsl(x, shift, width)	(((x) << (shift)) & (((uintmax_t)2 << ((width) - 1)) - 1))
 
 /*
- * lsr
+ * MACRO lsr
  *
  * Description:
  * 	Logical shift right.
@@ -134,13 +163,10 @@ lsl(uint64_t x, unsigned shift, unsigned width) {
  * 		x			The value to shift.
  * 		shift			The amount to shift.
  */
-static inline uint64_t
-lsr(uint64_t x, unsigned shift) {
-	return (x >> shift);
-}
+#define lsr(x, shift)		((x) >> (shift))
 
 /*
- * asr
+ * MACRO asr
  *
  * Description:
  * 	Arithmetic shift right.
@@ -150,13 +176,15 @@ lsr(uint64_t x, unsigned shift) {
  * 		shift			The amount to shift.
  * 		width			The width of x in bits. Cannot be 0.
  */
-static inline uint64_t
-asr(uint64_t x, unsigned shift, unsigned width) {
-	return ((int64_t)x << (64 - width)) >> (64 - width + shift);
-}
+#define asr(x, shift, width)						\
+	({ __typeof__(x) _x = (x);					\
+	   unsigned _width = (width);					\
+	   unsigned _shift = (shift);					\
+	   unsigned _bits = 8 * sizeof(_x);				\
+	   ((_x << (_bits - _width)) >> (_bits - _width + _shift)); })
 
 /*
- * ror
+ * MACRO ror
  *
  * Description:
  * 	Rotate right.
@@ -166,11 +194,14 @@ asr(uint64_t x, unsigned shift, unsigned width) {
  * 		shift			The amount to shift.
  * 		width			The width of x in bits. Cannot be 0.
  */
-static inline uint64_t
-ror(uint64_t x, unsigned shift, unsigned width) {
-	unsigned s = shift % width;
-	return lsl(x, width - s, width) | lsr(x, s);
-}
+#define ror(x, shift, width)						\
+	({ __typeof__(x) _x = (x);					\
+	   unsigned _shift = (shift);					\
+	   unsigned _width = (width);					\
+	   unsigned _s = _shift % _width;				\
+	   __typeof__(x) _lsl = lsl(_x, _width - _s, _width);		\
+	   __typeof__(x) _lsr = lsr(_x, _s);				\
+	   _lsl | _lsr; })
 
 /*
  * pack_uint

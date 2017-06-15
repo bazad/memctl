@@ -1,21 +1,12 @@
 #include "memctl/aarch64/disasm.h"
 
+#include "memctl/utility.h"
+
 #include <assert.h>
 #include <stdlib.h>
 #include <strings.h>
 
 // Bit manipulations
-
-/*
- * ones
- *
- * Description:
- * 	Returns a mask of the given number of bits.
- */
-static inline uint64_t
-ones(unsigned n) {
-	return (n == 64 ? (uint64_t)(-1) : ((uint64_t)1 << n) - 1);
-}
 
 /*
  * lobits
@@ -29,28 +20,12 @@ lobits(uint64_t x, unsigned n) {
 }
 
 /*
- * test
+ * MACRO test
  *
  * Description:
  * 	Returns 1 if (zero-indexed) bit n is set in x, 0 otherwise.
  */
-static inline unsigned
-test(uint64_t x, unsigned n) {
-	return (x & (1 << n)) != 0;
-}
-
-/*
- * ror
- *
- * Description:
- * 	Rotate x, an n-bit value, right by shift bits.
- */
-static inline uint64_t
-ror(uint64_t x, unsigned n, unsigned shift) {
-	assert(x == lobits(x, n));
-	unsigned m = shift % n;
-	return lobits(x << (n - m), n) | (x >> m);
-}
+#define test(x, n)	testbit(x, n)
 
 /*
  * replicate
@@ -70,21 +45,13 @@ replicate(uint64_t x, unsigned m, unsigned n) {
 }
 
 /*
- * extract
+ * MACRO extract
  *
  * Description:
  * 	Extract bits lo to hi of x, inclusive, sign extending the result if sign is 1. Return the
  * 	extracted value shifted left by shift bits.
  */
-static inline uint64_t
-extract(uint64_t x, unsigned sign, unsigned hi, unsigned lo, unsigned shift) {
-	unsigned d = 64 - (hi - lo + 1);
-	if (sign) {
-		return ((((int64_t) x) >> lo) << d) >> (d - shift);
-	} else  {
-		return ((((uint64_t) x) >> lo) << d) >> (d - shift);
-	}
-}
+#define extract(x, sign, hi, lo, shift)	bext(x, sign, hi, lo, shift)
 
 // Instruction routines
 
@@ -165,7 +132,7 @@ decode_bit_masks(unsigned sf, uint8_t N, uint8_t imms, uint8_t immr, uint8_t imm
 	uint8_t d = lobits(diff, len - 1);
 	uint64_t welem = ones(S + 1);
 	uint64_t telem = ones(d + 1);
-	*wmask = replicate(ror(welem, esize, R), esize, (sf ? 64 : 32));
+	*wmask = replicate(ror(welem, R, esize), esize, (sf ? 64 : 32));
 	*tmask = replicate(telem, esize, (sf ? 64 : 32));
 	return true;
 }
@@ -484,6 +451,7 @@ aarch64_decode_mov(uint32_t ins, struct aarch64_ins_mov *mov) {
 	}
 	mov->k     = (opc == 3);
 	mov->n     = (opc == 0);
+	mov->z     = (opc == 2);
 	mov->Rd    = gpreg(ins, sf, USE_ZR, 0);
 	mov->imm   = extract(ins, 0, 20, 5, 0);
 	mov->shift = 16 * hw;

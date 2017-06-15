@@ -57,13 +57,15 @@ endif
 
 ARCH_arm64_DIR = aarch64
 
-LIBMEMCTL_arm64_SRCS = disasm.c \
+LIBMEMCTL_arm64_SRCS = aarch64_sim.c \
+		       disasm.c \
 		       kernel_call_aarch64.c \
 		       memory_region.c
 
 LIBMEMCTL_arm64_HDRS = kernel_call_aarch64.h
 
-LIBMEMCTL_arm64_INCS = disasm.h
+LIBMEMCTL_arm64_INCS = aarch64_sim.h \
+		       disasm.h
 
 # libmemctl x86_64 sources.
 

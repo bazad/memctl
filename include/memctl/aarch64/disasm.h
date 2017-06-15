@@ -1138,7 +1138,8 @@ bool aarch64_ins_decode_ldr_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_r)
 struct aarch64_ins_mov {
 	uint8_t       k:1;
 	uint8_t       n:1;
-	uint8_t       _fill:6;
+	uint8_t       z:1;
+	uint8_t       _fill:5;
 	aarch64_gpreg Rd;
 	uint16_t      imm;
 	uint8_t       shift;

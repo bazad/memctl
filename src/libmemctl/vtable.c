@@ -6,6 +6,7 @@
 
 #if __arm64__
 #include "memctl/aarch64/disasm.h"
+#include "memctl/aarch64/aarch64_sim.h"
 #include "memctl/kernel_slide.h"
 #include "memctl/kernelcache.h"
 #endif
@@ -78,256 +79,13 @@ adjust_vtable_from_symbol(kaddr_t *vtable, size_t *size) {
  * correct OSMetaClass instance. This will be the virtual method table we are looking for.
  */
 
-// AArch64 simulator
-
-#define NREGS          32
-#define TEMPREGS_START 0
-#define TEMPREGS_END   17
-
-/*
- * struct sim
- *
- * Description:
- * 	A simplistic AArch64 simulator to run an initialization function and detect construction of
- * 	OSMetaClass objects.
- */
-struct sim {
-	uint64_t pc;
-	const uint32_t *ins;
-	size_t count;
-	struct {
-		uint64_t value;
-		enum { VALUE, UNKNOWN } state;
-	} X[NREGS];
-	uint64_t bl;
-	uint64_t ret;
-};
-
-/*
- * sim_clear
- *
- * Description:
- * 	Clear the register state in the simulator.
- */
-static void
-sim_clear(struct sim *sim) {
-	for (size_t i = 0; i < NREGS; i++) {
-		sim->X[i].state = UNKNOWN;
-	}
-}
-
-/*
- * sim_clear_temporary
- *
- * Description:
- * 	Clear the temporary registers.
- */
-static void
-sim_clear_temporary(struct sim *sim) {
-	for (size_t i = TEMPREGS_START; i <= TEMPREGS_END; i++) {
-		sim->X[i].state = UNKNOWN;
-	}
-}
-
-/*
- * regmask
- *
- * Description:
- * 	Get the register mask for the given register.
- */
-static uint64_t
-regmask(aarch64_gpreg r) {
-	return ((2 << (AARCH64_GPREGSIZE(r) - 1)) - 1);
-}
-
-/*
- * getreg
- *
- * Description:
- * 	Get the contents of the given register, and set the register state flags in state.
- */
-static uint64_t
-getreg(struct sim *sim, aarch64_gpreg r, int *state) {
-	if (AARCH64_GPREGZR(r)) {
-		*state |= VALUE;
-		return 0;
-	}
-	unsigned n = AARCH64_GPREGID(r);
-	*state |= sim->X[n].state;
-	return sim->X[n].value & regmask(r);
-}
-
-/*
- * shiftreg
- *
- * Description:
- * 	Get the shifted register value.
- */
-static uint64_t
-shiftreg(struct sim *sim, aarch64_gpreg r, aarch64_shift shift, unsigned amount, int *state) {
-	uint64_t value = getreg(sim, r, state);
-	size_t size = AARCH64_GPREGSIZE(r);
-	switch (shift) {
-		case AARCH64_SHIFT_LSL: return lsl(value, amount, size);
-		case AARCH64_SHIFT_LSR: return lsr(value, amount);
-		case AARCH64_SHIFT_ASR: return asr(value, amount, size);
-		case AARCH64_SHIFT_ROR: return ror(value, amount, size);
-		default:                assert(false);
-	}
-}
-
-/*
- * setreg
- *
- * Description:
- * 	Set the contents and state of the given register.
- */
-static void
-setreg(struct sim *sim, aarch64_gpreg d, uint64_t value, int state) {
-	if (!AARCH64_GPREGZR(d)) {
-		unsigned d0 = AARCH64_GPREGID(d);
-		sim->X[d0].value = value & regmask(d);
-		sim->X[d0].state = state;
-	}
-}
-
-/*
- * exec_one
- *
- * Description:
- * 	Execute one instruction in the simulator.
- */
-static bool
-exec_one(struct sim *sim) {
-	if (sim->count == 0) {
-		return false;
-	}
-	if (sim->bl != 0) {
-		sim_clear_temporary(sim);
-		sim->bl = 0;
-	}
-	sim->ret = 0;
-	uint32_t ins = *sim->ins;
-	uint64_t pc = sim->pc;
-	// Process the instruction, updating the state.
-	int state = 0;
-	struct aarch64_ins_adr adr;
-	struct aarch64_ins_add_im add_im;
-	struct aarch64_ins_mov mov;
-	struct aarch64_ins_and_im and_im;
-	struct aarch64_ins_and_sr and_sr;
-	struct aarch64_ins_b b;
-	struct aarch64_ins_br br;
-	struct aarch64_ins_ldr_im ldr_im;
-	struct aarch64_ins_ldp ldp;
-	if (aarch64_decode_adr(ins, pc, &adr)) {
-		setreg(sim, adr.Xd, adr.label, VALUE);
-	} else if (aarch64_decode_add_im(ins, &add_im)) {
-		uint64_t value = getreg(sim, add_im.Rn, &state);
-		uint64_t imm = (uint64_t)add_im.imm << add_im.shift;
-		if (add_im.add) {
-			value += imm;
-		} else {
-			value -= imm;
-		}
-		setreg(sim, add_im.Rd, value, state);
-	} else if (aarch64_decode_mov(ins, &mov)) {
-		uint64_t value = 0;
-		if (mov.k) {
-			value = getreg(sim, mov.Rd, &state);
-		}
-		value &= ~((((uint64_t)1 << 16) - 1) << mov.shift);
-		value |= (uint64_t)mov.imm << mov.shift;
-		if (mov.n) {
-			value = ~value;
-		}
-		setreg(sim, mov.Rd, value, VALUE);
-	} else if (aarch64_decode_and_im(ins, &and_im)) {
-		uint64_t value = getreg(sim, and_im.Rn, &state);
-		if (and_im.and) {
-			value &= add_im.imm;
-		} else {
-			value |= and_im.imm;
-		}
-		setreg(sim, and_im.Rd, value, state);
-	} else if (aarch64_decode_and_sr(ins, &and_sr)) {
-		uint64_t value = getreg(sim, and_sr.Rn, &state);
-		uint64_t value2 = shiftreg(sim, and_sr.Rm, and_sr.shift, and_sr.amount, &state);
-		if (and_sr.and) {
-			value &= value2;
-		} else {
-			value |= value2;
-		}
-		setreg(sim, and_sr.Rd, value, state);
-	} else if (aarch64_decode_b(ins, pc, &b) && b.link) {
-		sim->bl = b.label;
-	} else if (aarch64_decode_ldr_ui(ins, &ldr_im)) {
-		if (ldr_im.load) {
-			setreg(sim, ldr_im.Rt, 0, UNKNOWN);
-		}
-	} else if (aarch64_decode_ldp(ins, &ldp)) {
-		if (ldp.load) {
-			setreg(sim, ldp.Rt1, 0, UNKNOWN);
-			setreg(sim, ldp.Rt2, 0, UNKNOWN);
-		}
-	} else if (aarch64_decode_br(ins, &br) && br.ret) {
-		// TODO: This is incomplete. We should abort on B.
-		uint64_t retaddr = getreg(sim, br.Xn, &state);
-		sim->ret = (state == VALUE ? retaddr : 1);
-	} else if (aarch64_decode_nop(ins)) {
-		// Nothing to do.
-	} else {
-		memctl_warning("unknown instruction: %x", ins); // TODO
-		sim_clear(sim);
-	}
-	sim->ins++;
-	sim->count--;
-	sim->pc += sizeof(*sim->ins);
-	return true;
-}
-
-/*
- * exec_until_function_call
- *
- * Description:
- * 	Execute the simulator until a function call.
- */
-static bool
-exec_until_function_call(struct sim *sim) {
-	do {
-		if (!exec_one(sim)) {
-			return false;
-		}
-		if (sim->ret != 0) {
-			return false;
-		}
-	} while (sim->bl == 0);
-	return true;
-}
-
-/*
- * exec_until_return
- *
- * Description:
- * 	Execute the simulator until the function returns.
- */
-static bool
-exec_until_return(struct sim *sim) {
-	do {
-		if (!exec_one(sim)) {
-			return false;
-		}
-	} while (sim->ret == 0);
-	return true;
-}
-
-// Vtable discovery
+// Kernel extension memory regions
 
 /*
  * struct region
  *
  * Description:
- * 	Records information about a region of memory mapped by the Mach-O file..
+ * 	Records information about a region of memory mapped by the Mach-O file.
  */
 struct region {
 	const void *data;
@@ -373,6 +131,206 @@ region_address(const struct region *region, const void *data) {
 	assert(offset <= region->size);
 	return region->addr + offset;
 }
+
+
+// AArch64 simulator
+
+// AArch64 temporary registers.
+#define KSIM_TEMPREGS_START 0
+#define KSIM_TEMPREGS_END   17
+
+// A strong taint denoting that the value is unknown.
+#define KSIM_TAINT_UNKNOWN 0x1
+
+/*
+ * ksim_taint_unknown
+ *
+ * Description:
+ * 	Returns true if the taint indicates that the corresponding value is unknown.
+ */
+static bool
+ksim_taint_unknown(aarch64_sim_taint taint) {
+	return (taint.t_or & KSIM_TAINT_UNKNOWN) != 0;
+}
+
+/*
+ * ksim_taints
+ *
+ * Description:
+ * 	The taint_default table for ksim.
+ */
+static aarch64_sim_taint ksim_taints[] = {
+	{ .t_and = 0, .t_or = 0                  }, // AARCH64_SIM_TAINT_CONSTANT
+	{ .t_and = 0, .t_or = KSIM_TAINT_UNKNOWN }, // AARCH64_SIM_TAINT_UNKNOWN
+};
+
+/*
+ * struct ksim
+ *
+ * Description:
+ * 	The simulator context for the ksim simulator.
+ */
+struct ksim {
+	struct region text_exec;
+	size_t max_instruction_count;
+	size_t instruction_count;
+	bool at_function_call;
+	bool at_return;
+	bool clear_temporaries;
+};
+
+/*
+ * ksim_clear_temporaries
+ *
+ * Description:
+ * 	Clear the temporary registers after a function call/return.
+ */
+static void
+ksim_clear_temporaries(struct aarch64_sim *sim, aarch64_sim_taint taint) {
+	for (size_t n = KSIM_TEMPREGS_START; n <= KSIM_TEMPREGS_END; n++) {
+		aarch64_sim_word_clear(sim, &sim->X[n]);
+		aarch64_sim_taint_meet_with(&sim->X[n].taint, taint);
+	}
+}
+
+/*
+ * ksim_instruction_fetch
+ *
+ * Description:
+ * 	The aarch64_sim callback to fetch the next instruction. This function also handles clearing
+ * 	temporary registers after a function call instruction.
+ */
+static bool
+ksim_instruction_fetch(struct aarch64_sim *sim) {
+	struct ksim *ksim = sim->context;
+	// Limit the total number of instructions we execute.
+	if (ksim->instruction_count >= ksim->max_instruction_count) {
+		return false;
+	}
+	ksim->instruction_count++;
+	// Clear temporary registers if we are resuming after a function call.
+	if (ksim->clear_temporaries) {
+		// This taint is from the old instruction: we haven't updated to the new
+		// instruction yet.
+		ksim_clear_temporaries(sim, sim->instruction.taint);
+		ksim->clear_temporaries = false;
+	}
+	// Get the next instruction.
+	const uint32_t *ins;
+	size_t size;
+	region_get(&ksim->text_exec, sim->PC.value, (const void **)&ins, &size);
+	if (size < sizeof(*ins)) {
+		return false;
+	}
+	// Set the new instruction but keep the taint the same.
+	sim->instruction.value = *ins;
+	return true;
+}
+
+/*
+ * ksim_memory_load
+ *
+ * Description:
+ * 	The aarch64_sim callback to load a value from memory.
+ */
+static bool
+ksim_memory_load(struct aarch64_sim *sim, struct aarch64_sim_word *value,
+		const struct aarch64_sim_word *address, size_t size) {
+	aarch64_sim_taint_meet_with(&value->taint, sim->taint_default[AARCH64_SIM_TAINT_UNKNOWN]);
+	value->value = 0;
+	return true;
+}
+
+/*
+ * ksim_memory_store
+ *
+ * Description:
+ * 	The aarch64_sim callback to store a value to memory.
+ */
+static bool
+ksim_memory_store(struct aarch64_sim *sim,
+		const struct aarch64_sim_word *value, const struct aarch64_sim_word *address,
+		size_t size) {
+	return true;
+}
+
+/*
+ * ksim_branch_hit
+ *
+ * Description:
+ * 	The aarch64_sim callback informing us of a branch about to be taken. This function always
+ * 	aborts simulation.
+ */
+static bool
+ksim_branch_hit(struct aarch64_sim *sim, enum aarch64_sim_branch_type type,
+		const struct aarch64_sim_word *branch, bool *take_branch) {
+	struct ksim *ksim = sim->context;
+	*take_branch = false;
+	switch (type) {
+		case AARCH64_SIM_BRANCH_TYPE_BRANCH:
+			// Branches are usually not function calls, but sometimes they are. There's
+			// not really a good way to distinguish them as of yet.
+			return false;
+		case AARCH64_SIM_BRANCH_TYPE_BRANCH_AND_LINK:
+			ksim->clear_temporaries = true;
+			ksim->at_function_call = true;
+			return false;
+		case AARCH64_SIM_BRANCH_TYPE_RETURN:
+			ksim->at_return = true;
+			return false;
+	}
+}
+
+/*
+ * ksim_illegal_instruction
+ *
+ * Description:
+ * 	The aarch64_sim callback for an illegal instruction. Since the simulator is currently
+ * 	incomplete, we conservatively clear any simulator state that is likely to be invalidated by
+ * 	an unknown instruction.
+ */
+static bool
+ksim_illegal_instruction(struct aarch64_sim *sim) {
+	for (size_t n = 0; n < AARCH64_SIM_GPREGS; n++) {
+		aarch64_sim_word_clear(sim, &sim->X[n]);
+	}
+	aarch64_sim_pstate_clear(sim, &sim->PSTATE);
+	return true;
+}
+
+/*
+ * ksim_init
+ *
+ * Description:
+ * 	Initialize the ksim simulator.
+ */
+static void
+ksim_init(struct aarch64_sim *sim, struct ksim *ksim, struct region *text_exec, uint64_t pc,
+		size_t max_steps) {
+	// Initialize the client state.
+	sim->context             = ksim;
+	sim->instruction_fetch   = ksim_instruction_fetch;
+	sim->memory_load         = ksim_memory_load;
+	sim->memory_store        = ksim_memory_store;
+	sim->branch_hit          = ksim_branch_hit;
+	sim->illegal_instruction = ksim_illegal_instruction;
+	sim->taint_default       = ksim_taints;
+	// Clear the simulator.
+	aarch64_sim_clear(sim);
+	// Initialize the ksim state.
+	ksim->text_exec             = *text_exec;
+	ksim->max_instruction_count = (max_steps == 0 ? -1 : max_steps);
+	ksim->instruction_count     = 0;
+	ksim->at_function_call      = false;
+	ksim->at_return             = false;
+	ksim->clear_temporaries     = false;
+	// Set the simulator to start at the specified PC.
+	sim->PC.value          = pc;
+	sim->PC.taint          = ksim_taints[AARCH64_SIM_TAINT_CONSTANT];
+	sim->instruction.taint = sim->PC.taint;
+}
+
+// Vtable discovery
 
 /*
  * struct context
@@ -475,13 +433,13 @@ context_set_kext(struct context *context, const struct macho *macho) {
  * 	metaclass we are searching for.
  */
 static bool
-get_metaclass_from_call(struct context *c, struct sim *sim) {
+get_metaclass_from_call(struct context *c, struct aarch64_sim *sim) {
 	kword_t arg[4];
-	for (size_t i = 0; i < 4; i++) {
-		if (i != 2 && sim->X[i].state != VALUE) {
+	for (size_t n = 0; n < 4; n++) {
+		if (n != 2 && ksim_taint_unknown(sim->X[n].taint)) {
 			return false;
 		}
-		arg[i] = sim->X[i].value;
+		arg[n] = sim->X[n].value;
 	}
 	if (!region_contains(&c->data, arg[0])) {
 		return false;
@@ -510,15 +468,15 @@ get_metaclass_from_call(struct context *c, struct sim *sim) {
  */
 static bool
 find_metaclass_from_initializer(struct context *c, kaddr_t mod_init_func) {
-	struct sim sim;
-	sim_clear(&sim);
-	sim.pc = mod_init_func;
-	region_get(&c->text_exec, mod_init_func, (const void **)&sim.ins, &sim.count);
-	sim.count /= sizeof(*sim.ins);
+	struct aarch64_sim sim;
+	struct ksim ksim;
+	ksim_init(&sim, &ksim, &c->text_exec, mod_init_func, 0);
 	for (;;) {
-		if (!exec_until_function_call(&sim)) {
+		aarch64_sim_run(&sim);
+		if (!ksim.at_function_call) {
 			return false;
 		}
+		ksim.at_function_call = false;
 		if (get_metaclass_from_call(c, &sim)) {
 			return true;
 		}
@@ -532,8 +490,9 @@ find_metaclass_from_initializer(struct context *c, kaddr_t mod_init_func) {
  * 	Check whether the method seems to be returning the metaclass pointer.
  */
 static bool
-check_metaclass_at_return(struct context *c, struct sim *sim) {
-	return (sim->X[0].state == VALUE && sim->X[0].value == c->metaclass);
+check_metaclass_at_return(struct context *c, struct aarch64_sim *sim) {
+	return (!ksim_taint_unknown(sim->X[0].taint)
+	        && sim->X[0].value == c->metaclass);
 }
 
 #define MAX_GETMETACLASS_INSTRUCTION_COUNT 8
@@ -549,21 +508,16 @@ method_is_getmetaclass(struct context *c, kaddr_t method) {
 	if (!region_contains(&c->text_exec, method)) {
 		return false;
 	}
-	struct sim sim;
-	sim_clear(&sim);
-	sim.pc = method;
-	region_get(&c->text_exec, method, (const void **)&sim.ins, &sim.count);
-	sim.count /= sizeof(*sim.ins);
-	if (sim.count > MAX_GETMETACLASS_INSTRUCTION_COUNT) {
-		sim.count = MAX_GETMETACLASS_INSTRUCTION_COUNT;
-	}
-	if (!exec_until_return(&sim)) {
+	struct aarch64_sim sim;
+	struct ksim ksim;
+	ksim_init(&sim, &ksim, &c->text_exec, method, MAX_GETMETACLASS_INSTRUCTION_COUNT);
+	aarch64_sim_run(&sim);
+	if (ksim.instruction_count >= ksim.max_instruction_count
+			|| ksim.at_function_call
+			|| !ksim.at_return) {
 		return false;
 	}
-	if (check_metaclass_at_return(c, &sim)) {
-		return true;
-	}
-	return false;
+	return check_metaclass_at_return(c, &sim);
 }
 
 #define NMETHODS           12
