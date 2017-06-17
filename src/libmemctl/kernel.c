@@ -599,7 +599,9 @@ kernel_and_kexts_resolve_symbol(const char *symbol, kaddr_t *addr, size_t *size)
 		return KEXT_NOT_FOUND;
 	}
 	*addr = context.addr;
-	*size = context.size;
+	if (size != NULL) {
+		*size = context.size;
+	}
 	return KEXT_SUCCESS;
 }
 
