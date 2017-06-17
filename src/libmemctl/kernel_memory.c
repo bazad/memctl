@@ -546,6 +546,9 @@ kernel_io(kaddr_t kaddr, size_t *size, void *data, size_t access, kaddr_t *next,
 		size_t transfer_access = access;
 		result = transfer_range(kaddr, &transfer_size, &transfer_access, next, write);
 		if (result != KERNEL_IO_SUCCESS) {
+			if (transfer_size == 0) {
+				break;
+			}
 			left = transfer_size;
 		}
 		kernel_io_result result2 = transfer(kaddr, transfer_size, p, transfer_access,
