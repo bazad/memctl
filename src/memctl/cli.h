@@ -21,7 +21,7 @@ bool ws_command(kaddr_t address, const char *string, bool physical, size_t acces
 bool f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical, bool heap,
 		size_t access, size_t alignment);
 bool fpr_command(pid_t pid);
-bool fi_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle_id,
+bool fc_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle_id,
 		size_t access);
 bool kp_command(kaddr_t address);
 bool kpm_command(kaddr_t start, kaddr_t end);

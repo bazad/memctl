@@ -629,7 +629,7 @@ fpr_command(pid_t pid) {
 }
 
 bool
-fi_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle_id,
+fc_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle_id,
 		size_t access) {
 	kaddr_t address;
 	bool success = find_vtable(classname, bundle_id, &address, NULL);

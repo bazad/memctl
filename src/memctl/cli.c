@@ -259,7 +259,7 @@ static bool fpr_handler(const struct argument *arguments) {
 	return fpr_command(pid);
 }
 
-static bool fi_handler(const struct argument *arguments) {
+static bool fc_handler(const struct argument *arguments) {
 	const char *bundle_id = OPT_GET_STRING_OR(0, "b", "kext", NULL);
 	bool in_kernel        = OPT_PRESENT(1, "k");
 	size_t access         = OPT_GET_WIDTH_OR(2, "x", "access", 0);
@@ -272,7 +272,7 @@ static bool fi_handler(const struct argument *arguments) {
 		}
 		bundle_id = KERNEL_ID;
 	}
-	return fi_command(range.start, range.end, classname, bundle_id, access);
+	return fc_command(range.start, range.end, classname, bundle_id, access);
 }
 
 static bool kp_handler(const struct argument *arguments) {
@@ -458,7 +458,7 @@ static struct command commands[] = {
 			{ ARGUMENT, "pid", ARG_INT, "pid of process" },
 		},
 	}, {
-		"fi", "f", fi_handler,
+		"fc", "f", fc_handler,
 		"find instances of C++ class",
 		5, (struct argspec *) &(struct argspec[5]) {
 			{ "b",      "kext",   ARG_STRING, "bundle ID of kext defining class" },
