@@ -228,24 +228,24 @@ context_set_kext(struct context *context, const struct macho *macho) {
 }
 
 /*
- * break_at_branch_and_link
+ * stop_at_bl
  *
  * Description:
- * 	A ksim_run_until_fn callback to break execution once a branch instruction is hit.
+ * 	A ksim_stop_fn callback to stop execution at a BL instruction.
  */
 static bool
-break_at_branch_and_link(struct ksim *ksim, uint32_t ins) {
+stop_at_bl(struct ksim *ksim, uint32_t ins) {
 	return AARCH64_INS_TYPE(ins, BL_INS);
 }
 
 /*
- * break_at_return
+ * stop_at_ret
  *
  * Description:
- * 	A ksim_run_until_fn callback to break execution once a return instruction is hit.
+ * 	A ksim_stop_fn callback to stop execution at a RET instruction.
  */
 static bool
-break_at_return(struct ksim *ksim, uint32_t ins) {
+stop_at_ret(struct ksim *ksim, uint32_t ins) {
 	return AARCH64_INS_TYPE(ins, RET_INS);
 }
 
@@ -289,7 +289,7 @@ static bool
 find_metaclass_from_initializer(struct context *c, kaddr_t mod_init_func) {
 	struct ksim ksim;
 	ksim_init(&ksim, c->text_exec.data, c->text_exec.size, c->text_exec.addr, mod_init_func);
-	ksim.run_until = break_at_branch_and_link;
+	ksim.stop_before = stop_at_bl;
 	for (;;) {
 		if (!ksim_run(&ksim)) {
 			return false;
@@ -329,7 +329,7 @@ method_is_getmetaclass(struct context *c, kaddr_t method) {
 	struct ksim ksim;
 	ksim_init(&ksim, c->text_exec.data, c->text_exec.size, c->text_exec.addr, method);
 	ksim.max_instruction_count = MAX_GETMETACLASS_INSTRUCTION_COUNT;
-	ksim.run_until = break_at_return;
+	ksim.stop_before = stop_at_ret;
 	if (!ksim_run(&ksim)) {
 		return false;
 	}
@@ -485,8 +485,6 @@ vtable_for_class_symbol(const char *class_name, const char *bundle_id, kaddr_t *
 	free(symbol);
 	if (kr == KEXT_SUCCESS) {
 		adjust_vtable_from_symbol(vtable, size);
-	} else if (kr == KEXT_NO_SYMBOLS) {
-		kr = KEXT_NOT_FOUND;
 	}
 	return kr;
 }

@@ -397,8 +397,19 @@ run_symbol_finders(const struct kext_analyzers *ka, const struct kext *kext,
 	kext_find_symbol_fn *find_symbol = ka->find_symbol_fn;
 	kext_find_symbol_fn *end = find_symbol + ka->find_symbol_count;
 	kext_result kr = KEXT_NOT_FOUND;
+	size_t size0 = 0;
+	size_t *psize = (size == NULL ? NULL : &size0);
+	// Run the symbol finders until one returns something other than KEXT_NOT_FOUND.
 	for (; kr == KEXT_NOT_FOUND && find_symbol < end; find_symbol++) {
-		kr = (*find_symbol)(kext, symbol, addr, size);
+		kr = (*find_symbol)(kext, symbol, addr, psize);
+	}
+	// Clean up the result on success.
+	if (kr == KEXT_SUCCESS && size != NULL) {
+		if (size0 == 0) {
+			size0 = macho_guess_symbol_size(&kext->macho, kext->symtab,
+					*addr - kext->slide);
+		}
+		*size = size0;
 	}
 	return kr;
 }
@@ -427,7 +438,7 @@ run_matching_symbol_finders(const struct kext *kext, const char *symbol,
 kext_result
 kext_find_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
 	kext_result kr = kext_resolve_symbol(kext, symbol, addr, size);
-	if (kr == KEXT_NOT_FOUND || kr == KEXT_NO_SYMBOLS) {
+	if (kr == KEXT_NOT_FOUND) {
 		kr = run_matching_symbol_finders(kext, symbol, addr, size);
 	}
 	return kr;
@@ -436,7 +447,7 @@ kext_find_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, siz
 kext_result
 kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
 	if (kext->symtab == NULL) {
-		return KEXT_NO_SYMBOLS;
+		return KEXT_NOT_FOUND;
 	}
 	uint64_t static_addr;
 	macho_result mr = macho_resolve_symbol(&kext->macho, kext->symtab, symbol, &static_addr,
@@ -456,7 +467,7 @@ kext_result
 kext_resolve_address(const struct kext *kext, kaddr_t addr, const char **name, size_t *size,
 		size_t *offset) {
 	if (kext->symtab == NULL) {
-		return KEXT_NO_SYMBOLS;
+		return KEXT_NOT_FOUND;
 	}
 	uint64_t static_addr = addr - kext->slide;
 	macho_result mr = macho_resolve_address(&kext->macho, kext->symtab, static_addr, name,
@@ -546,52 +557,52 @@ kext_containing_address(kaddr_t kaddr, char **bundle_id) {
 }
 
 kext_result
-kext_id_resolve_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr, size_t *size) {
+kext_id_find_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr, size_t *size) {
 	struct kext kext;
 	kext_result kr = kext_init(&kext, bundle_id);
 	if (kr == KEXT_SUCCESS) {
-		kr = kext_resolve_symbol(&kext, symbol, addr, size);
+		kr = kext_find_symbol(&kext, symbol, addr, size);
 		kext_deinit(&kext);
 	}
 	return kr;
 }
 
 /*
- * struct kernel_and_kexts_resolve_symbol_context
+ * struct kernel_and_kexts_find_symbol_context
  *
  * Description:
- * 	Callback context for kernel_and_kexts_resolve_symbol.
+ * 	Callback context for kernel_and_kexts_find_symbol.
  */
-struct kernel_and_kexts_resolve_symbol_context {
+struct kernel_and_kexts_find_symbol_context {
 	const char *symbol;
 	kaddr_t addr;
 	size_t size;
 };
 
 /*
- * kernel_and_kexts_resolve_symbol_callback
+ * kernel_and_kexts_find_symbol_callback
  *
  * Description:
- * 	A callback for kernel_and_kexts_resolve_symbol that tries to resolve a symbol in the given
+ * 	A callback for kernel_and_kexts_find_symbol that tries to find a symbol in the given
  * 	kernel extension.
  */
 static bool
-kernel_and_kexts_resolve_symbol_callback(void *context, CFDictionaryRef info,
+kernel_and_kexts_find_symbol_callback(void *context, CFDictionaryRef info,
 		const char *bundle_id, kaddr_t base0, size_t size0) {
 	if (bundle_id == NULL) {
 		return false;
 	}
-	struct kernel_and_kexts_resolve_symbol_context *c = context;
+	struct kernel_and_kexts_find_symbol_context *c = context;
 	error_stop();
-	kext_result kr = kext_id_resolve_symbol(bundle_id, c->symbol, &c->addr, &c->size);
+	kext_result kr = kext_id_find_symbol(bundle_id, c->symbol, &c->addr, &c->size);
 	error_start();
 	return (kr == KEXT_SUCCESS);
 }
 
 kext_result
-kernel_and_kexts_resolve_symbol(const char *symbol, kaddr_t *addr, size_t *size) {
-	struct kernel_and_kexts_resolve_symbol_context context = { symbol };
-	bool success = kext_for_each(kernel_and_kexts_resolve_symbol_callback, &context);
+kernel_and_kexts_find_symbol(const char *symbol, kaddr_t *addr, size_t *size) {
+	struct kernel_and_kexts_find_symbol_context context = { symbol };
+	bool success = kext_for_each(kernel_and_kexts_find_symbol_callback, &context);
 	if (!success) {
 		return KEXT_ERROR;
 	}
@@ -668,8 +679,8 @@ kernel_and_kexts_search_data(const void *data, size_t size, int minprot, kaddr_t
 kext_result
 resolve_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr, size_t *size) {
 	if (bundle_id == NULL) {
-		return kernel_and_kexts_resolve_symbol(symbol, addr, size);
+		return kernel_and_kexts_find_symbol(symbol, addr, size);
 	} else {
-		return kext_id_resolve_symbol(bundle_id, symbol, addr, size);
+		return kext_id_find_symbol(bundle_id, symbol, addr, size);
 	}
 }

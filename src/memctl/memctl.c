@@ -16,6 +16,7 @@
 #include "memctl/platform.h"
 #include "memctl/privilege_escalation.h"
 #include "memctl/process.h"
+#include "memctl/symbol_finders.h"
 #include "memctl/vtable.h"
 
 #include <stdio.h>
@@ -168,6 +169,7 @@ initialize(feature_t features) {
 			error_message("could not initialize kernel image");
 			return false;
 		}
+		kernel_symbol_finders_init();
 		LOADED(KERNEL_IMAGE);
 	}
 	if (NEED(KERNEL_SLIDE)) {
@@ -420,9 +422,6 @@ kext_error(kext_result kr, const char *bundle_id, const char *symbol, kaddr_t ad
 			} else {
 				error_kext_not_found(bundle_id);
 			}
-			return true;
-		case KEXT_NO_SYMBOLS:
-			error_kext_no_symbols(bundle_id);
 			return true;
 		case KEXT_NOT_FOUND:
 			error_kext_symbol_not_found(bundle_id, symbol);
@@ -820,7 +819,7 @@ s_command(kaddr_t address) {
 		} else {
 			printf("%s+%zu\n", kext.bundle_id, offset);
 		}
-	} else if (kr == KEXT_SUCCESS || kr == KEXT_NOT_FOUND || kr == KEXT_NO_SYMBOLS) {
+	} else if (kr == KEXT_SUCCESS || kr == KEXT_NOT_FOUND) {
 		if (offset == 0) {
 			printf("%s.%s\n", kext.bundle_id, segname);
 		} else {

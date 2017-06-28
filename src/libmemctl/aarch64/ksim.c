@@ -1,4 +1,6 @@
 #include "memctl/aarch64/ksim.h"
+
+#include "memctl/macho.h"
 #include "memctl/utility.h"
 
 
@@ -9,8 +11,8 @@
 // A strong taint denoting that the value is unknown.
 #define TAINT_UNKNOWN 0x1
 
-// A ksim instance will only execute a maximum of 0x1000000 instructions.
-#define KSIM_MAX_INSTRUCTIONS 0x1000000
+// A ksim instance will execute a maximum of 0x10000 instructions by default.
+#define KSIM_MAX_INSTRUCTIONS 0x10000
 
 /*
  * ksim_taints
@@ -97,15 +99,17 @@ ksim_instruction_fetch(struct aarch64_sim *sim) {
 	if (!get_instruction(ksim, &ins)) {
 		return false;
 	}
-	// Check if the caller wants to break.
-	if (ksim->instruction_count != ksim->internal.last_break
-			&& ksim->run_until != NULL
-			&& ksim->run_until(ksim, ins)) {
-		ksim->internal.last_break = ksim->instruction_count;
-		ksim->internal.break_condition = true;
-		return false;
+	// Check if the caller wants to stop before this instruction. If so, set the
+	// did_stop_before field so that we know not to stop next time.
+	if (ksim->stop_before != NULL && !ksim->internal.did_stop_before) {
+		if (ksim->stop_before(ksim, ins)) {
+			ksim->internal.did_stop_before = true;
+			ksim->internal.do_stop = true;
+			return false;
+		}
 	}
 	// Set the new instruction but keep the taint the same.
+	ksim->internal.did_stop_before = false;
 	sim->instruction.value = ins;
 	ksim->instruction_count++;
 	return true;
@@ -149,17 +153,34 @@ static bool
 ksim_branch_hit(struct aarch64_sim *sim, enum aarch64_sim_branch_type type,
 		const struct aarch64_sim_word *branch, bool *take_branch) {
 	struct ksim *ksim = sim->context;
-	// We will eventually need to let the client decide how to handle branches.
-	*take_branch = false;
+	// If the user has a branch handler, use that.
+	if (ksim->handle_branch != NULL) {
+		uint64_t branch_address = branch->value;
+		if (taint_unknown(branch->taint)) {
+			branch_address = KSIM_PC_UNKNOWN;
+		}
+		bool stop;
+		bool handled = ksim->handle_branch(ksim, sim->instruction.value, branch_address,
+				take_branch, &stop);
+		if (handled) {
+			if (stop) {
+				ksim->internal.do_stop = true;
+			}
+			return !stop;
+		}
+	}
+	// Don't take conditional branches and branches with link.
+	*take_branch = (type != AARCH64_SIM_BRANCH_TYPE_BRANCH_AND_LINK);
 	// If the current branch looks like a function call, clear the temporary registers.
-	// Branches without link are usually not function calls, but sometimes they are. There's
-	// not really a good way to distinguish them as of yet.
 	if (type == AARCH64_SIM_BRANCH_TYPE_BRANCH_AND_LINK) {
 		ksim->internal.clear_temporaries = true;
-		return true;
 	}
-	// For any other branch types we halt.
-	return false;
+	// Stop the simulator if we're about to execute an unknown address.
+	if (*take_branch && taint_unknown(branch->taint)) {
+		return false;
+	}
+	// Continue running the simulator.
+	return true;
 }
 
 /*
@@ -180,7 +201,8 @@ ksim_illegal_instruction(struct aarch64_sim *sim) {
 }
 
 void
-ksim_init(struct ksim *ksim, const void *code, size_t size, uint64_t code_address, uint64_t pc) {
+ksim_init(struct ksim *ksim, const void *code, size_t size, uint64_t address, uint64_t pc) {
+	assert(address <= pc && pc < address + size);
 	// Initialize the aarch64_sim client state.
 	ksim->sim.context             = ksim;
 	ksim->sim.instruction_fetch   = ksim_instruction_fetch;
@@ -194,13 +216,15 @@ ksim_init(struct ksim *ksim, const void *code, size_t size, uint64_t code_addres
 	// Initialize the ksim state.
 	ksim->code_data             = code;
 	ksim->code_size             = size;
-	ksim->code_address          = code_address;
-	ksim->run_until             = NULL;
+	ksim->code_address          = address;
+	ksim->stop_before           = NULL;
+	ksim->stop_after            = NULL;
+	ksim->handle_branch         = NULL;
 	ksim->max_instruction_count = KSIM_MAX_INSTRUCTIONS;
 	ksim->instruction_count     = 0;
 	// Initialize the internal state.
-	ksim->internal.break_condition   = false;
-	ksim->internal.last_break        = (uint64_t)(-1);
+	ksim->internal.do_stop           = false;
+	ksim->internal.did_stop_before   = false;
 	ksim->internal.clear_temporaries = false;
 	// Set the simulator to start at the specified PC.
 	ksim->sim.PC.value          = pc;
@@ -208,12 +232,61 @@ ksim_init(struct ksim *ksim, const void *code, size_t size, uint64_t code_addres
 	ksim->sim.instruction.taint = ksim->sim.PC.taint;
 }
 
+/*
+ * find_code_segment
+ *
+ * Description:
+ * 	Find the load command for the segment containing the given address.
+ */
+static const struct load_command *
+find_code_segment(const struct macho *macho, uint64_t pc) {
+	const struct load_command *lc = NULL;
+	assert(macho_is_64(macho));
+	for (;;) {
+		lc = macho_next_segment(macho, lc);
+		if (lc == NULL) {
+			return NULL;
+		}
+		assert(lc->cmd == LC_SEGMENT_64);
+		const struct segment_command_64 *sc = (const struct segment_command_64 *)lc;
+		const int prot = VM_PROT_READ | VM_PROT_EXECUTE;
+		if ((sc->initprot & prot) != prot) {
+			continue;
+		}
+		if (pc < sc->vmaddr || sc->vmaddr + sc->vmsize <= pc) {
+			continue;
+		}
+		return lc;
+	}
+}
+
+bool
+ksim_init_kext(struct ksim *ksim, const struct kext *kext, uint64_t pc) {
+	const struct load_command *sc = find_code_segment(&kext->macho, pc);
+	if (sc == NULL) {
+		return false;
+	}
+	const void *code;
+	uint64_t address;
+	size_t size;
+	macho_segment_data(&kext->macho, sc, &code, &address, &size);
+	ksim_init(ksim, code, size, address, pc);
+	return true;
+}
+
 bool
 ksim_run(struct ksim *ksim) {
-	ksim->internal.break_condition = false;
+	ksim->internal.do_stop = false;
 	for (;;) {
+		// Step the simulator.
 		if (!aarch64_sim_step(&ksim->sim)) {
-			return ksim->internal.break_condition;
+			return ksim->internal.do_stop;
+		}
+		// Check if we should stop.
+		if (ksim->stop_after != NULL) {
+			if (ksim->stop_after(ksim, ksim->sim.instruction.value)) {
+				return true;
+			}
 		}
 	}
 }

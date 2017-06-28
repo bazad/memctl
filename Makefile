@@ -61,9 +61,11 @@ LIBMEMCTL_arm64_SRCS = aarch64_sim.c \
 		       disasm.c \
 		       kernel_call_aarch64.c \
 		       memory_region.c \
-		       ksim.c
+		       ksim.c \
+		       zone_element_size.c
 
-LIBMEMCTL_arm64_HDRS = kernel_call_aarch64.h
+LIBMEMCTL_arm64_HDRS = kernel_call_aarch64.h \
+		       zone_element_size.h
 
 LIBMEMCTL_arm64_INCS = aarch64_sim.h \
 		       disasm.h \
@@ -103,6 +105,7 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 platform.c \
 		 privilege_escalation.c \
 		 process.c \
+		 symbol_finders.c \
 		 vtable.c
 
 LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
@@ -126,6 +129,7 @@ LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
 		 platform.h \
 		 privilege_escalation.h \
 		 process.h \
+		 symbol_finders.h \
 		 utility.h \
 		 vtable.h
 

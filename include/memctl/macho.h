@@ -232,6 +232,23 @@ macho_result macho_resolve_symbol(const struct macho *macho, const struct symtab
 		const char *symbol, uint64_t *addr, size_t *size);
 
 /*
+ * macho_guess_symbol_size
+ *
+ * Description:
+ * 	Guess the size of a symbol starting at address addr. This will usually be an upper bound.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		symtab			The Mach-O symtab command.
+ * 		addr			The address of the symbol.
+ *
+ * Returns:
+ * 	A guess of the size of the symbol.
+ */
+size_t macho_guess_symbol_size(const struct macho *macho, const struct symtab_command *symtab,
+		uint64_t addr);
+
+/*
  * macho_resolve_address
  *
  * Description:
@@ -272,6 +289,21 @@ macho_result macho_search_data(const struct macho *macho, const void *data, size
 		int minprot, uint64_t *addr);
 
 /*
+ * macho_section_by_index
+ *
+ * Description:
+ * 	Find the given section by index.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		sect			The index of the section. Section indexing starts at 1.
+ *
+ * Returns:
+ * 	The section or section_64 struct, or NULL if no section with that index exists.
+ */
+const void *macho_get_section_by_index(const struct macho *macho, uint32_t sect);
+
+/*
  * macho_segment_containing_address
  *
  * Description:
@@ -286,5 +318,22 @@ macho_result macho_search_data(const struct macho *macho, const void *data, size
  */
 const struct load_command *macho_segment_containing_address(const struct macho *macho,
 		uint64_t addr);
+
+/*
+ * macho_section_containing_address
+ *
+ * Description:
+ * 	Get the section command of the section of the Mach-O file containing the given address.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		lc			The load command of the segment to search.
+ * 		addr			The address to search for.
+ *
+ * Returns:
+ * 	The section containing the address or NULL.
+ */
+const void *macho_section_containing_address(const struct macho *macho,
+		const struct load_command *lc, uint64_t addr);
 
 #endif

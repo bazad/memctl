@@ -105,7 +105,6 @@ typedef enum kext_result {
 	KEXT_ERROR,
 	KEXT_NO_KEXT,
 	KEXT_NOT_FOUND,
-	KEXT_NO_SYMBOLS,
 } kext_result;
 
 /*
@@ -195,7 +194,9 @@ void kext_deinit(struct kext *kext);
  * 		kext			The kext.
  * 		symbol			The symbol being resolved.
  * 	out	addr			On return, the runtime address of the symbol, if found.
- * 	out	size			On return, a guess of the size of the symbol, if found.
+ * 	out	size			On return, a guess of the size of the symbol, if found. If
+ * 					no guess of the symbol's size is available, do not set this
+ * 					parameter and a default upper bound will be used.
  *
  * Returns:
  * 	KEXT_SUCCESS, KEXT_ERROR, or KEXT_NOT_FOUND.
@@ -230,9 +231,9 @@ bool kext_add_symbol_finder(const char *bundle_id, kext_find_symbol_fn find_symb
  *
  * Description:
  * 	Try to find the address of a symbol by running additional kext analyzers after traditional
- * 	symbol resolution. If kext_resolve_symbol returns KEXT_NOT_FOUND or KEXT_NO_SYMBOLS, then
- * 	kext_find_symbol will run each registered symbol finder matching the specified kext in turn
- * 	until some finder returns KEXT_SUCCESS or KEXT_ERROR.
+ * 	symbol resolution. If kext_resolve_symbol returns KEXT_NOT_FOUND, then kext_find_symbol
+ * 	will run each registered symbol finder matching the specified kext in turn until some
+ * 	finder returns KEXT_SUCCESS or KEXT_ERROR.
  *
  * Parameters:
  * 		kext			The kext.
@@ -250,7 +251,8 @@ kext_result kext_find_symbol(const struct kext *kext, const char *symbol,
  * kext_resolve_symbol
  *
  * Description:
- * 	Resolve the given symbol in the kext, returning the runtime address and size.
+ * 	Resolve the given symbol in the kext, returning the runtime address and size. No special
+ * 	symbol finders are checked.
  *
  * Parameters:
  * 		kext			The kext struct for the kernel extension to search.
@@ -259,7 +261,7 @@ kext_result kext_find_symbol(const struct kext *kext, const char *symbol,
  * 	out	size			A guess of the size of the symbol.
  *
  * Returns:
- * 	KEXT_SUCCESS, KEXT_ERROR, KEXT_NOT_FOUND, or KEXT_NO_SYMBOLS.
+ * 	KEXT_SUCCESS, KEXT_ERROR, or KEXT_NOT_FOUND.
  */
 kext_result kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr,
 		size_t *size);
@@ -371,10 +373,10 @@ bool kext_for_each(kext_for_each_callback_fn callback, void *context);
 kext_result kext_containing_address(kaddr_t kaddr, char **bundle_id);
 
 /*
- * kext_id_resolve_symbol
+ * kext_id_find_symbol
  *
  * Description:
- * 	Resolve the symbol in the kext with the given bundle identifier.
+ * 	Find the symbol in the kext with the given bundle identifier.
  *
  * Parameters:
  * 		bundle_id		The bundle ID of the kext.
@@ -388,7 +390,7 @@ kext_result kext_containing_address(kaddr_t kaddr, char **bundle_id);
  * Dependencies:
  * 	kernel_slide
  */
-kext_result kext_id_resolve_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr,
+kext_result kext_id_find_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr,
 		size_t *size);
 
 /*
@@ -406,7 +408,7 @@ kernel_symbol(const char *symbol, kaddr_t *addr, size_t *size) {
 }
 
 /*
- * kernel_and_kexts_resolve_symbol
+ * kernel_and_kexts_find_symbol
  *
  * Description:
  * 	Search through the kernel and all loaded kernel extensions for the given symbol.
@@ -425,7 +427,7 @@ kernel_symbol(const char *symbol, kaddr_t *addr, size_t *size) {
  * Notes:
  * 	Searching through all kernel extensions is a very slow operation.
  */
-kext_result kernel_and_kexts_resolve_symbol(const char *symbol, kaddr_t *addr, size_t *size);
+kext_result kernel_and_kexts_find_symbol(const char *symbol, kaddr_t *addr, size_t *size);
 
 /*
  * kernel_and_kexts_search_data
@@ -459,7 +461,8 @@ kext_result kernel_and_kexts_search_data(const void *data, size_t size, int minp
  * resolve_symbol
  *
  * Description:
- * 	Search for the given symbol.
+ * 	Find the given symbol. Special symbol finders are checked in addition to standard symbol
+ * 	resolution.
  *
  * Parameters:
  * 		bundle_id		The bundle ID of the kext to search in, or NULL to search
@@ -475,7 +478,10 @@ kext_result kernel_and_kexts_search_data(const void *data, size_t size, int minp
  * 	kernel_slide
  *
  * Notes:
- * 	See kernel_and_kexts_resolve_symbol.
+ * 	See kernel_and_kexts_find_symbol.
+ *
+ * 	Even though this function is called "resolve_symbol", the behavior is that of
+ * 	"kext_find_symbol": special symbol finders are checked.
  */
 kext_result resolve_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr, size_t *size);
 

@@ -125,19 +125,6 @@ error_kext_not_found(const char *bundle_id) {
 }
 
 void
-error_kext_no_symbols(const char *bundle_id) {
-	assert(bundle_id != NULL);
-	size_t bundle_id_len = len(bundle_id);
-	struct kext_no_symbols_error *e = error_push_data(kext_no_symbols_error,
-			sizeof(*e) + bundle_id_len, NULL);
-	if (e != NULL) {
-		char *ebundle_id = (char *)(e + 1);
-		memcpy(ebundle_id, bundle_id, bundle_id_len);
-		e->bundle_id = ebundle_id;
-	}
-}
-
-void
 error_kext_symbol_not_found(const char *bundle_id, const char *symbol) {
 	assert(symbol != NULL);
 	size_t bundle_id_len = len(bundle_id);

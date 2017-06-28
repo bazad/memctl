@@ -138,10 +138,6 @@ print_error(error_handle error) {
 			struct kext_not_found_error *e = error->data;
 			PRINT("no loaded kext matches bundle ID '%s'", e->bundle_id);
 			} break;
-		case kext_no_symbols_error: {
-			struct kext_no_symbols_error *e = error->data;
-			PRINT("kext %s does not contain symbol information", e->bundle_id);
-			} break;
 		case kext_symbol_not_found_error: {
 			struct kext_symbol_not_found_error *e = error->data;
 			if (e->bundle_id == NULL) {

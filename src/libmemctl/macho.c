@@ -36,59 +36,34 @@ macho_get_nlist(const struct macho *macho, const struct symtab_command *symtab, 
 			+ idx * MACHO_STRUCT_SIZE(macho, struct nlist));
 }
 
-/*
- * macho_get_section_by_index
- *
- * Description:
- * 	Find the given section by index.
- */
-static const void *
-macho_get_section_by_index(const struct macho *macho, uint32_t sect) {
-	if (sect < 1) {
-		return NULL;
-	}
-	const struct load_command *lc = NULL;
-	uint32_t idx = 1;
-	uintptr_t sectcmd = 0;
-	for (;;) {
-		lc = macho_next_segment(macho, lc);
-		if (lc == NULL) {
-			break;
-		}
-		uint32_t nsects = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, nsects);
-		if (sect < idx + nsects) {
-			size_t lc_size = MACHO_STRUCT_SIZE(macho, struct segment_command);
-			sectcmd = (uintptr_t)lc + lc_size;
-			sectcmd += (sect - idx) * MACHO_STRUCT_SIZE(macho, struct section);
-			break;
-		}
-		idx += nsects;
-	}
-	return (const void *)sectcmd;
-}
-
 static size_t
-guess_symbol_size(const struct macho *macho, const struct symtab_command *symtab,
-		uint32_t idx, uint64_t next) {
-	const void *nl = macho_get_nlist(macho, symtab, idx);
+guess_symbol_size(const struct macho *macho, uint64_t addr, uint64_t next) {
 	size_t size = -1;
-	uint64_t n_value = MACHO_STRUCT_FIELD(macho, struct nlist, nl, n_value);
-	uint32_t n_sect  = MACHO_STRUCT_FIELD(macho, struct nlist, nl, n_sect);
+	// Limit the size to the next symbol.
 	if (next != -1) {
-		size = next - n_value;
+		size = next - addr;
 	}
-	const void *sect = macho_get_section_by_index(macho, n_sect);
-	if (sect != NULL) {
-		uint64_t sect_addr = MACHO_STRUCT_FIELD(macho, struct section, sect, addr);
-		size_t   sect_size = MACHO_STRUCT_FIELD(macho, struct section, sect, size);
-		if (sect_addr <= n_value && n_value < sect_addr + sect_size) {
-			size_t sect_limited_size = sect_addr + sect_size - n_value;
+	// See if any segment contains this address.
+	const struct load_command *sc = macho_segment_containing_address(macho, addr);
+	if (sc != NULL) {
+		// Limit the size to the section.
+		const void *sect = macho_section_containing_address(macho, sc, addr);
+		if (sect != NULL) {
+			uint64_t sect_addr = MACHO_STRUCT_FIELD(macho, struct section, sect, addr);
+			size_t   sect_size = MACHO_STRUCT_FIELD(macho, struct section, sect, size);
+			size_t sect_limited_size = sect_addr + sect_size - addr;
 			if (sect_limited_size < size) {
 				size = sect_limited_size;
 			}
 		}
+		// Limit the size to the segment.
+		uint64_t vmaddr = MACHO_STRUCT_FIELD(macho, struct segment_command, sc, vmaddr);
+		size_t   vmsize = MACHO_STRUCT_FIELD(macho, struct segment_command, sc, vmsize);
+		size_t segment_limited_size = vmaddr + vmsize - addr;
+		if (segment_limited_size < size) {
+			size = segment_limited_size;
+		}
 	}
-	// TODO: Use segment size if section size failed.
 	return (size == -1 ? 0 : size);
 }
 
@@ -251,9 +226,9 @@ macho_find_section(const struct macho *macho, const struct load_command *segment
 void
 macho_segment_data(const struct macho *macho, const struct load_command *segment,
 		const void **data, uint64_t *addr, size_t *size) {
-	size_t fileoff  = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, fileoff);
-	uint64_t vmaddr = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmaddr);
-	size_t vmsize   = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmsize);
+	size_t   fileoff = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, fileoff);
+	uint64_t vmaddr  = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmaddr);
+	size_t   vmsize  = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmsize);
 	*data = (const void *)((uintptr_t)macho->mh + fileoff);
 	*addr = vmaddr;
 	*size = vmsize;
@@ -291,6 +266,25 @@ macho_find_base(struct macho *macho, uint64_t *base) {
 	}
 }
 
+/*
+ * macho_next_symbol
+ *
+ * Description:
+ * 	Returns the address of the next symbol following addr.
+ */
+static uint64_t
+macho_next_symbol(const struct macho *macho, const struct symtab_command *symtab, uint64_t addr) {
+	uint64_t next = -1;
+	for (uint32_t i = 0; i < symtab->nsyms; i++) {
+		const void *nl_i = macho_get_nlist(macho, symtab, i);
+		uint64_t n_value = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_value);
+		if (n_value > addr && n_value < next) {
+			next = n_value;
+		}
+	}
+	return next;
+}
+
 // TODO: Make this resilient to malformed images.
 macho_result
 macho_resolve_symbol(const struct macho *macho, const struct symtab_command *symtab,
@@ -326,17 +320,20 @@ macho_resolve_symbol(const struct macho *macho, const struct symtab_command *sym
 		*addr = addr0;
 	}
 	if (size != NULL) {
-		uint64_t next = -1;
-		for (uint32_t i = 0; i < symtab->nsyms; i++) {
-			const void *nl_i = macho_get_nlist(macho, symtab, i);
-			uint64_t n_value = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_value);
-			if (n_value > addr0 && n_value < next) {
-				next = n_value;
-			}
-		}
-		*size = guess_symbol_size(macho, symtab, symidx, next);
+		uint64_t next = macho_next_symbol(macho, symtab, addr0);
+		*size = guess_symbol_size(macho, addr0, next);
 	}
 	return MACHO_SUCCESS;
+}
+
+size_t
+macho_guess_symbol_size(const struct macho *macho, const struct symtab_command *symtab,
+		uint64_t addr) {
+	uint64_t next = -1;
+	if (symtab != NULL) {
+		next = macho_next_symbol(macho, symtab, addr);
+	}
+	return guess_symbol_size(macho, addr, next);
 }
 
 macho_result
@@ -345,7 +342,6 @@ macho_resolve_address(const struct macho *macho, const struct symtab_command *sy
 	const void *sym = NULL;
 	uint32_t symidx;
 	uint64_t sym_addr;
-	uint64_t next_addr = -1;
 	for (uint32_t i = 0; i < symtab->nsyms; i++) {
 		const void *nl_i = macho_get_nlist(macho, symtab, i);
 		uint8_t n_type = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_type);
@@ -357,8 +353,6 @@ macho_resolve_address(const struct macho *macho, const struct symtab_command *sy
 			sym = nl_i;
 			symidx = i;
 			sym_addr = n_value;
-		} else if (addr < n_value && n_value <= next_addr) {
-			next_addr = n_value;
 		}
 	}
 	if (sym == NULL) {
@@ -371,7 +365,8 @@ macho_resolve_address(const struct macho *macho, const struct symtab_command *sy
 	}
 	uint64_t sym_strx = MACHO_STRUCT_FIELD(macho, struct nlist, sym, n_un.n_strx);
 	*name = (const char *)((uintptr_t)macho->mh + symtab->stroff + sym_strx);
-	*size = guess_symbol_size(macho, symtab, symidx, next_addr);
+	uint64_t next_addr = macho_next_symbol(macho, symtab, sym_addr);
+	*size = guess_symbol_size(macho, sym_addr, next_addr);
 	*offset = addr - sym_addr;
 	return MACHO_SUCCESS;
 }
@@ -404,6 +399,31 @@ macho_search_data(const struct macho *macho, const void *data, size_t size, int 
 	}
 }
 
+const void *
+macho_section_by_index(const struct macho *macho, uint32_t sect) {
+	if (sect < 1) {
+		return NULL;
+	}
+	const struct load_command *lc = NULL;
+	uint32_t idx = 1;
+	uintptr_t sectcmd = 0;
+	for (;;) {
+		lc = macho_next_segment(macho, lc);
+		if (lc == NULL) {
+			break;
+		}
+		uint32_t nsects = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, nsects);
+		if (sect < idx + nsects) {
+			size_t lc_size = MACHO_STRUCT_SIZE(macho, struct segment_command);
+			sectcmd = (uintptr_t)lc + lc_size;
+			sectcmd += (sect - idx) * MACHO_STRUCT_SIZE(macho, struct section);
+			break;
+		}
+		idx += nsects;
+	}
+	return (const void *)sectcmd;
+}
+
 const struct load_command *
 macho_segment_containing_address(const struct macho *macho, uint64_t addr) {
 	const struct load_command *lc = NULL;
@@ -418,4 +438,22 @@ macho_segment_containing_address(const struct macho *macho, uint64_t addr) {
 			return lc;
 		}
 	}
+}
+
+const void *
+macho_section_containing_address(const struct macho *macho, const struct load_command *lc,
+		uint64_t addr) {
+	uint32_t nsects = MACHO_STRUCT_FIELD(macho, struct segment_command, lc, nsects);
+	const size_t lc_size = MACHO_STRUCT_SIZE(macho, struct segment_command);
+	const size_t sect_size = MACHO_STRUCT_SIZE(macho, struct section);
+	const void *sect = (const void *)((uintptr_t)lc + lc_size);
+	for (size_t i = 0; i < nsects; i++) {
+		uint64_t sectaddr = MACHO_STRUCT_FIELD(macho, struct section, sect, addr);
+		size_t   sectsize = MACHO_STRUCT_FIELD(macho, struct section, sect, size);
+		if (sectaddr <= addr && addr < sectaddr + sectsize) {
+			return sect;
+		}
+		sect = (const void *)((uintptr_t)sect + sect_size);
+	}
+	return NULL;
 }
