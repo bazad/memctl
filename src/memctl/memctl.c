@@ -800,7 +800,7 @@ s_command(kaddr_t address) {
 	}
 	const char *segname = NULL;
 	size_t segoffset;
-	get_segment_offset(&kext.macho, address - kernel_slide, &segname, &segoffset);
+	get_segment_offset(&kext.macho, address - kext.slide, &segname, &segoffset);
 	const char *name = NULL;
 	size_t size = 0;
 	size_t offset = 0;
