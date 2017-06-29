@@ -86,24 +86,6 @@ mach_unexpected(bool error, const char *function, kern_return_t kr) {
 	}
 }
 
-/*
- * ilog2
- *
- * Description:
- * 	Integer logarithm base 2. ilog2(0) is 0.
- */
-static unsigned
-ilog2(uint64_t n) {
-	unsigned log = 0;
-	for (;;) {
-		n >>= 1;
-		if (n == 0) {
-			return log;
-		}
-		log += 1;
-	}
-}
-
 bool
 kernel_allocate(kaddr_t *addr, size_t size) {
 	mach_vm_address_t address = 0;

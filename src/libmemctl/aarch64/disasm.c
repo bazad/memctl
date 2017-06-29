@@ -116,11 +116,10 @@ get_extend(uint32_t ins, unsigned lo) {
 static bool
 decode_bit_masks(unsigned sf, uint8_t N, uint8_t imms, uint8_t immr, uint8_t immediate,
                  uint64_t *wmask, uint64_t *tmask) {
-	uint8_t len = fls((N << 6) | lobits(~imms, 6));
-	if (len <= 1) {
+	int len = msb1((N << 6) | lobits(~imms, 6));
+	if (len < 1) {
 		return false;
 	}
-	len--;
 	uint8_t levels = ones(len);
 	if (immediate != 0 && (imms & levels) == levels) {
 		return false;

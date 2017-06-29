@@ -17,3 +17,4 @@ fffffff0070c003c  ORN     W9, W9, W10
 fffffff0070c0040  BICS    WZR, W8, W9
 fffffff0070c0044  EON     W8, W9, W8
 fffffff0070c0048  ANDS    X29, X25, X1, LSL #35
+fffffff0070c004c  MOV     X9, #0xaaaaaaaaaaaaaaaa

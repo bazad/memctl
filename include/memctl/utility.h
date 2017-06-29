@@ -91,23 +91,27 @@
 	   ((_x & (_x - 1)) == 0); })
 
 /*
- * MACRO ones
+ * ones
  *
  * Description:
  * 	Returns a mask of the given number of bits.
  */
-#define ones(n)								\
-	({ unsigned _n = (n);						\
-	   unsigned _bits = sizeof(uintmax_t) * 8;			\
-	   (_n == _bits ? (uintmax_t)(-1) : ((uintmax_t)1 << _n) - 1); })
+static inline uintmax_t
+ones(unsigned n) {
+	const unsigned bits = sizeof(uintmax_t) * 8;
+	return (n == bits ? (uintmax_t)(-1) : ((uintmax_t)1 << n) - 1);
+}
 
 /*
- * MACRO testbit
+ * testbit
  *
  * Description:
  * 	Returns true if bit n is set in x.
  */
-#define testbit(x, n)		(((x) & ((uintmax_t)1 << (n))) != 0)
+static inline unsigned
+testbit(uintmax_t x, unsigned n) {
+	return ((x & ((uintmax_t)1 << n)) != 0);
+}
 
 /*
  * MACRO bext
@@ -116,17 +120,16 @@
  * 	Extract bits lo to hi of x, inclusive, sign extending the result if sign is 1. Return the
  * 	extracted value shifted left by shift bits.
  */
-#define bext(x, sign, hi, lo, shift)					\
-	({ __typeof__(x) _x = (x);					\
-	   unsigned _sign = (sign);					\
-	   unsigned _hi = (hi);						\
-	   unsigned _lo = (lo);						\
-	   unsigned _shift = (shift);					\
-	   unsigned _bits = sizeof(uintmax_t) * 8;			\
-	   unsigned _d = _bits - (_hi - _lo + 1);			\
-	   (_sign							\
-	    ? ((((intmax_t)  _x) >> _lo) << _d) >> (_d - _shift)	\
-	    : ((((uintmax_t) _x) >> _lo) << _d) >> (_d - _shift)); })
+static inline uintmax_t
+bext(uintmax_t x, unsigned sign, unsigned hi, unsigned lo, unsigned shift) {
+	const unsigned bits = sizeof(uintmax_t) * 8;
+	unsigned d = bits - (hi - lo + 1);
+	if (sign) {
+		return (((((intmax_t)  x) >> lo) << d) >> (d - shift));
+	} else {
+		return (((((uintmax_t) x) >> lo) << d) >> (d - shift));
+	}
+}
 
 /*
  * MACRO popcount
@@ -139,6 +142,38 @@
 #else
 #error popcount not implemented
 #endif
+
+/*
+ * msb1
+ *
+ * Description:
+ * 	Computes the index (starting at 0) of the most significant 1 bit. If the input is 0, then
+ * 	-1 is returned.
+ *
+ * TODO: Use a faster implementation.
+ */
+static inline int
+msb1(uintmax_t n) {
+	unsigned msb = -1;
+	while (n > 0) {
+		n >>= 1;
+		msb += 1;
+	}
+	return msb;
+}
+
+
+/*
+ * MACRO ilog2
+ *
+ * Description:
+ * 	Computes the integer part (floor) of the logarithm base 2 of the given integer. If the
+ * 	input is 0, -1 is returned.
+ */
+static inline int
+ilog2(uintmax_t n) {
+	return msb1(n);
+}
 
 /*
  * MACRO lsl
@@ -216,12 +251,14 @@
  * 					4, or 8.
  */
 static inline void
-pack_uint(void *dest, uint64_t value, unsigned width) {
+pack_uint(void *dest, uintmax_t value, unsigned width) {
 	switch (width) {
 		case 1: *(uint8_t  *)dest = value; break;
 		case 2: *(uint16_t *)dest = value; break;
 		case 4: *(uint32_t *)dest = value; break;
+#ifdef UINT64_MAX
 		case 8: *(uint64_t *)dest = value; break;
+#endif
 	}
 }
 
@@ -239,13 +276,15 @@ pack_uint(void *dest, uint64_t value, unsigned width) {
  * Returns:
  * 	The `width`-byte integer in `src` as a uint64_t.
  */
-static inline uint64_t
+static inline uintmax_t
 unpack_uint(const void *src, unsigned width) {
 	switch (width) {
 		case 1:  return *(uint8_t  *)src;
 		case 2:  return *(uint16_t *)src;
 		case 4:  return *(uint32_t *)src;
+#ifdef UINT64_MAX
 		case 8:  return *(uint64_t *)src;
+#endif
 		default: assert(false);
 	}
 }
