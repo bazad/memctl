@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#define HANDLER(name)							\
+	static bool name(const struct argument *arguments)
+
 #define OPT_GET_OR_(n_, opt_, arg_, val_, type_, field_)		\
 	({ const struct argument *a = &arguments[n_];			\
 	   assert(strcmp(a->option, opt_) == 0);			\
@@ -145,11 +148,11 @@ parse_protection(const char *command, const char *protection, int *pprot) {
 	return false;
 }
 
-static bool i_handler(const struct argument *arguments) {
+HANDLER(i_handler) {
 	return i_command();
 }
 
-static bool r_handler(const struct argument *arguments) {
+HANDLER(r_handler) {
 	size_t width    = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
 	bool dump       = OPT_PRESENT(1, "d");
 	bool physical   = OPT_PRESENT(2, "p");
@@ -166,7 +169,7 @@ static bool r_handler(const struct argument *arguments) {
 	return r_command(address, length, physical, width, access, dump);
 }
 
-static bool rb_handler(const struct argument *arguments) {
+HANDLER(rb_handler) {
 	bool physical   = OPT_PRESENT(0, "p");
 	size_t access   = OPT_GET_WIDTH_OR(1, "x", "access", 0);
 	kaddr_t address = ARG_GET_ADDRESS(2, "address");
@@ -176,7 +179,7 @@ static bool rb_handler(const struct argument *arguments) {
 
 #if MEMCTL_DISASSEMBLY
 
-static bool ri_handler(const struct argument *arguments) {
+HANDLER(ri_handler) {
 	bool physical   = OPT_PRESENT(0, "p");
 	size_t access   = OPT_GET_WIDTH_OR(1, "x", "access", 0);
 	kaddr_t address = ARG_GET_ADDRESS(2, "address");
@@ -190,7 +193,7 @@ static bool ri_handler(const struct argument *arguments) {
 	return ri_command(address, length, physical, access);
 }
 
-static bool rif_handler(const struct argument *arguments) {
+HANDLER(rif_handler) {
 	size_t access             = OPT_GET_WIDTH_OR(0, "x", "access", 0);
 	struct argsymbol function = ARG_GET_SYMBOL(1, "function");
 	return rif_command(function.symbol, function.kext, access);
@@ -198,7 +201,7 @@ static bool rif_handler(const struct argument *arguments) {
 
 #endif // MEMCTL_DISASSEMBLY
 
-static bool rs_handler(const struct argument *arguments) {
+HANDLER(rs_handler) {
 	bool physical   = OPT_PRESENT(0, "p");
 	size_t access   = OPT_GET_WIDTH_OR(1, "x", "access", 0);
 	kaddr_t address = ARG_GET_ADDRESS(2, "address");
@@ -206,7 +209,7 @@ static bool rs_handler(const struct argument *arguments) {
 	return rs_command(address, length, physical, access);
 }
 
-static bool w_handler(const struct argument *arguments) {
+HANDLER(w_handler) {
 	size_t width    = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
 	bool physical   = OPT_PRESENT(1, "p");
 	size_t access   = OPT_GET_WIDTH_OR(2, "x", "access", 0);
@@ -215,7 +218,7 @@ static bool w_handler(const struct argument *arguments) {
 	return w_command(address, value, physical, width, access);
 }
 
-static bool wd_handler(const struct argument *arguments) {
+HANDLER(wd_handler) {
 	bool physical       = OPT_PRESENT(0, "p");
 	size_t access       = OPT_GET_WIDTH_OR(1, "x", "access", 0);
 	kaddr_t address     = ARG_GET_ADDRESS(2, "address");
@@ -223,7 +226,7 @@ static bool wd_handler(const struct argument *arguments) {
 	return wd_command(address, data.data, data.length, physical, access);
 }
 
-static bool ws_handler(const struct argument *arguments) {
+HANDLER(ws_handler) {
 	bool physical      = OPT_PRESENT(0, "p");
 	size_t access      = OPT_GET_WIDTH_OR(1, "x", "access", 0);
 	kaddr_t address    = ARG_GET_ADDRESS(2, "address");
@@ -231,7 +234,7 @@ static bool ws_handler(const struct argument *arguments) {
 	return ws_command(address, string, physical, access);
 }
 
-static bool f_handler(const struct argument *arguments) {
+HANDLER(f_handler) {
 	size_t width          = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
 	bool physical         = OPT_PRESENT(1, "p");
 	bool heap             = OPT_PRESENT(2, "h");
@@ -249,7 +252,7 @@ static bool f_handler(const struct argument *arguments) {
 	return f_command(range.start, range.end, value, width, physical, heap, access, alignment);
 }
 
-static bool fpr_handler(const struct argument *arguments) {
+HANDLER(fpr_handler) {
 	intmax_t ipid = ARG_GET_INT(0, "pid");
 	pid_t pid = ipid;
 	if ((intmax_t)pid != ipid) {
@@ -259,7 +262,7 @@ static bool fpr_handler(const struct argument *arguments) {
 	return fpr_command(pid);
 }
 
-static bool fc_handler(const struct argument *arguments) {
+HANDLER(fc_handler) {
 	const char *bundle_id = OPT_GET_STRING_OR(0, "b", "kext", NULL);
 	bool in_kernel        = OPT_PRESENT(1, "k");
 	size_t access         = OPT_GET_WIDTH_OR(2, "x", "access", 0);
@@ -275,18 +278,23 @@ static bool fc_handler(const struct argument *arguments) {
 	return fc_command(range.start, range.end, classname, bundle_id, access);
 }
 
-static bool kp_handler(const struct argument *arguments) {
+HANDLER(kp_handler) {
 	kaddr_t address = ARG_GET_ADDRESS(0, "address");
 	return kp_command(address);
 }
 
-static bool kpm_handler(const struct argument *arguments) {
+HANDLER(kpm_handler) {
 	struct argrange range = ARG_GET_RANGE(0, "range");
 	default_virtual_range(&range);
 	return kpm_command(range.start, range.end);
 }
 
-static bool vt_handler(const struct argument *arguments) {
+HANDLER(kz_handler) {
+	kaddr_t address = ARG_GET_ADDRESS(0, "address");
+	return kz_command(address);
+}
+
+HANDLER(vt_handler) {
 	const char *bundle_id = OPT_GET_STRING_OR(0, "b", "kext", NULL);
 	bool in_kernel        = OPT_PRESENT(1, "k");
 	const char *classname = ARG_GET_STRING(2, "class");
@@ -300,19 +308,19 @@ static bool vt_handler(const struct argument *arguments) {
 	return vt_command(classname, bundle_id);
 }
 
-static bool vm_handler(const struct argument *arguments) {
+HANDLER(vm_handler) {
 	unsigned depth  = OPT_GET_UINT_OR(0, "d", "depth", 2048);
 	kaddr_t address = ARG_GET_ADDRESS(1, "address");
 	return vm_command(address, depth);
 }
 
-static bool vmm_handler(const struct argument *arguments) {
+HANDLER(vmm_handler) {
 	unsigned depth        = OPT_GET_UINT_OR(0, "d", "depth", 2048);
 	struct argrange range = ARG_GET_RANGE_OR(1, "range", 0, -1);
 	return vmm_command(range.start, range.end, depth);
 }
 
-static bool vmp_handler(const struct argument *arguments) {
+HANDLER(vmp_handler) {
 	const char *protection = ARG_GET_STRING(0, "protection");
 	kaddr_t address        = ARG_GET_ADDRESS(1, "address");
 	size_t length          = ARG_GET_UINT_OR(2, "length", 1);
@@ -323,29 +331,29 @@ static bool vmp_handler(const struct argument *arguments) {
 	return vmp_command(address, length, prot);
 }
 
-static bool ks_handler(const struct argument *arguments) {
+HANDLER(ks_handler) {
 	bool unslide    = OPT_PRESENT(0, "u");
 	kaddr_t address = ARG_GET_ADDRESS_OR(1, "address", 0);
 	return ks_command(address, unslide);
 }
 
-static bool a_handler(const struct argument *arguments) {
+HANDLER(a_handler) {
 	struct argsymbol symbol = ARG_GET_SYMBOL(0, "symbol");
 	return a_command(symbol.symbol, symbol.kext);
 }
 
-static bool ap_handler(const struct argument *arguments) {
+HANDLER(ap_handler) {
 	bool unpermute  = OPT_PRESENT(0, "u");
 	kaddr_t address = ARG_GET_ADDRESS_OR(1, "address", 0);
 	return ap_command(address, unpermute);
 }
 
-static bool s_handler(const struct argument *arguments) {
+HANDLER(s_handler) {
 	kaddr_t address = ARG_GET_ADDRESS(0, "address");
 	return s_command(address);
 }
 
-static bool kcd_handler(const struct argument *arguments) {
+HANDLER(kcd_handler) {
 	const char *output = OPT_GET_STRING_OR(0, "o", "output", NULL);
 #if KERNELCACHE
 	const char *kernelcache = ARG_GET_STRING_OR(1, "file", NULL);
@@ -355,7 +363,7 @@ static bool kcd_handler(const struct argument *arguments) {
 	return kcd_command(kernelcache, output);
 }
 
-static bool root_handler(const struct argument *arguments) {
+HANDLER(root_handler) {
 	return root_command();
 }
 
@@ -478,6 +486,12 @@ static struct command commands[] = {
 		"map to physical pages",
 		1, (struct argspec *) &(struct argspec[1]) {
 			{ ARGUMENT, "range", ARG_RANGE, "range of virtual addresses" },
+		},
+	}, {
+		"kz", NULL, kz_handler,
+		"get size of kalloc memory",
+		1, (struct argspec *) &(struct argspec[1]) {
+			{ ARGUMENT, "address", ARG_ADDRESS, "kalloc address" },
 		},
 	}, {
 		"vt", NULL, vt_handler,

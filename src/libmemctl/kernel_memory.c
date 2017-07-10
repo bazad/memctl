@@ -57,6 +57,9 @@ kernel_write_fn physical_write_unsafe;
 bool (*kernel_virtual_to_physical)(
 		kaddr_t kaddr,
 		paddr_t *paddr);
+bool (*kalloc_size)(
+		kaddr_t kaddr,
+		size_t *size);
 
 // pmap_t kernel_pmap;
 static kaddr_t kernel_pmap;
@@ -75,6 +78,9 @@ static kaddr_t _IOMappedWrite8;
 static kaddr_t _IOMappedWrite16;
 static kaddr_t _IOMappedWrite32;
 static kaddr_t _IOMappedWrite64;
+
+// vm_size_t zone_element_size(void *addr, zone_t *z)
+static kaddr_t _zone_element_size;
 
 /*
  * mach_unexpected
@@ -660,10 +666,30 @@ kernel_virtual_to_physical_(kaddr_t kaddr, paddr_t *paddr) {
 }
 
 bool
+kalloc_size_(kaddr_t address, size_t *size) {
+	vm_size_t vmsize;
+	kword_t args[] = { address, 0 };
+	bool success = kernel_call(&vmsize, sizeof(vmsize), _zone_element_size, 2, args);
+	if (!success) {
+		error_internal("could not call %s", "_zone_element_size");
+		return false;
+	}
+	// TODO: kalloc_size includes vm_map_lookup_kalloc_entry_locked.
+	*size = vmsize;
+	return true;
+}
+
+bool
 kernel_memory_init() {
 #define SET(fn)									\
 	if (fn == NULL) {							\
 		fn = fn##_;							\
+	}
+#define TRY_RESOLVE(sym)							\
+	if (sym == 0) {								\
+		error_stop();							\
+		kernel_symbol(#sym, &sym, NULL);				\
+		error_start();							\
 	}
 #define DO_RESOLVE(sym)								\
 	kext_result kr = kernel_symbol(#sym, &sym, NULL);			\
@@ -727,8 +753,14 @@ kernel_memory_init() {
 	if (kernel_call(NULL, 0, 0, 2, dummy_args)) {
 		SET(physical_write_unsafe);
 	}
+	// Load kalloc_size.
+	TRY_RESOLVE(_zone_element_size);
+	if (_zone_element_size != 0) {
+		SET(kalloc_size);
+	}
 	return true;
 #undef SET
+#undef TRY_RESOLVE
 #undef DO_RESOLVE
 #undef RESOLVE
 #undef READ

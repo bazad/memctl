@@ -676,6 +676,25 @@ kpm_command(kaddr_t start, kaddr_t end) {
 }
 
 bool
+kz_command(kaddr_t address) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
+	if (kalloc_size == NULL) {
+		error_functionality_unavailable("kalloc_size unavailable");
+		return false;
+	}
+	size_t size;
+	bool success = kalloc_size(address, &size);
+	if (!success) {
+		error_message("kalloc_size("KADDR_XFMT") failed", address);
+		return false;
+	}
+	printf("%zu\n", size);
+	return true;
+}
+
+bool
 vt_command(const char *classname, const char *bundle_id) {
 	kaddr_t address;
 	size_t size;
