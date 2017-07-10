@@ -158,8 +158,9 @@ initialize(feature_t features) {
 		LOADED(KERNEL_TASK);
 	}
 	if (NEED(KERNEL_MEMORY_BASIC)) {
-		if (!kernel_memory_init()) {
-			error_message("could not initialize kernel memory");
+		kernel_memory_init();
+		if (kernel_read_unsafe == NULL) {
+			error_message("could not initialize unsafe kernel memory functions");
 			return false;
 		}
 		LOADED(KERNEL_MEMORY_BASIC);
@@ -190,8 +191,13 @@ initialize(feature_t features) {
 		LOADED(KERNEL_CALL);
 	}
 	if (NEED(KERNEL_MEMORY)) {
-		if (!kernel_memory_init()) {
-			error_message("could not initialize kernel memory");
+		kernel_memory_init();
+		if (kernel_read_all == NULL || kernel_virtual_to_physical == NULL) {
+			error_message("could not initialize safe kernel memory functions");
+			return false;
+		}
+		if (physical_read_unsafe == NULL || physical_write_unsafe == NULL) {
+			error_message("could not initialize unsafe physical memory functions");
 			return false;
 		}
 		LOADED(KERNEL_MEMORY);

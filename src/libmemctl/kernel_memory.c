@@ -206,6 +206,9 @@ physical_word_write_unsafe(paddr_t paddr, uint64_t data, size_t logsize) {
  *
  * Notes:
  * 	Since at most 8 bytes can be transferred per kernel call, this operation is slow.
+ *
+ * 	If access is 8 but we are reading from the kernel and 8-byte return values are not
+ * 	supported, then memory will silently be read with width 4.
  */
 static kernel_io_result
 transfer_physical_words_unsafe(paddr_t paddr, size_t size, void *data, size_t access,
@@ -679,64 +682,56 @@ kalloc_size_(kaddr_t address, size_t *size) {
 	return true;
 }
 
-bool
+void
 kernel_memory_init() {
 #define SET(fn)									\
 	if (fn == NULL) {							\
 		fn = fn##_;							\
 	}
-#define TRY_RESOLVE(sym)							\
-	if (sym == 0) {								\
+#define RESOLVE(sym)								\
+	if (sym == 0 && kernel.base != 0 && kernel.slide != 0) {		\
 		error_stop();							\
 		kernel_symbol(#sym, &sym, NULL);				\
 		error_start();							\
 	}
-#define DO_RESOLVE(sym)								\
-	kext_result kr = kernel_symbol(#sym, &sym, NULL);			\
-	if (kr != KEXT_SUCCESS) {						\
-		error_internal("could not resolve %s", #sym);			\
-		return false;							\
-	}
-#define RESOLVE(sym)								\
-	if (sym == 0) {								\
-		DO_RESOLVE(sym);						\
-	}
 #define READ(var)								\
-	if (var == 0) {								\
-		kaddr_t _##var;							\
-		DO_RESOLVE(_##var);						\
-		kernel_io_result kior = kernel_read_word(kernel_read_unsafe,	\
-				_##var, &var, sizeof(var), 0);			\
-		if (kior != KERNEL_IO_SUCCESS) {				\
-			error_internal("could not read %s", "_"#var);		\
-			return false;						\
+	do {									\
+		kaddr_t _##var = 0;						\
+		RESOLVE(_##var);						\
+		if (_##var != 0 && kernel_read_unsafe != 0) {			\
+			error_stop();						\
+			kernel_read_word(kernel_read_unsafe,			\
+					_##var, &var, sizeof(var), 0);		\
+			error_start();						\
 		}								\
-	}
+	} while (0)
 
-	// Load the basic functionality provided by kernel_task.
-	if (kernel_task == MACH_PORT_NULL) {
-		return true;
+	// Load the basic kernel read/write functions.
+	if (kernel_task != MACH_PORT_NULL) {
+		SET(kernel_read_unsafe);
+		SET(kernel_write_unsafe);
+		SET(kernel_read_heap);
+		SET(kernel_write_heap);
 	}
-	SET(kernel_read_unsafe);
-	SET(kernel_write_unsafe);
-	SET(kernel_read_heap);
-	SET(kernel_write_heap);
-	// Load symbols and kernel variable values for kernel_virtual_to_physical.
-	if (kernel.base == 0 || kernel.slide == 0) {
-		return true;
+	// Load kernel_virtual_to_physical.
+	if (kernel_virtual_to_physical == NULL) {
+		READ(kernel_pmap);
+		RESOLVE(_pmap_find_phys);
+		if (kernel_pmap != 0 && _pmap_find_phys != 0) {
+			kword_t dummy_args[2] = { kernel_pmap, kernel.base };
+			if (kernel_call(NULL, sizeof(ppnum_t), 0, 2, dummy_args)) {
+				SET(kernel_virtual_to_physical);
+			}
+		}
 	}
-	READ(kernel_pmap);
-	RESOLVE(_pmap_find_phys);
-	// Load kernel_virtual_to_physical and the functions that depend on it.
-	kword_t kv2p_args[2] = { kernel_pmap, kernel.base };
-	if (kernel_call(NULL, sizeof(ppnum_t), 0, 2, kv2p_args)) {
-		SET(kernel_virtual_to_physical);
+	// Load the kernel read/write functions that depend on kernel_virtual_to_physical.
+	if (kernel_task != MACH_PORT_NULL && kernel_virtual_to_physical != NULL) {
 		SET(kernel_read_safe);
 		SET(kernel_write_safe);
 		SET(kernel_read_all);
 		SET(kernel_write_all);
 	}
-	// Load symbols for physical memory functions.
+	// Resolve the XNU physical memory functions.
 	RESOLVE(_IOMappedRead8);
 	RESOLVE(_IOMappedRead16);
 	RESOLVE(_IOMappedRead32);
@@ -745,23 +740,32 @@ kernel_memory_init() {
 	RESOLVE(_IOMappedWrite16);
 	RESOLVE(_IOMappedWrite32);
 	RESOLVE(_IOMappedWrite64);
-	// Load the physical memory functions.
-	kword_t dummy_args[2] = { 1, 1 };
-	if (kernel_call(NULL, sizeof(uint32_t), 0, 1, dummy_args)) {
-		SET(physical_read_unsafe);
+	// Load the unsafe physical memory read/write functions.
+	if (physical_read_unsafe == NULL && _IOMappedRead8 != 0 && _IOMappedRead16 != 0
+			&& _IOMappedRead32 != 0 && _IOMappedRead64 != 0) {
+		kword_t dummy_args[2] = { 1, 1 };
+		if (kernel_call(NULL, sizeof(uint32_t), 0, 1, dummy_args)) {
+			SET(physical_read_unsafe);
+		}
 	}
-	if (kernel_call(NULL, 0, 0, 2, dummy_args)) {
-		SET(physical_write_unsafe);
+	if (physical_write_unsafe == NULL && _IOMappedWrite8 != 0 && _IOMappedWrite16 != 0
+			&& _IOMappedWrite32 != 0 && _IOMappedWrite64 != 0) {
+		kword_t dummy_args[2] = { 1, 1 };
+		if (kernel_call(NULL, 0, 0, 2, dummy_args)) {
+			SET(physical_write_unsafe);
+		}
 	}
 	// Load kalloc_size.
-	TRY_RESOLVE(_zone_element_size);
-	if (_zone_element_size != 0) {
-		SET(kalloc_size);
+	if (kalloc_size == NULL) {
+		RESOLVE(_zone_element_size);
+		if (_zone_element_size != 0) {
+			kword_t dummy_args[2] = { kernel.base, 0 };
+			if (kernel_call(NULL, sizeof(vm_size_t), 0, 2, dummy_args)) {
+				SET(kalloc_size);
+			}
+		}
 	}
-	return true;
 #undef SET
-#undef TRY_RESOLVE
-#undef DO_RESOLVE
 #undef RESOLVE
 #undef READ
 }

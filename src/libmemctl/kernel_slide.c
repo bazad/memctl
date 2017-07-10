@@ -324,7 +324,8 @@ kernel_slide_init() {
 		return true;
 	}
 #if KERNELCACHE
-	return kernel_memory_init() && kernel_slide_init_ios();
+	kernel_memory_init();
+	return kernel_slide_init_ios();
 #else
 	return kernel_slide_init_macos();
 #endif

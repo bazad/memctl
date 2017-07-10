@@ -13,10 +13,10 @@ memctl_find(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physic
 		size_t access, size_t alignment) {
 	// Select the read function.
 	kernel_read_fn read = kernel_read_all;
-	if (heap) {
+	if (heap || read == NULL) {
 		read = kernel_read_heap;
 	} else if (physical) {
-		error_internal("physical memory read not implemented"); // TODO
+		error_internal("physical memory find not implemented"); // TODO
 		return false;
 	}
 	// Initialize the loop.

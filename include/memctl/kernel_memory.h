@@ -307,10 +307,7 @@ extern bool (*kalloc_size)(
  * Description:
  * 	Initialize the kernel memory functions based on currently available functionality. This
  * 	function can be called multiple times.
- *
- * Returns:
- * 	True if there were no errors.
  */
-bool kernel_memory_init(void);
+void kernel_memory_init(void);
 
 #endif
