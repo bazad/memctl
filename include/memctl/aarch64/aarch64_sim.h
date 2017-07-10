@@ -137,6 +137,7 @@ enum aarch64_sim_branch_type {
 	AARCH64_SIM_BRANCH_TYPE_BRANCH,
 	AARCH64_SIM_BRANCH_TYPE_BRANCH_AND_LINK,
 	AARCH64_SIM_BRANCH_TYPE_RETURN,
+	AARCH64_SIM_BRANCH_TYPE_CONDITIONAL,
 };
 
 /*
@@ -149,6 +150,8 @@ enum aarch64_sim_branch_type {
  * 		sim			The simulator.
  * 		type			The type of branch.
  * 		branch			The address of the branch.
+ * 		condition		For conditional branch instructions, the branch condition
+ * 					(i.e., true if the branch should be taken).
  * 	out	take_branch		On return, indicates whether the simulator should take the
  * 					branch or not.
  *
@@ -159,6 +162,7 @@ typedef bool (*aarch64_sim_branch_hit_fn)(
 		struct aarch64_sim *sim,
 		enum aarch64_sim_branch_type type,
 		const struct aarch64_sim_word *branch,
+		const struct aarch64_sim_word *condition,
 		bool *take_branch);
 
 /*

@@ -491,6 +491,7 @@ disassemble_adr_b(uint32_t ins, uint64_t pc, char *buf) {
 	struct aarch64_ins_adr adr;
 	struct aarch64_ins_b   b;
 	struct aarch64_ins_br  br;
+	struct aarch64_ins_cbz cbz;
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
 	if (aarch64_decode_adr(ins, pc, &adr)) {
@@ -505,6 +506,8 @@ disassemble_adr_b(uint32_t ins, uint64_t pc, char *buf) {
 		} else {
 			W("%-7s %s", "RET", reg(br.Xn));
 		}
+	} else if (aarch64_decode_cbz(ins, pc, &cbz)) {
+		W("%-7s %s, #0x%llx", (cbz.n ? "CBNZ" : "CBZ"), reg(cbz.Rt), cbz.label);
 	} else {
 		return false;
 	}

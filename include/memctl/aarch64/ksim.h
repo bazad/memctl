@@ -35,6 +35,18 @@ typedef bool (*ksim_stop_fn)(
 		uint32_t ins);
 
 /*
+ * enum ksim_branch_condition
+ *
+ * Description:
+ * 	For conditional branch instructions, the branch condition (true, false, or unknown).
+ */
+enum ksim_branch_condition {
+	KSIM_BRANCH_CONDITION_UNKNOWN,
+	KSIM_BRANCH_CONDITION_TRUE,
+	KSIM_BRANCH_CONDITION_FALSE,
+};
+
+/*
  * ksim_handle_branch_fn
  *
  * Description:
@@ -46,6 +58,8 @@ typedef bool (*ksim_stop_fn)(
  * 		ins			The branch instruction.
  * 		branch_address		The address that would be branched to if the branch
  * 					condition is true.
+ * 		branch_condition	For a conditional branch instruction, the branch condition
+ * 					(i.e., whether the branch would be taken).
  * 	out	take_branch		On return, instructs the simulator whether or not to take
  * 					the branch.
  * 	out	stop			On return, instructs the simulator whether to stop after
@@ -59,10 +73,9 @@ typedef bool (*ksim_handle_branch_fn)(
 		struct ksim *ksim,
 		uint32_t ins,
 		uint64_t branch_address,
+		enum ksim_branch_condition branch_condition,
 		bool *take_branch,
 		bool *stop);
-
-
 
 /*
  * struct ksim
@@ -87,6 +100,8 @@ struct ksim {
 	const void *code_data;
 	size_t code_size;
 	uint64_t code_address;
+	// Client-specified context.
+	void *context;
 	// A callback indicating if the simulation should stop before executing the current
 	// instruction.
 	ksim_stop_fn stop_before;

@@ -60,12 +60,14 @@ ARCH_arm64_DIR = aarch64
 LIBMEMCTL_arm64_SRCS = aarch64_sim.c \
 		       disasm.c \
 		       kernel_call_aarch64.c \
-		       memory_region.c \
 		       ksim.c \
-		       zone_element_size.c
+		       memory_region.c \
+		       pthread_callbacks_finder.c \
+		       zone_element_size_finder.c
 
 LIBMEMCTL_arm64_HDRS = kernel_call_aarch64.h \
-		       zone_element_size.h
+		       pthread_callbacks_finder.h \
+		       zone_element_size_finder.h
 
 LIBMEMCTL_arm64_INCS = aarch64_sim.h \
 		       disasm.h \

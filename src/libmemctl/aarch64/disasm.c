@@ -388,6 +388,25 @@ aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br) {
 }
 
 bool
+aarch64_decode_cbz(uint32_t ins, uint64_t pc, struct aarch64_ins_cbz *cbz) {
+	//  31   30         25 24  23                                    5 4         0
+	// +----+-------------+---+---------------------------------------+-----------+
+	// | sf | 0 1 1 0 1 0 | 0 |                 imm19                 |    Rt     | CBZ
+	// | sf | 0 1 1 0 1 0 | 1 |                 imm19                 |    Rt     | CBNZ
+	// +----+-------------+---+---------------------------------------+-----------+
+	//                     op
+	if (!AARCH64_INS_TYPE(ins, CBZ_CLASS)) {
+		return false;
+	}
+	unsigned sf = test(ins, 31);
+	unsigned n  = test(ins, 24);
+	cbz->n     = n;
+	cbz->Rt    = gpreg(ins, sf, USE_ZR, 0);
+	cbz->label = pc + extract(ins, 1, 23, 5, 2);
+	return true;
+}
+
+bool
 aarch64_decode_ldp(uint32_t ins, struct aarch64_ins_ldp *ldp) {
 	//  31 30 29   27 26  25   23 22  21           15 14       10 9         5 4         0
 	// +-----+-------+---+-------+---+---------------+-----------+-----------+-----------+

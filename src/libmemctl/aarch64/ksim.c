@@ -151,7 +151,8 @@ ksim_memory_store(struct aarch64_sim *sim,
  */
 static bool
 ksim_branch_hit(struct aarch64_sim *sim, enum aarch64_sim_branch_type type,
-		const struct aarch64_sim_word *branch, bool *take_branch) {
+		const struct aarch64_sim_word *branch, const struct aarch64_sim_word *condition,
+		bool *take_branch) {
 	struct ksim *ksim = sim->context;
 	// If the user has a branch handler, use that.
 	if (ksim->handle_branch != NULL) {
@@ -159,9 +160,15 @@ ksim_branch_hit(struct aarch64_sim *sim, enum aarch64_sim_branch_type type,
 		if (taint_unknown(branch->taint)) {
 			branch_address = KSIM_PC_UNKNOWN;
 		}
+		enum ksim_branch_condition branch_condition = KSIM_BRANCH_CONDITION_UNKNOWN;
+		if (!taint_unknown(condition->taint)) {
+			branch_condition = (condition->value
+					? KSIM_BRANCH_CONDITION_TRUE
+					: KSIM_BRANCH_CONDITION_FALSE);
+		}
 		bool stop;
 		bool handled = ksim->handle_branch(ksim, sim->instruction.value, branch_address,
-				take_branch, &stop);
+				branch_condition, take_branch, &stop);
 		if (handled) {
 			if (stop) {
 				ksim->internal.do_stop = true;
@@ -170,7 +177,8 @@ ksim_branch_hit(struct aarch64_sim *sim, enum aarch64_sim_branch_type type,
 		}
 	}
 	// Don't take conditional branches and branches with link.
-	*take_branch = (type != AARCH64_SIM_BRANCH_TYPE_BRANCH_AND_LINK);
+	*take_branch = (type != AARCH64_SIM_BRANCH_TYPE_CONDITIONAL
+			&& type != AARCH64_SIM_BRANCH_TYPE_BRANCH_AND_LINK);
 	// If the current branch looks like a function call, clear the temporary registers.
 	if (type == AARCH64_SIM_BRANCH_TYPE_BRANCH_AND_LINK) {
 		ksim->internal.clear_temporaries = true;

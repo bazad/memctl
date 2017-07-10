@@ -243,6 +243,7 @@ aarch64_sim_step(struct aarch64_sim *sim) {
 	bool take_branch = true;
 	enum aarch64_sim_branch_type branch_type = AARCH64_SIM_BRANCH_TYPE_BRANCH;
 	struct aarch64_sim_word branch_address = { 0, taint };
+	struct aarch64_sim_word branch_condition = { 1, taint };
 	// Common values.
 	uint64_t op1, op2, result;
 	uint8_t carry = 0;
@@ -257,6 +258,7 @@ aarch64_sim_step(struct aarch64_sim *sim) {
 	struct aarch64_ins_and_sr  and_sr;
 	struct aarch64_ins_b       b;
 	struct aarch64_ins_br      br;
+	struct aarch64_ins_cbz     cbz;
 	struct aarch64_ins_ldp     ldp;
 	struct aarch64_ins_ldr_im  ldr_im;
 	struct aarch64_ins_ldr_lit ldr_lit;
@@ -363,6 +365,14 @@ aarch64_sim_step(struct aarch64_sim *sim) {
 		}
 		branch_address.value = gpreg_get_(sim, br.Xn, &taint);
 		branch_address.taint = taint;
+	} else if (aarch64_decode_cbz(ins, pc, &cbz)) {
+		do_branch = true;
+		branch_type = AARCH64_SIM_BRANCH_TYPE_CONDITIONAL;
+		op1 = gpreg_get_(sim, cbz.Rt, &taint);
+		branch_condition.value = ((cbz.n && op1 != 0) || (!cbz.n && op1 == 0));
+		branch_condition.taint = taint;
+		branch_address.value = pc + cbz.label;
+		aarch64_sim_taint_meet_with(&branch_address.taint, sim->PC.taint);
 	} else if (aarch64_decode_ldp(ins, &ldp)) {
 		uint64_t address = gpreg_get_(sim, ldp.Xn, &taint);
 		if (!ldp.post) {
@@ -476,7 +486,8 @@ aarch64_sim_step(struct aarch64_sim *sim) {
 
 	// Handle any branching.
 	if (do_branch) {
-		run = sim->branch_hit(sim, branch_type, &branch_address, &take_branch);
+		run = sim->branch_hit(sim, branch_type, &branch_address, &branch_condition,
+				&take_branch);
 		if (!run) {
 			keep_running = false;
 		}

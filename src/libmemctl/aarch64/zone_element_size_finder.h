@@ -1,5 +1,5 @@
-#ifndef MEMCTL__AARCH64__ZONE_ELEMENT_SIZE_H_
-#define MEMCTL__AARCH64__ZONE_ELEMENT_SIZE_H_
+#ifndef MEMCTL__AARCH64__ZONE_ELEMENT_SIZE_FINDER_H_
+#define MEMCTL__AARCH64__ZONE_ELEMENT_SIZE_FINDER_H_
 
 /*
  * kernel_symbol_finder_init_zone_element_size

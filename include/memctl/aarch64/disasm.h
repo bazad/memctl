@@ -667,9 +667,32 @@ bool aarch64_decode_br(uint32_t ins, struct aarch64_ins_br *br);
 
 // BRK
 
+// ---- CBNZ, CBZ ----
+
+#define AARCH64_CBZ_CLASS_MASK 0x7e000000
+#define AARCH64_CBZ_CLASS_BITS 0x34000000
+
+struct aarch64_ins_cbz {
+	uint8_t       n:1;
+	uint8_t       _fill:7;
+	aarch64_gpreg Rt;
+	uint64_t      label;
+};
+
+bool aarch64_decode_cbz(uint32_t ins, uint64_t pc, struct aarch64_ins_cbz *cbz);
+
 // CBNZ
+//   CBNZ <Wt>, <label>
+//   CBNZ <Xt>, <label>
+#define AARCH64_CBNZ_INS_MASK 0x7f000000
+#define AARCH64_CBNZ_INS_BITS 0x35000000
 
 // CBZ
+//   CBZ <Wt>, <label>
+//   CBZ <Xt>, <label>
+#define AARCH64_CBZ_INS_MASK 0x7f000000
+#define AARCH64_CBZ_INS_BITS 0x34000000
+
 
 // CCMN immediate
 

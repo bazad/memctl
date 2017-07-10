@@ -1,4 +1,4 @@
-#include "aarch64/zone_element_size.h"
+#include "aarch64/zone_element_size_finder.h"
 /*
  * Locating _zone_element_size
  * ---------------------------
@@ -18,13 +18,13 @@ static kaddr_t _kfree_addr;
 static kaddr_t _zone_element_size;
 
 /*
- * get_free_addr
+ * find___FREE
  *
  * Description:
  * 	Get the static address of the __FREE symbol.
  */
 static kaddr_t
-get_free_addr(void) {
+find___FREE(void) {
 	kaddr_t __FREE;
 	kext_result kr = kernel_symbol("__FREE", &__FREE, NULL);
 	// Subtract out the slide, since we're simulating using the static addresses.
@@ -42,21 +42,21 @@ stop_at_b(struct ksim *ksim, uint32_t ins) {
 	return AARCH64_INS_TYPE(ins, B_INS);
 }
 
-#define MAX_KFREE_ADDR_INSTRUCTIONS 8
+#define MAX__kfree_addr_INSTRUCTIONS 8
 
 /*
- * get_kfree_addr
+ * find__kfree_addr
  *
  * Description:
  * 	Find the address of _kfree_addr by simulating the execution of __FREE.
  */
 static bool
-get_kfree_addr(kaddr_t __FREE) {
+find__kfree_addr(kaddr_t __FREE) {
 	struct ksim ksim;
 	if (!ksim_init_kext(&ksim, &kernel, __FREE)) {
 		return false;
 	}
-	ksim.max_instruction_count = MAX_KFREE_ADDR_INSTRUCTIONS;
+	ksim.max_instruction_count = MAX__kfree_addr_INSTRUCTIONS;
 	ksim.stop_after = stop_at_b;
 	if (!ksim_run(&ksim)) {
 		return false;
@@ -66,13 +66,14 @@ get_kfree_addr(kaddr_t __FREE) {
 }
 
 /*
- * get_bl
+ * take_bl_and_stop
  *
  * Description:
  * 	Take a branch from a BL instruction then stop.
  */
 static bool
-get_bl(struct ksim *ksim, uint32_t ins, uint64_t branch_address, bool *take_branch, bool *stop) {
+take_bl_and_stop(struct ksim *ksim, uint32_t ins, uint64_t branch_address,
+		enum ksim_branch_condition branch_condition, bool *take_branch, bool *stop) {
 	if (!AARCH64_INS_TYPE(ins, BL_INS) || branch_address == KSIM_PC_UNKNOWN) {
 		return false;
 	}
@@ -81,16 +82,16 @@ get_bl(struct ksim *ksim, uint32_t ins, uint64_t branch_address, bool *take_bran
 	return true;
 }
 
-#define MAX_ZONE_ELEMENT_SIZE_INSTRUCTIONS 12
+#define MAX__zone_element_size_INSTRUCTIONS 12
 
 static bool
-get_zone_element_size() {
+find__zone_element_size() {
 	struct ksim ksim;
 	if (!ksim_init_kext(&ksim, &kernel, _kfree_addr)) {
 		return false;
 	}
-	ksim.max_instruction_count = MAX_ZONE_ELEMENT_SIZE_INSTRUCTIONS;
-	ksim.handle_branch = get_bl;
+	ksim.max_instruction_count = MAX__zone_element_size_INSTRUCTIONS;
+	ksim.handle_branch = take_bl_and_stop;
 	if (!ksim_run(&ksim)) {
 		return false;
 	}
@@ -124,16 +125,16 @@ void
 kernel_symbol_finder_init_zone_element_size() {
 #define WARN(sym)	memctl_warning("could not find %s", #sym)
 	error_stop();
-	kaddr_t __FREE = get_free_addr();
+	kaddr_t __FREE = find___FREE();
 	if (__FREE == 0) {
 		WARN(__FREE);
 		goto abort;
 	}
-	if (!get_kfree_addr(__FREE)) {
+	if (!find__kfree_addr(__FREE)) {
 		WARN(_kfree_addr);
 		goto abort;
 	}
-	if (!get_zone_element_size()) {
+	if (!find__zone_element_size()) {
 		WARN(_zone_element_size);
 		goto abort;
 	}
