@@ -53,6 +53,11 @@ kernel_write_fn kernel_write_all;
 kernel_read_fn  physical_read_unsafe;
 kernel_write_fn physical_write_unsafe;
 
+// Other functions.
+bool (*kernel_virtual_to_physical)(
+		kaddr_t kaddr,
+		paddr_t *paddr);
+
 // pmap_t kernel_pmap;
 static kaddr_t kernel_pmap;
 
@@ -343,10 +348,12 @@ region_looks_safe(vm_region_submap_short_info_64_t info, bool into_kernel) {
  * transfer_range_safe
  *
  * Description:
- * 	Find the transfer range for the given transfer, but only consider safe regions.
+ * 	Find the transfer range for the given transfer, but only consider safe regions. Needs
+ * 	kernel_virtual_to_physical.
  */
 static kernel_io_result
 transfer_range_safe(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, bool into_kernel) {
+	assert(kernel_virtual_to_physical != NULL);
 	size_t left = *size;
 	size_t transfer_size = 0;
 	kaddr_t next_viable = kaddr + left;
@@ -426,10 +433,11 @@ transfer_range_safe(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, 
  *
  * Description:
  * 	Find the transfer range for the given transfer, checking virtual and physical addresses to
- * 	see if the memory is mapped and safe to access.
+ * 	see if the memory is mapped and safe to access. Needs kernel_virtual_to_physical.
  */
 static kernel_io_result
 transfer_range_all(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, bool into_kernel) {
+	assert(kernel_virtual_to_physical != NULL);
 	bool default_access = (*access == 0);
 	size_t remaining = *size;
 	size_t transfer_size = 0;
@@ -634,8 +642,8 @@ physical_write_unsafe_(paddr_t paddr, size_t *size, const void *data, size_t acc
 }
 
 bool
-kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr) {
-	assert(_pmap_find_phys != 0);
+kernel_virtual_to_physical_(kaddr_t kaddr, paddr_t *paddr) {
+	assert(_pmap_find_phys != 0 && kernel_pmap != 0);
 	ppnum_t ppnum;
 	kword_t args[] = { kernel_pmap, kaddr };
 	bool success = kernel_call(&ppnum, sizeof(ppnum), _pmap_find_phys, 2, args);
@@ -687,12 +695,22 @@ kernel_memory_init() {
 	SET(kernel_write_unsafe);
 	SET(kernel_read_heap);
 	SET(kernel_write_heap);
-	// Load symbols and kernel variable values.
+	// Load symbols and kernel variable values for kernel_virtual_to_physical.
 	if (kernel.base == 0 || kernel.slide == 0) {
 		return true;
 	}
 	READ(kernel_pmap);
 	RESOLVE(_pmap_find_phys);
+	// Load kernel_virtual_to_physical and the functions that depend on it.
+	kword_t kv2p_args[2] = { kernel_pmap, kernel.base };
+	if (kernel_call(NULL, sizeof(ppnum_t), 0, 2, kv2p_args)) {
+		SET(kernel_virtual_to_physical);
+		SET(kernel_read_safe);
+		SET(kernel_write_safe);
+		SET(kernel_read_all);
+		SET(kernel_write_all);
+	}
+	// Load symbols for physical memory functions.
 	RESOLVE(_IOMappedRead8);
 	RESOLVE(_IOMappedRead16);
 	RESOLVE(_IOMappedRead32);
@@ -701,14 +719,7 @@ kernel_memory_init() {
 	RESOLVE(_IOMappedWrite16);
 	RESOLVE(_IOMappedWrite32);
 	RESOLVE(_IOMappedWrite64);
-	// Load the functions that depend on kernel_virtual_to_physical.
-	kword_t kv2p_args[2] = { kernel_pmap, kernel.base };
-	if (kernel_call(NULL, sizeof(ppnum_t), 0, 2, kv2p_args)) {
-		SET(kernel_read_safe);
-		SET(kernel_write_safe);
-		SET(kernel_read_all);
-		SET(kernel_write_all);
-	}
+	// Load the physical memory functions.
 	kword_t dummy_args[2] = { 1, 1 };
 	if (kernel_call(NULL, sizeof(uint32_t), 0, 1, dummy_args)) {
 		SET(physical_read_unsafe);

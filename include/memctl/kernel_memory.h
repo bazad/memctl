@@ -271,7 +271,9 @@ extern kernel_write_fn physical_write_unsafe;
  * Returns:
  * 	True if no errors were encountered.
  */
-bool kernel_virtual_to_physical(kaddr_t kaddr, paddr_t *paddr);
+extern bool (*kernel_virtual_to_physical)(
+		kaddr_t kaddr,
+		paddr_t *paddr);
 
 /*
  * kernel_memory_init
