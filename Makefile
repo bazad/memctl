@@ -157,6 +157,7 @@ MEMCTL_SRCS = $(MEMCTL_ARCH_SRCS) \
 	      memctl.c \
 	      memory.c \
 	      read.c \
+	      strparse.c \
 	      vmmap.c
 
 MEMCTL_HDRS = $(MEMCTL_ARCH_HDRS) \
@@ -168,6 +169,7 @@ MEMCTL_HDRS = $(MEMCTL_ARCH_HDRS) \
 	      format.h \
 	      memory.h \
 	      read.h \
+	      strparse.h \
 	      vmmap.h
 
 MEMCTL_SRCS := $(MEMCTL_SRCS:%=$(SRC_DIR)/$(MEMCTL_DIR)/%)

@@ -1,6 +1,7 @@
 #include "command.h"
 
 #include "error.h"
+#include "strparse.h"
 
 #include "memctl/kernel.h"
 #include "memctl/utility.h"
@@ -332,48 +333,59 @@ parse_none(struct state *s) {
 	return true;
 }
 
+/*
+ * parse_int_internal
+ *
+ * Description:
+ * 	Parse an integer value of the given argument type.
+ */
+static bool
+parse_int_internal(struct state *s, enum argtype argtype) {
+	const char *end;
+	uintmax_t address;
+	unsigned base = 10;
+	uintmax_t *intptr;
+	bool sign = false;
+	const char *typename = "integer";
+	if (argtype == ARG_ADDRESS) {
+		base = 16;
+		intptr = &address;
+		typename = "address";
+	} else if (argtype == ARG_UINT) {
+		intptr = &s->argument->uint;
+	} else {
+		intptr = (uintmax_t *)&s->argument->sint;
+		sign = true;
+	}
+	enum strtoint_result sr = strtoint(s->arg, sign, base, intptr, &end);
+	if (sr == STRTOINT_OVERFLOW) {
+		ERROR_OPTION(s, "integer overflow: '%s'", s->arg);
+		return false;
+	} else if (sr == STRTOINT_NODIGITS) {
+fail:
+		ERROR_OPTION(s, "invalid %s: '%s'", typename, s->arg);
+		return false;
+	}
+	// If we didn't process the whole current argument, and if either this is not the first
+	// argument or we are parsing an address, fail.
+	if (sr == STRTOINT_BADDIGIT && (s->argidx != 0 || argtype == ARG_ADDRESS)) {
+		goto fail;
+	}
+	if (argtype == ARG_ADDRESS) {
+		s->argument->address = address;
+	}
+	s->argument->type = argtype;
+	s->arg = end;
+	return true;
+}
+
 static bool
 parse_int(struct state *s) {
 	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing integer");
 		return false;
 	}
-	char *end;
-	s->argument->sint = strtoimax(s->arg, &end, 0);
-	if (end == s->arg) {
-		goto fail;
-	}
-	// If this is not the first argument and we didn't process the whole current argument,
-	// fail.
-	if (s->argidx != 0 && *end != 0) {
-		goto fail;
-	}
-	s->argument->type = ARG_INT;
-	s->arg = end;
-	return true;
-fail:
-	ERROR_OPTION(s, "not a valid integer: '%s'", s->arg);
-	return false;
-}
-
-static bool
-parse_uint_internal(struct state *s) {
-	char *end;
-	s->argument->uint = strtoumax(s->arg, &end, 0);
-	if (end == s->arg) {
-		goto fail;
-	}
-	// If this is not the first argument and we didn't process the whole current argument,
-	// fail.
-	if (s->argidx != 0 && *end != 0) {
-		goto fail;
-	}
-	s->argument->type = ARG_UINT;
-	s->arg = end;
-	return true;
-fail:
-	ERROR_OPTION(s, "not a valid integer: '%s'", s->arg);
-	return false;
+	return parse_int_internal(s, ARG_INT);
 }
 
 static bool
@@ -382,7 +394,7 @@ parse_uint(struct state *s) {
 		ERROR_OPTION(s, "missing integer");
 		return false;
 	}
-	return parse_uint_internal(s);
+	return parse_int_internal(s, ARG_UINT);
 }
 
 static bool
@@ -391,38 +403,18 @@ parse_width(struct state *s) {
 		ERROR_OPTION(s, "missing width");
 		return false;
 	}
-	if (!parse_uint_internal(s)) {
+	if (!parse_int_internal(s, ARG_UINT)) {
 		return false;
 	}
 	size_t width = s->argument->uint;
 	if (width == 0 || width > sizeof(kword_t) || !ispow2(width)) {
 		s->keep_error = true;
-		ERROR_OPTION(s, "invalid width %zd", width);
+		ERROR_OPTION(s, "invalid width %zu", width);
 		return false;
 	}
 	s->argument->width = width;
 	s->argument->type = ARG_WIDTH;
 	return true;
-}
-
-/*
- * hex_digit
- *
- * Description:
- * 	Convert the given hexadecimal digit into its numeric value, returning -1 if the character
- * 	is not valid hexadecimal.
- */
-static int
-hex_digit(int c) {
-	if ('0' <= c && c <= '9') {
-		return c - '0';
-	} else if ('A' <= c && c <= 'F') {
-		return c - 'A' + 0xa;
-	} else if ('a' <= c && c <= 'f') {
-		return c - 'a' + 0xa;
-	} else {
-		return -1;
-	}
 }
 
 static bool
@@ -431,34 +423,26 @@ parse_data(struct state *s) {
 		ERROR_OPTION(s, "missing data");
 		return false;
 	}
-	const char *str = s->arg;
-	if (strcmp(str, "0x") == 0) {
-		str += 2;
-	}
-	size_t size = strlen(str);
-	if (size & 1) {
-		ERROR_OPTION(s, "odd-length hex data");
+	size_t size = 0;
+	const char *end;
+	enum strtodata_result sr = strtodata(s->arg, 16, NULL, &size, &end);
+	if (sr == STRTODATA_BADBASE) {
+		ERROR_OPTION(s, "bad base: '%s'", s->arg);
+		return false;
+	} else if (sr == STRTODATA_BADDIGIT) {
+		ERROR_OPTION(s, "invalid digit '%c': '%s'", *end, s->arg);
+		return false;
+	} else if (sr == STRTODATA_NEEDDIGIT) {
+		ERROR_OPTION(s, "incomplete final byte: '%s'", s->arg);
 		return false;
 	}
-	size /= 2;
 	uint8_t *data = malloc(size);
-	if (data == NULL && size > 0) {
-		error_out_of_memory();
-		return false;
-	}
-	for (size_t i = 0; i < size; i++, str += 2) {
-		int h1 = hex_digit(str[0]);
-		int h2 = hex_digit(str[1]);
-		if (h1 < 0 || h2 < 0) {
-			ERROR_OPTION(s, "invalid hexadecimal digit '%c'", (h1 < 0 ? str[0] : str[1]));
-			return false;
-		}
-		data[i] = (h1 << 4) | h2;
-	}
+	sr = strtodata(s->arg, 16, data, &size, &end);
+	assert(sr == STRTODATA_OK);
 	s->argument->data.data = data;
 	s->argument->data.length = size;
 	s->argument->type = ARG_DATA;
-	s->arg = str;
+	s->arg = end;
 	assert(*s->arg == 0);
 	return true;
 }
@@ -519,21 +503,7 @@ parse_address(struct state *s) {
 		ERROR_OPTION(s, "missing address");
 		return false;
 	}
-	if (s->arg[0] == 0 || s->arg[0] == '-') {
-		goto fail;
-	}
-	char *end;
-	s->argument->address = strtoumax(s->arg, &end, 16);
-	// Always process the full argument.
-	if (*end != 0) {
-		goto fail;
-	}
-	s->argument->type = ARG_ADDRESS;
-	s->arg = end;
-	return true;
-fail:
-	ERROR_OPTION(s, "invalid address: '%s'", s->arg);
-	return false;
+	return parse_int_internal(s, ARG_ADDRESS);
 }
 
 static bool
