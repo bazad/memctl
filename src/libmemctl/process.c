@@ -247,7 +247,7 @@ process_init() {
 		current_proc(&currentproc);
 	}
 	initialize_offsets();
-	if (OFFSET(proc, p_ucred).valid > 0) {
+	if (proc_set_ucred == NULL && OFFSET(proc, p_ucred).valid > 0) {
 		proc_set_ucred = proc_set_ucred_;
 	}
 	error_start();
