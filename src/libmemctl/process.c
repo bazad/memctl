@@ -74,7 +74,7 @@ proc_find_(kaddr_t *proc, int pid, bool release) {
 		ERROR_CALL(_proc_find);
 		return false;
 	}
-	if (!release) {
+	if (release) {
 		success = proc_rele_(proc0);
 		if (!success) {
 			return false;
