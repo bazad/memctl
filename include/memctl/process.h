@@ -27,6 +27,14 @@ extern kaddr_t kernproc;
 extern kaddr_t currentproc;
 
 /*
+ * currenttask
+ *
+ * Description:
+ * 	The current task, as returned by current_task().
+ */
+extern kaddr_t currenttask;
+
+/*
  * current_proc
  *
  * Description:
@@ -218,10 +226,64 @@ extern bool (*task_reference)(kaddr_t task);
 extern bool (*convert_task_to_port)(kaddr_t *ipc_port, kaddr_t task);
 
 /*
+ * get_task_ipcspace
+ *
+ * Description:
+ * 	XNU's get_task_ipcspace. Returns the ipc_space pointer for the given task.
+ *
+ * Parameters:
+ * 	out	ipc_space		The ipc_space_t for the task.
+ * 		task			The task.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*get_task_ipcspace)(kaddr_t *ipc_space, kaddr_t task);
+
+/*
+ * ipc_port_copyout_send
+ *
+ * Description:
+ * 	XNU's ipc_port_copyout_send. Copies a naked send right to the given ipc_space, returning
+ * 	the port name.
+ *
+ * Parameters:
+ * 	out	port_name		The name of the newly added port.
+ * 		send_right		An ipc_port representing the send right.
+ * 		ipc_space		The ipc_space to which to add the send right.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*ipc_port_copyout_send)(
+		mach_port_t *port_name,
+		kaddr_t send_right,
+		kaddr_t ipc_space);
+
+/*
+ * task_to_task_port
+ *
+ * Description:
+ * 	Convert a task struct to a task port for the task, and add a send right for that task port
+ * 	to the specified sender task.
+ *
+ * Parameters:
+ * 	out	task_port		The Mach port name of a Mach port with a send right to
+ * 					task, in sender's IPC space.
+ * 		task			The task to which a send right will be created.
+ * 		sender			The task which shall receive the send right.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*task_to_task_port)(mach_port_t *task_port, kaddr_t task, kaddr_t sender);
+
+/*
  * proc_to_task_port
  *
  * Description:
- * 	Convert a proc struct to a task port for the process's task.
+ * 	Convert a proc struct to a task port for the process's task. This function wraps
+ * 	task_to_task_port.
  *
  * Parameters:
  * 	out	task_port		A mach task port for the process's task.
@@ -229,8 +291,6 @@ extern bool (*convert_task_to_port)(kaddr_t *ipc_port, kaddr_t task);
  *
  * Returns:
  * 	True if no errors were encountered.
- *
- * TODO: This function has no implementation and thus is always unavailable.
  */
 extern bool (*proc_to_task_port)(mach_port_t *task_port, kaddr_t proc);
 

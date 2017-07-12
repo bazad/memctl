@@ -13,6 +13,7 @@ DEFINE_OFFSET(proc, p_ucred);
 
 kaddr_t kernproc;
 kaddr_t currentproc;
+kaddr_t currenttask;
 bool (*current_proc)(kaddr_t *proc);
 bool (*proc_find)(kaddr_t *proc, int pid, bool release);
 bool (*proc_rele)(kaddr_t proc);
@@ -24,6 +25,9 @@ bool (*kauth_cred_unref)(kaddr_t cred);
 bool (*kauth_cred_setsvuidgid)(kaddr_t *newcred, kaddr_t cred, uid_t uid, gid_t gid);
 bool (*task_reference)(kaddr_t task);
 bool (*convert_task_to_port)(kaddr_t *ipc_port, kaddr_t task);
+bool (*get_task_ipcspace)(kaddr_t *ipc_space, kaddr_t task);
+bool (*ipc_port_copyout_send)(mach_port_t *port_name, kaddr_t send_right, kaddr_t ipc_space);
+bool (*task_to_task_port)(mach_port_t *task_port, kaddr_t task, kaddr_t sender);
 bool (*proc_to_task_port)(mach_port_t *task_port, kaddr_t proc);
 
 static kaddr_t _kernproc;
@@ -37,6 +41,8 @@ static kaddr_t _kauth_cred_unref;
 static kaddr_t _kauth_cred_setsvuidgid;
 static kaddr_t _task_reference;
 static kaddr_t _convert_task_to_port;
+static kaddr_t _get_task_ipcspace;
+static kaddr_t _ipc_port_copyout_send;
 
 #define ERROR_CALL(symbol)	error_internal("could not call %s", #symbol)
 
@@ -178,6 +184,64 @@ convert_task_to_port_(kaddr_t *ipc_port, kaddr_t task) {
 }
 
 static bool
+get_task_ipcspace_(kaddr_t *ipc_space, kaddr_t task) {
+	assert(task != 0);
+	bool success = kernel_call(ipc_space, sizeof(*ipc_space), _get_task_ipcspace, 1, &task);
+	if (!success) {
+		ERROR_CALL(_get_task_ipcspace);
+	}
+	return success;
+}
+
+static bool
+ipc_port_copyout_send_(mach_port_t *port_name, kaddr_t send_right, kaddr_t ipc_space) {
+	assert(send_right != 0 && ipc_space != 0);
+	kword_t args[] = { send_right, ipc_space };
+	bool success = kernel_call(port_name, sizeof(*port_name), _ipc_port_copyout_send, 2, args);
+	if (!success) {
+		ERROR_CALL(_ipc_port_copyout_send);
+	}
+	return success;
+}
+
+static bool
+task_to_task_port_(mach_port_t *task_port, kaddr_t task, kaddr_t sender) {
+	// TODO: This doesn't work as might be expected for kernel_task because the XNU function
+	// convert_port_to_task will not return the kernel_task.
+	bool success = task_reference(task);
+	if (!success) {
+		return false;
+	}
+	kaddr_t send_right;
+	success = convert_task_to_port(&send_right, task);
+	if (!success) {
+		return false;
+	}
+	kaddr_t ipc_space;
+	success = get_task_ipcspace(&ipc_space, sender);
+	if (!success) {
+		return false;
+	}
+	mach_port_t port_name;
+	success = ipc_port_copyout_send(&port_name, send_right, ipc_space);
+	if (!success) {
+		return false;
+	}
+	*task_port = port_name;
+	return true;
+}
+
+static bool
+proc_to_task_port_(mach_port_t *task_port, kaddr_t proc) {
+	kaddr_t task;
+	bool success = proc_task(&task, proc);
+	if (!success) {
+		return false;
+	}
+	return task_to_task_port(task_port, task, currenttask);
+}
+
+static bool
 initialize_p_ucred_offset() {
 	// Dump the contents of the current proc struct.
 	kword_t proc_data[PROC_DUMP_SIZE];
@@ -230,25 +294,41 @@ process_init() {
 			fn = impl;						\
 		}								\
 	}
+#define RESOLVE1(fn)	RESOLVE(_##fn, fn, fn##_)
 	READ(_kernproc, kernproc);
-	RESOLVE(_current_proc, current_proc, current_proc_);
-	RESOLVE(_proc_find, proc_find, proc_find_);
-	RESOLVE(_proc_rele, proc_rele, proc_rele_);
-	RESOLVE(_proc_task, proc_task, proc_task_);
-	RESOLVE(_proc_ucred, proc_ucred, proc_ucred_);
-	RESOLVE(_kauth_cred_proc_ref, kauth_cred_proc_ref, kauth_cred_proc_ref_);
-	RESOLVE(_kauth_cred_unref, kauth_cred_unref, kauth_cred_unref_);
-	RESOLVE(_kauth_cred_setsvuidgid, kauth_cred_setsvuidgid, kauth_cred_setsvuidgid_);
-	RESOLVE(_task_reference, task_reference, task_reference_);
-	RESOLVE(_convert_task_to_port, convert_task_to_port, convert_task_to_port_);
+	RESOLVE1(current_proc);
+	RESOLVE1(proc_find);
+	RESOLVE1(proc_rele);
+	RESOLVE1(proc_task);
+	RESOLVE1(proc_ucred);
+	RESOLVE1(kauth_cred_proc_ref);
+	RESOLVE1(kauth_cred_unref);
+	RESOLVE1(kauth_cred_setsvuidgid);
+	RESOLVE1(task_reference);
+	RESOLVE1(convert_task_to_port);
+	RESOLVE1(get_task_ipcspace);
+	RESOLVE1(ipc_port_copyout_send);
 #undef READ
 #undef RESOLVE
+#undef RESOLVE1
 	if (currentproc == 0 && current_proc != NULL) {
 		current_proc(&currentproc);
+	}
+	if (currentproc != 0 && proc_task != NULL) {
+		proc_task(&currenttask, currentproc);
 	}
 	initialize_offsets();
 	if (proc_set_ucred == NULL && OFFSET(proc, p_ucred).valid > 0) {
 		proc_set_ucred = proc_set_ucred_;
+	}
+	if (task_to_task_port == NULL
+			&& task_reference != NULL && convert_task_to_port != NULL
+			&& get_task_ipcspace != NULL && ipc_port_copyout_send != NULL) {
+		task_to_task_port = task_to_task_port_;
+	}
+	if (proc_to_task_port == NULL
+			&& proc_task != NULL && currenttask != 0 && task_to_task_port != NULL) {
+		proc_to_task_port = proc_to_task_port_;
 	}
 	error_start();
 }
