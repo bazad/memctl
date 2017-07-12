@@ -555,8 +555,8 @@ struct initial_state {
  * 		args			The arguments to the kernel function.
  * 	out	payload			On return, the JOP payload. This will be copied into the
  * 					kernel at address jop_payload.
- * 	out	initial_state		On return, the state of the CPU registers to at the start
- * 					of JOP execution.
+ * 	out	initial_state		On return, the state of the CPU registers to set at the
+ * 					start of JOP execution.
  * 	out	result_address		On return, the address of the result value.
  */
 typedef void (*build_jop_fn)(uint64_t func, const uint64_t args[8],
@@ -899,9 +899,10 @@ bool
 kernel_call_aarch64(void *result, unsigned result_size,
 		kaddr_t func, unsigned arg_count, const kword_t args[]) {
 	if (func == 0) {
-		// Everything is supported.
-		return true;
+		// Everything is supported, as long as kernel_call_aarch64 has been initialized.
+		return (jop_payload != 0);
 	}
+	assert(jop_payload != 0);
 	// Get exactly 8 arguments.
 	uint64_t args8[8] = { 0 };
 	for (size_t i = 0; i < arg_count; i++) {

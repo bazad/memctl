@@ -200,6 +200,7 @@ remove_syscall_hook() {
 	if (syscall_hook.function == 0) {
 		return;
 	}
+	error_stop();
 	// We do this first because physical_write_unsafe calls kernel_call; see
 	// kernel_call_syscall_x86_64.
 	kaddr_t function = syscall_hook.function;
@@ -227,6 +228,7 @@ remove_syscall_hook() {
 		               target_function);
 	}
 	free(syscall_hook.original);
+	error_start();
 }
 
 /*
@@ -255,6 +257,12 @@ kernel_write_text_default(kaddr_t kaddr, size_t *size, const void *data, size_t 
  */
 static bool
 init_text_io() {
+	// If either IO function is not supplied, try to initialize the kernel memory system.
+	// physical_write_unsafe will also depend on kernel_call_7.
+	if (kernel_read_text == NULL || kernel_write_text == NULL) {
+		kernel_memory_init();
+	}
+	// Try to load the functions.
 	const char *func;
 	if (kernel_read_text == NULL) {
 		if (kernel_read_unsafe == NULL) {
@@ -278,7 +286,7 @@ need_func:
 
 bool
 kernel_call_init_syscall_x86_64(void) {
-	if (kernel.base == 0 || kernel_slide == 0 || kernel.slide == 0) {
+	if (kernel.base == 0 || kernel.slide == 0) {
 		error_internal("kernel_call_init_syscall_x86_64: kernel and kernel_slide "
 		               "not initialized");
 		return false;

@@ -24,7 +24,7 @@ extern kernel_write_fn kernel_write_text;
  * Dependencies:
  * 	kernel image
  * 	kernel_slide
- * 	kernel_read_text/kernel_write_text OR kernel_call_7
+ * 	kernel_read_text/kernel_write_text OR kernel_call_7/physical_write_unsafe
  */
 bool kernel_call_init_syscall_x86_64(void);
 

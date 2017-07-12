@@ -695,16 +695,16 @@ kernel_memory_init() {
 		error_start();							\
 	}
 #define READ(var)								\
-	do {									\
+	if (var == 0 && kernel_read_unsafe != NULL) {				\
 		kaddr_t _##var = 0;						\
 		RESOLVE(_##var);						\
-		if (_##var != 0 && kernel_read_unsafe != 0) {			\
+		if (_##var != 0) {						\
 			error_stop();						\
 			kernel_read_word(kernel_read_unsafe,			\
 					_##var, &var, sizeof(var), 0);		\
 			error_start();						\
 		}								\
-	} while (0)
+	}
 
 	// Load the basic kernel read/write functions.
 	if (kernel_task != MACH_PORT_NULL) {

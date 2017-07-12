@@ -178,7 +178,7 @@ initialize(feature_t features) {
 			error_message("could not find the kASLR slide");
 			return false;
 		}
-		// Re-initialize the kernel image.
+		// Re-initialize the kernel image to set kernel.slide.
 		kernel_init(NULL);
 		LOADED(KERNEL_SLIDE);
 	}

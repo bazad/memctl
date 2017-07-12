@@ -491,7 +491,9 @@ kernel_call_7(void *result, unsigned result_size,
 		return false;
 	}
 	if (func == 0) {
-		return true;
+		// If func is 0, then we can only support the given kernel call if the kernel_call
+		// hook is installed.
+		return hook.hooked;
 	}
 	assert(hook.hooked); // We better have already installed the hook.
 	IOExternalTrap trap = { (args[0] == 0 ? 1 : args[0]), func, 0 };
