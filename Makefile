@@ -57,7 +57,7 @@ endif
 
 ARCH_arm64_DIR = aarch64
 
-LIBMEMCTL_arm64_SRCS = aarch64_sim.c \
+LIBMEMCTL_arm64_SRCS = sim.c \
 		       disasm.c \
 		       kernel_call_aarch64.c \
 		       ksim.c \
@@ -69,7 +69,7 @@ LIBMEMCTL_arm64_HDRS = kernel_call_aarch64.h \
 		       pthread_callbacks_finder.h \
 		       zone_element_size_finder.h
 
-LIBMEMCTL_arm64_INCS = aarch64_sim.h \
+LIBMEMCTL_arm64_INCS = sim.h \
 		       disasm.h \
 		       ksim.h
 

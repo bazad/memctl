@@ -1,5 +1,5 @@
-#ifndef MEMCTL__AARCH64__AARCH64_SIM_H_
-#define MEMCTL__AARCH64__AARCH64_SIM_H_
+#ifndef MEMCTL__AARCH64__SIM_H_
+#define MEMCTL__AARCH64__SIM_H_
 
 #include "memctl/aarch64/disasm.h"
 

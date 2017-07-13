@@ -1,4 +1,4 @@
-#include "memctl/aarch64/aarch64_sim.h"
+#include "memctl/aarch64/sim.h"
 
 #include "memctl/utility.h"
 

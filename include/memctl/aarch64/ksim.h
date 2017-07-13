@@ -1,7 +1,7 @@
 #ifndef MEMCTL__AARCH64__KSIM_H_
 #define MEMCTL__AARCH64__KSIM_H_
 
-#include "memctl/aarch64/aarch64_sim.h"
+#include "memctl/aarch64/sim.h"
 #include "memctl/aarch64/disasm.h"
 #include "memctl/kernel.h"
 
