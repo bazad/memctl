@@ -1,5 +1,75 @@
 #include "memctl/kernel_call.h"
 
+/*
+ * Kernel Function Call Strategy
+ * -----------------------------
+ *
+ *  At the point we are installing this kernel_call handler, we have access to the kernel_task, we
+ *  know the kernel slide, and we have the basic kernel memory functions (kernel_write_unsafe,
+ *  kernel_read_heap, etc.). We will use these primitives to hook an IOUserClient instance, which
+ *  will allow us to call arbitrary kernel functions (albeit with some restrictions on the
+ *  arguments and return value). This kernel function call mechanism is called kernel_call_7.
+ *
+ *  We replace the vtable pointer of an IOUserClient instance so that the iokit_user_client_trap
+ *  Mach trap can be used to call arbitrary functions. This trap is reachable from user space via
+ *  the IOConnectTrap6 function. This technique is described in Stefan Esser's slides titled "Tales
+ *  from iOS 6 Exploitation and iOS 7 Security Challenges". While it's possible to devise an
+ *  alternative calling mechanism (we could replace any method in the vtable), hooking IOUserClient
+ *  traps is quite easy.
+ *
+ *  XNU's iokit_user_client_trap function determines which trap to invoke by calling the
+ *  IOUserClient's getTargetAndTrapForIndex method. The default implementation of
+ *  getTargetAndTrapForIndex calls getExternalTrapForIndex. The getExternalTrapForIndex method
+ *  returns a pointer to an IOExternalTrap object, which is in turn returned by
+ *  getTargetAndTrapForIndex. The iokit_user_client_trap function then invokes the trap by calling
+ *  the trap->func function. The first argument in this call is trap->object (as extracted by
+ *  getTargetAndTrapForIndex), and the remaining arguments are the values passed to IOConnectTrap6
+ *  from user space. Thus, 7 arguments in total can be passed to the called function (hence the
+ *  name kernel_call_7).
+ *
+ *  Unfortunately, using iokit_user_client_trap places some restrictions on the arguments and
+ *  return value. Because the trap->object pointer is verified as non-NULL before the trap is
+ *  invoked, the first argument to the called function cannot be 0. The more serious restriction is
+ *  that the return value of iokit_user_client_trap is a kern_return_t, which on 64-bit platforms
+ *  is a 32-bit type. This means for example that kernel_call_7 cannot be used to call functions
+ *  that return a pointer, since the returned pointer value will be truncated. However, other
+ *  kernel function call mechanisms can be established on top of kernel_call_7 that relax these
+ *  restrictions.
+ *
+ *  To actually implement this hook, an AppleKeyStoreUserClient instance is allocated in the kernel
+ *  by opening a connection to an AppleKeyStore service. I chose this class because most
+ *  applications can access it on both macOS and iOS. The registry entry ID of the user client is
+ *  determined by recording a list of the IDs of all children of AppleKeyStore and looking for a
+ *  new child after the user client is created. (Despite searching far and wide, I could not find
+ *  an official API to retrieve the registry entry ID associated with an io_connect_t object
+ *  returned by IOServiceOpen.) Then, the kernel heap is scanned looking for an
+ *  AppleKeyStoreUserClient instance with the same registry entry ID as the user client; if one is
+ *  found, it is almost certainly the AppleKeyStoreUserClient instance we allocated earlier.
+ *  (Ambiguity is eliminated by scanning the whole heap and failing if there is more than one
+ *  match.) Having the address of this user client is crucial because we can now modify an
+ *  IOUserClient instance to which we can send commands.
+ *
+ *  The next step is creating the fake vtable. The real AppleKeyStoreUserClient vtable is copied
+ *  into user space and the IOUserClient::getExternalTrapForIndex method is replaced with
+ *  IORegistryEntry::getRegistryEntryID. This means that when getTargetAndTrapForIndex calls
+ *  getExternalTrapForIndex, the user client's registry entry ID will be returned instead. A block
+ *  of kernel memory is allocated and the fake vtable is copied back into the kernel.
+ *
+ *  The last initialization step is to patch the AppleKeyStoreUserClient. More kernel memory is
+ *  allocated to store the fake IOExternalTrap object, and the user client's registry entry ID
+ *  field is overwritten with this address. Finally, the user client's vtable pointer is
+ *  overwritten with the address of the fake vtable copied into the kernel earlier.
+ *
+ *  At this point, when iokit_user_client_trap calls getTargetAndTrapForIndex, the trap that is
+ *  returned will be the address of the IOExternalTrap method we allocated. However, the fields of
+ *  this object need to be initialized for each function call.
+ *
+ *  In order to actually call a kernel function, the IOExternalTrap object is overwritten so that
+ *  the func field points to the function we want to call and the object field is the first
+ *  argument to that function. Then, we can invoke IOConnectTrap6 with the remaining arguments to
+ *  perform the actual function call.
+ */
+
 #include "memctl/core.h"
 #include "memctl/kernel.h"
 #include "memctl/kernel_memory.h"
@@ -327,8 +397,8 @@ get_user_client_vtable() {
  * create_user_client
  *
  * Description:
- * 	Creates a connection to a user client, returning the connection and the address of the
- * 	user client instance in kernel memory.
+ * 	Creates the connection to the target user client and stores information about the user
+ * 	client instance in the global state.
  *
  * Global state changes:
  * 	hook.connection			The connection to the user client.
@@ -449,7 +519,7 @@ fail_1:
  *
  * Description:
  * 	Patch the user client to use the hooked vtable. This function also allocates kernel memory
- * 	for the IOExternalTrap object and initializes the offset field to 0.
+ * 	for the IOExternalTrap object.
  *
  * Global state changes:
  * 	hook.trap			The newly allocated IOExternalTrap.

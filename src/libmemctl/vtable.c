@@ -54,29 +54,30 @@ adjust_vtable_from_symbol(kaddr_t *vtable, size_t *size) {
  * How we find vtables in the kernelcache
  * --------------------------------------
  *
- * Each kernel extension that declares OSObject subclasses has a number of initialization functions
- * in the __DATA_CONST.__mod_init_func section of the Mach-O. These initialization functions
- * construct the OSMetaClass object associated with each class. The OSMetaClass constructor is:
+ *  Each kernel extension that declares OSObject subclasses has a number of initialization
+ *  functions in the __DATA_CONST.__mod_init_func section of the Mach-O. These initialization
+ *  functions construct the OSMetaClass object associated with each class. The OSMetaClass
+ *  constructor is:
  *
- *   OSMetaClass::OSMetaClass(char const*, OSMetaClass const*, unsigned int)
+ *  	OSMetaClass::OSMetaClass(char const*, OSMetaClass const*, unsigned int)
  *
- * The first argument to the constructor (excluding the implicit this pointer) is the name of the
- * class represented by this OSMetaClass object. By disassembling every initialization function
- * declared by a kernel extension and looking at this argument, we can detect which OSMetaClass
- * instance is associated with the desired class name.
+ *  The first argument to the constructor (excluding the implicit this pointer) is the name of the
+ *  class represented by this OSMetaClass object. By disassembling every initialization function
+ *  declared by a kernel extension and looking at this argument, we can detect which OSMetaClass
+ *  instance is associated with the desired class name.
  *
- * The reason this OSMetaClass object is useful is that all OSObject subclasses override the
- * getMetaClass method:
+ *  The reason this OSMetaClass object is useful is that all OSObject subclasses override the
+ *  getMetaClass method:
  *
- *   virtual const OSMetaClass * getMetaClass() const
+ *  	virtual const OSMetaClass * getMetaClass() const
  *
- * The override is defined in the OSDefineMetaClassWithInit macro, which must be called for every
- * OSObject subclass. Thus, every virtual method table corresponding to a subclass of OSObject
- * contains a method that returns the associated OSMetaClass instance.
+ *  The override is defined in the OSDefineMetaClassWithInit macro, which must be called for every
+ *  OSObject subclass. Thus, every virtual method table corresponding to a subclass of OSObject
+ *  contains a method that returns the associated OSMetaClass instance.
  *
- * Thus, if we know which OSMetaClass instance is associated with the given class name, we can
- * disassemble the getMetaClass method in every virtual method table to find which one returns the
- * correct OSMetaClass instance. This will be the virtual method table we are looking for.
+ *  Thus, if we know which OSMetaClass instance is associated with the given class name, we can
+ *  disassemble the getMetaClass method in every virtual method table to find which one returns the
+ *  correct OSMetaClass instance. This will be the virtual method table we are looking for.
  */
 
 // Kernel extension memory regions

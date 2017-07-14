@@ -1,11 +1,12 @@
 #include "aarch64/zone_element_size_finder.h"
+
 /*
  * Locating _zone_element_size
  * ---------------------------
  *
- * The zone_element_size function is useful for finding the size of a memory region allocated with
- * kalloc. This special symbol finder locates _zone_element_size by disassembling __FREE to find a
- * call to _kfree_addr, then disassembling _kfree_addr to find a call to _zone_element_size.
+ *  The zone_element_size function is useful for finding the size of a memory region allocated with
+ *  kalloc. This special symbol finder locates _zone_element_size by disassembling __FREE to find a
+ *  call to _kfree_addr, then disassembling _kfree_addr to find a call to _zone_element_size.
  */
 
 #include "memctl/kernel.h"
