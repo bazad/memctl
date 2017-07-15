@@ -1046,7 +1046,7 @@ bool aarch64_decode_ldr_ui(uint32_t ins, struct aarch64_ins_ldr_im *ldr_ui);
 #define AARCH64_STRH_UI_INS_BITS 0x79000000
 
 
-// ---- LDR literal, STR literal ----
+// ---- LDR literal, LDRSW literal ----
 
 #define AARCH64_LDR_LIT_CLASS_MASK 0x3f000000
 #define AARCH64_LDR_LIT_CLASS_BITS 0x18000000
@@ -1074,14 +1074,17 @@ bool aarch64_decode_ldr_lit(uint32_t ins, uint64_t pc, struct aarch64_ins_ldr_li
 #define AARCH64_LDRSW_LIT_INS_BITS 0x98000000
 
 
-// LDR register
-//   LDR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
-//   LDR <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+// ---- LDR register, LDRB register, LDRH register, LDRSB register, LDRSH register, LDRSW register,
+//      STR register, STRB register, STRH register ----
 
-#define AARCH64_LDR_R_INS_MASK 0xbfe00c00
-#define AARCH64_LDR_R_INS_BITS 0xb8600800
+#define AARCH64_LDR_R_CLASS_MASK 0x3f200c00
+#define AARCH64_LDR_R_CLASS_BITS 0x38200800
 
-struct aarch64_ins_ldr_str_r {
+struct aarch64_ins_ldr_r {
+	uint8_t       load:1;
+	uint8_t       size:2;
+	uint8_t       sign:1;
+	uint8_t       _fill:4;
 	aarch64_gpreg  Rt;
 	aarch64_gpreg  Xn;
 	aarch64_gpreg  Rm;
@@ -1089,19 +1092,61 @@ struct aarch64_ins_ldr_str_r {
 	uint8_t        amount;
 };
 
-bool aarch64_ins_decode_ldr_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_r);
+bool aarch64_decode_ldr_r(uint32_t ins, struct aarch64_ins_ldr_r *ldr_r);
+
+// LDR register
+//   LDR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+//   LDR <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+#define AARCH64_LDR_R_INS_MASK 0xbfe00c00
+#define AARCH64_LDR_R_INS_BITS 0xb8600800
 
 // LDRB register
+//   LDRB <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {<amount>}]
+//   LDRB <Wt>, [<Xn|SP>, <Xm>{, LSL <amount>}]
+#define AARCH64_LDRB_R_INS_MASK 0xffe00c00
+#define AARCH64_LDRB_R_INS_BITS 0x38600800
 
 // LDRH register
+//   LDRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+#define AARCH64_LDRH_R_INS_MASK 0xffe00c00
+#define AARCH64_LDRH_R_INS_BITS 0x78600800
 
 // LDRSB register
+//   LDRSB <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {<amount>}]
+//   LDRSB <Wt>, [<Xn|SP>, <Xm>{, LSL <amount>}]
+//   LDRSB <Xt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {<amount>}]
+//   LDRSB <Xt>, [<Xn|SP>, <Xm>{, LSL <amount>}]
+#define AARCH64_LDRSB_R_INS_MASK 0xffa00c00
+#define AARCH64_LDRSB_R_INS_BITS 0x38a00800
 
 // LDRSH register
-
-// LDRSW literal
+//   LDRSH <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+//   LDRSH <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+#define AARCH64_LDRSH_R_INS_MASK 0xffa00c00
+#define AARCH64_LDRSH_R_INS_BITS 0x78a00800
 
 // LDRSW register
+//   LDRSW <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+#define AARCH64_LDRSW_R_INS_MASK 0xffe00c00
+#define AARCH64_LDRSW_R_INS_BITS 0xb8a00800
+
+// STR register
+//   STR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+//   STR <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+#define AARCH64_STR_R_INS_MASK 0xbfe00c00
+#define AARCH64_STR_R_INS_BITS 0xb8200800
+
+// STRB register
+//   STRB <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {<amount>}]
+//   STRB <Wt>, [<Xn|SP>, <Xm>{, LSL <amount>}]
+#define AARCH64_STRB_R_INS_MASK 0xffe00c00
+#define AARCH64_STRB_R_INS_BITS 0x38200800
+
+// STRH register
+//   STRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+#define AARCH64_STRH_R_INS_MASK 0xffe00c00
+#define AARCH64_STRH_R_INS_BITS 0x78200800
+
 
 // LDTR
 
@@ -1279,19 +1324,6 @@ bool aarch64_decode_nop(uint32_t ins);
 // STLXRB
 
 // STLXRH
-
-// STR register
-//   STR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
-//   STR <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
-
-#define AARCH64_STR_R_INS_MASK 0xbfe00c00
-#define AARCH64_STR_R_INS_BITS 0xb8200800
-
-bool aarch64_ins_decode_str_r(uint32_t ins, struct aarch64_ins_ldr_str_r *ldr_r);
-
-// STRB register
-
-// STRH register
 
 // STTR
 

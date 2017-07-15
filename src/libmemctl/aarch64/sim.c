@@ -262,6 +262,7 @@ aarch64_sim_step(struct aarch64_sim *sim) {
 	struct aarch64_ins_ldp     ldp;
 	struct aarch64_ins_ldr_im  ldr_im;
 	struct aarch64_ins_ldr_lit ldr_lit;
+	struct aarch64_ins_ldr_r   ldr_r;
 	struct aarch64_ins_mov     mov;
 
 	if (aarch64_decode_adc(ins, &adc)) {
@@ -464,6 +465,31 @@ aarch64_sim_step(struct aarch64_sim *sim) {
 			mem.value = sign_extend(mem.value, 8 * size - 1);
 		}
 		gpreg_set_(sim, ldr_im.Rt, mem.value, mem.taint);
+	} else if (aarch64_decode_ldr_r(ins, &ldr_r)) {
+		uint64_t address = gpreg_get_(sim, ldr_r.Xn, &taint);
+		uint64_t offset  = gpreg_get_extend_(sim, ldr_r.Rm, ldr_r.extend, ldr_r.amount,
+				&taint);
+		address += offset;
+		struct aarch64_sim_word address_taint = { address, taint };
+		size_t size = 1 << ldr_r.size;
+		if (ldr_r.load) {
+			struct aarch64_sim_word mem = { 0, taint };
+			run = sim->memory_load(sim, &mem, &address_taint, size);
+			if (!run) {
+				keep_running = false;
+			}
+			if (ldr_r.sign) {
+				mem.value = sign_extend(mem.value, 8 * size - 1);
+			}
+			gpreg_set_(sim, ldr_r.Rt, mem.value, mem.taint);
+		} else {
+			struct aarch64_sim_word reg = { 0, sim->instruction.taint };
+			reg.value = gpreg_get_(sim, ldr_r.Rt, &reg.taint);
+			run = sim->memory_store(sim, &reg, &address_taint, size);
+			if (!run) {
+				keep_running = false;
+			}
+		}
 	} else if (aarch64_decode_mov(ins, &mov)) {
 		op1 = 0;
 		if (mov.k) {

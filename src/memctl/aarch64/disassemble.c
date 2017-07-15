@@ -342,10 +342,10 @@ sr_mov:
 
 static bool
 disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
-	struct aarch64_ins_ldp        p;
-	struct aarch64_ins_ldr_im     im;
-	struct aarch64_ins_ldr_str_r  r;
-	struct aarch64_ins_ldr_lit    lit;
+	struct aarch64_ins_ldp     p;
+	struct aarch64_ins_ldr_im  im;
+	struct aarch64_ins_ldr_r   r;
+	struct aarch64_ins_ldr_lit lit;
 	const char *name = NULL;
 #define W(fmt, ...) \
 	buf += sprintf(buf, fmt, ##__VA_ARGS__)
@@ -376,7 +376,6 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 		} else {
 			W("%-7s %s, %s, [%s, #%d]!", name, reg(p.Rt1), reg(p.Rt2), reg(p.Xn), p.imm);
 		}
-		return true;
 	} else if (aarch64_decode_ldr_ix(ins, &im)
 			|| aarch64_decode_ldr_ui(ins, &im)) {
 		if (im.load) {
@@ -415,10 +414,45 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 		} else {
 			W("%-7s %s, [%s, #%u]", name, reg(im.Rt), reg(im.Xn), im.imm);
 		}
-		return true;
-	} else if (aarch64_ins_decode_ldr_r(ins, &r)) {
-		name = "LDR";
-		goto r_r;
+	} else if (aarch64_decode_ldr_r(ins, &r)) {
+		if (r.load) {
+			if (r.sign) {
+				if (r.size == 0) {
+					name = "LDRSB";
+				} else if (r.size == 1) {
+					name = "LDRSH";
+				} else {
+					name = "LDRSW";
+				}
+			} else {
+				if (r.size == 0) {
+					name = "LDRB";
+				} else if (r.size == 1) {
+					name = "LDRH";
+				} else {
+					name = "LDR";
+				}
+			}
+		} else {
+			if (r.size == 0) {
+				name = "STRB";
+			} else if (r.size == 1) {
+				name = "STRH";
+			} else {
+				name = "STR";
+			}
+		}
+		if (r.amount == 0) {
+			if (AARCH64_EXTEND_IS_LSL(r.extend)) {
+				W("%-7s %s, [%s, %s]", name, reg(r.Rt), reg(r.Xn), reg(r.Rm));
+			} else {
+				W("%-7s %s, [%s, %s, %s]", name, reg(r.Rt), reg(r.Xn), reg(r.Rm),
+						extend(r.extend));
+			}
+		} else {
+			W("%-7s %s, [%s, %s, %s #%u]", name, reg(r.Rt), reg(r.Xn), reg(r.Rm),
+					extend(r.extend), r.amount);
+		}
 	} else if (aarch64_decode_ldr_lit(ins, pc, &lit)) {
 		if (lit.sign) {
 			name = "LDRSW";
@@ -426,23 +460,8 @@ disassemble_memory(uint32_t ins, uint64_t pc, char *buf) {
 			name = "LDR";
 		}
 		W("%-7s %s, #0x%llx", name, reg(lit.Rt), lit.label);
-		return true;
-	} else if (aarch64_ins_decode_str_r(ins, &r)) {
-		name = "STR";
-		goto r_r;
-	}
-	return false;
-r_r:
-	if (r.amount == 0) {
-		if (AARCH64_EXTEND_IS_LSL(r.extend)) {
-			W("%-7s %s, [%s, %s]", name, reg(r.Rt), reg(r.Xn), reg(r.Rm));
-		} else {
-			W("%-7s %s, [%s, %s, %s]", name, reg(r.Rt), reg(r.Xn), reg(r.Rm),
-					extend(r.extend));
-		}
 	} else {
-		W("%-7s %s, [%s, %s, %s #%u]", name, reg(r.Rt), reg(r.Xn), reg(r.Rm),
-				extend(r.extend), r.amount);
+		return false;
 	}
 	return true;
 #undef W
