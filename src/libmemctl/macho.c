@@ -1,7 +1,5 @@
 #include "memctl/macho.h"
 
-#include "memctl/memctl_error.h"
-
 #include <assert.h>
 #include <string.h>
 
@@ -106,15 +104,15 @@ macho_string_index(const struct macho *macho, const struct symtab_command *symta
 macho_result
 macho_validate_32(const struct mach_header *mh, size_t size) {
 	if (mh->magic != MH_MAGIC) {
-		error_macho("32-bit Mach-O invalid magic: %x", mh->magic);
+		macho_error("32-bit Mach-O invalid magic: %x", mh->magic);
 		return MACHO_ERROR;
 	}
 	if (size < sizeof(*mh)) {
-		error_macho("32-bit Mach-O too small");
+		macho_error("32-bit Mach-O too small");
 		return MACHO_ERROR;
 	}
 	if (mh->sizeofcmds > size) {
-		error_macho("Mach-O sizeofcmds greater than file size");
+		macho_error("Mach-O sizeofcmds greater than file size");
 		return MACHO_ERROR;
 	}
 	// TODO: Validate commands.
@@ -124,15 +122,15 @@ macho_validate_32(const struct mach_header *mh, size_t size) {
 macho_result
 macho_validate_64(const struct mach_header_64 *mh, size_t size) {
 	if (mh->magic != MH_MAGIC_64) {
-		error_macho("64-bit Mach-O invalid magic: %x", mh->magic);
+		macho_error("64-bit Mach-O invalid magic: %x", mh->magic);
 		return MACHO_ERROR;
 	}
 	if (size < sizeof(*mh)) {
-		error_macho("64-bit Mach-O too small");
+		macho_error("64-bit Mach-O too small");
 		return MACHO_ERROR;
 	}
 	if (mh->sizeofcmds > size) {
-		error_macho("Mach-O sizeofcmds greater than file size");
+		macho_error("Mach-O sizeofcmds greater than file size");
 		return MACHO_ERROR;
 	}
 	// TODO: Validate commands.
@@ -143,7 +141,7 @@ macho_result
 macho_validate(const void *mh, size_t size) {
 	const struct mach_header *mh32 = mh;
 	if (size < sizeof(*mh32)) {
-		error_macho("Mach-O too small");
+		macho_error("Mach-O too small");
 		return MACHO_ERROR;
 	}
 	if (mh32->magic == MH_MAGIC) {
@@ -151,7 +149,7 @@ macho_validate(const void *mh, size_t size) {
 	} else if (mh32->magic == MH_MAGIC_64) {
 		return macho_validate_64((const struct mach_header_64 *)mh, size);
 	} else {
-		error_macho("Mach-O invalid magic: %x", mh32->magic);
+		macho_error("Mach-O invalid magic: %x", mh32->magic);
 		return MACHO_ERROR;
 	}
 }
@@ -304,7 +302,7 @@ macho_resolve_symbol(const struct macho *macho, const struct symtab_command *sym
 				return MACHO_NOT_FOUND;
 			}
 			if ((n_type & N_TYPE) != N_SECT) {
-				error_macho("unexpected Mach-O symbol type %x for symbol %s",
+				macho_error("unexpected Mach-O symbol type %x for symbol %s",
 						n_type & N_TYPE, symbol);
 				return MACHO_ERROR;
 			}
@@ -360,7 +358,7 @@ macho_resolve_address(const struct macho *macho, const struct symtab_command *sy
 	}
 	uint32_t sym_sect = MACHO_STRUCT_FIELD(macho, struct nlist, sym, n_sect);
 	if (sym_sect == NO_SECT) {
-		error_macho("symbol index %d has no section", symidx);
+		macho_error("symbol index %d has no section", symidx);
 		return MACHO_ERROR;
 	}
 	uint64_t sym_strx = MACHO_STRUCT_FIELD(macho, struct nlist, sym, n_un.n_strx);

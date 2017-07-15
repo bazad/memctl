@@ -4,7 +4,6 @@
 #include "disassemble.h"
 
 #include "memctl/macho.h"
-#include "memctl/memctl_error.h"
 
 #include <ctype.h>
 #include <stdarg.h>
@@ -24,7 +23,7 @@ static void _Noreturn error(const char *fmt, ...) {
 	verror(fmt, ap);
 }
 
-void error_macho(const char *fmt, ...) {
+void macho_error(const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
 	verror(fmt, ap);

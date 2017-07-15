@@ -178,7 +178,7 @@ print_error(error_handle error) {
 				PRINT("symbol '%s' not found in kext %s", e->symbol, e->bundle_id);
 			}
 			} break;
-		case macho_error: {
+		case macho_parse_error: {
 			PRINT("%s", (char *)error->data);
 			} break;
 		case kernelcache_error: {

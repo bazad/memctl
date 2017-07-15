@@ -17,7 +17,7 @@ enum {
 	address_protection_error         = 37,
 	address_unmapped_error           = 38,
 	address_inaccessible_error       = 39,
-	macho_error                      = 43,
+	macho_parse_error                = 43,
 	kernelcache_error                = 44,
 
 	core_error                       = 64,
@@ -126,11 +126,6 @@ struct address_inaccessible_error {
 };
 
 void error_address_inaccessible(kaddr_t address);
-
-/*
- * macho_error
- */
-void error_macho(const char *format, ...);
 
 /*
  * kernelcache_error

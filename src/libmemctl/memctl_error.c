@@ -1,5 +1,7 @@
 #include "memctl/memctl_error.h"
 
+#include "memctl/macho.h"
+
 #include <assert.h>
 #include <string.h>
 
@@ -112,10 +114,10 @@ error_address_inaccessible(kaddr_t address) {
 }
 
 void
-error_macho(const char *format, ...) {
+macho_error(const char *format, ...) {
 	va_list ap;
 	va_start(ap, format);
-	error_push_printf(macho_error, format, ap);
+	error_push_printf(macho_parse_error, format, ap);
 	va_end(ap);
 }
 

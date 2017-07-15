@@ -36,6 +36,15 @@ typedef enum macho_result {
 } macho_result;
 
 /*
+ * macho_error
+ *
+ * Description:
+ * 	A client-implemented function that the Mach-O routines below will call if an error is
+ * 	encountered.
+ */
+extern void macho_error(const char *fmt, ...);
+
+/*
  * macho_validate
  *
  * Description:
