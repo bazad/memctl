@@ -8,9 +8,11 @@
  * 	Error codes for the memctl tool.
  */
 enum {
-	message_error   = 128,
-	usage_error     = 129,
-	execve_error    = 130,
+	message_error               = 128,
+	usage_error                 = 129,
+	execve_error                = 130,
+	kext_not_found_error        = 131,
+	kext_symbol_not_found_error = 132,
 };
 
 /*
@@ -38,6 +40,25 @@ struct execve_error {
 };
 
 void error_execve(const char *path, const char *error);
+
+/*
+ * kext_not_found_error
+ */
+struct kext_not_found_error {
+	const char *bundle_id;
+};
+
+void error_kext_not_found(const char *bundle_id);
+
+/*
+ * kext_symbol_not_found_error
+ */
+struct kext_symbol_not_found_error {
+	const char *bundle_id;
+	const char *symbol;
+};
+
+void error_kext_symbol_not_found(const char *bundle_id, const char *symbol);
 
 /*
  * print_errors

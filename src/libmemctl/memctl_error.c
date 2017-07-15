@@ -112,36 +112,6 @@ error_address_inaccessible(kaddr_t address) {
 }
 
 void
-error_kext_not_found(const char *bundle_id) {
-	assert(bundle_id != NULL);
-	size_t bundle_id_len = len(bundle_id);
-	struct kext_not_found_error *e = error_push_data(kext_not_found_error,
-			sizeof(*e) + bundle_id_len, NULL);
-	if (e != NULL) {
-		char *ebundle_id = (char *)(e + 1);
-		memcpy(ebundle_id, bundle_id, bundle_id_len);
-		e->bundle_id = ebundle_id;
-	}
-}
-
-void
-error_kext_symbol_not_found(const char *bundle_id, const char *symbol) {
-	assert(symbol != NULL);
-	size_t bundle_id_len = len(bundle_id);
-	size_t symbol_len = len(symbol);
-	struct kext_symbol_not_found_error *e = error_push_data(kext_symbol_not_found_error,
-			sizeof(*e) + bundle_id_len + symbol_len, NULL);
-	if (e != NULL) {
-		char *ebundle_id = (char *)(e + 1);
-		char *esymbol = ebundle_id + bundle_id_len;
-		memcpy(ebundle_id, bundle_id, bundle_id_len);
-		memcpy(esymbol, symbol, symbol_len);
-		e->bundle_id = (bundle_id == NULL ? NULL : ebundle_id);
-		e->symbol = esymbol;
-	}
-}
-
-void
 error_macho(const char *format, ...) {
 	va_list ap;
 	va_start(ap, format);

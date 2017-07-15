@@ -17,8 +17,6 @@ enum {
 	address_protection_error         = 37,
 	address_unmapped_error           = 38,
 	address_inaccessible_error       = 39,
-	kext_not_found_error             = 41,
-	kext_symbol_not_found_error      = 42,
 	macho_error                      = 43,
 	kernelcache_error                = 44,
 
@@ -128,34 +126,6 @@ struct address_inaccessible_error {
 };
 
 void error_address_inaccessible(kaddr_t address);
-
-/*
- * kext_not_found_error
- */
-struct kext_not_found_error {
-	const char *bundle_id;
-};
-
-void error_kext_not_found(const char *bundle_id);
-
-/*
- * kext_no_symbols_error
- */
-struct kext_no_symbols_error {
-	const char *bundle_id;
-};
-
-void error_kext_no_symbols(const char *bundle_id);
-
-/*
- * kext_symbol_not_found_error
- */
-struct kext_symbol_not_found_error {
-	const char *bundle_id;
-	const char *symbol;
-};
-
-void error_kext_symbol_not_found(const char *bundle_id, const char *symbol);
 
 /*
  * macho_error
