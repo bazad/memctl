@@ -31,13 +31,13 @@ typedef enum {
  * 	The type of a function to read kernel memory into user space.
  *
  * Parameters:
- * 		kaddr			The kernel virtual address to read
+ * 		address			The kernel virtual address to read.
  * 	inout	size			On entry, the number of bytes to read. On return, the
  * 					number of bytes actually read. This may be smaller than
  * 					the desired number of bytes if an error was encountered.
  * 		data			The buffer in which to store the data.
- * 		access_width		The number of bytes to read at a time, or 0 to let
- * 					kernel_read decide the appropriate width. This parameter
+ * 		access_width		The number of bytes to read at a time, or 0 to let the
+ * 					implementation decide the appropriate width. This parameter
  * 					is useful when accessing memory mapped registers, which
  * 					may trigger a panic if accessed with the wrong width.
  * 	out	next			On return, the next address at which a read might
@@ -45,12 +45,9 @@ typedef enum {
  *
  * Returns:
  * 	A kernel_io_result.
- *
- * Errors:
- * 	Any non-success result is accompanied by an error.
  */
 typedef kernel_io_result (*kernel_read_fn)(
-		kaddr_t kaddr,
+		kaddr_t address,
 		size_t *size,
 		void *data,
 		size_t access_width,
@@ -63,26 +60,23 @@ typedef kernel_io_result (*kernel_read_fn)(
  * 	The type of a function to write data into kernel memory.
  *
  * Parameters:
- * 		kaddr			The kernel virtual address to write.
+ * 		address			The kernel virtual address to write.
  * 	inout	size			On entry, the number of bytes to write. On return, the
  * 					number of bytes actually written. This may be smaller
  * 					than the desired number of bytes if an error was
  * 					encountered.
  * 		data			The data to write.
- * 		access_width		The number of bytes to write at a time, or 0 to let
- * 					kernel_write decide the appropriate width. See
- * 					kernel_read.
+ * 		access_width		The number of bytes to write at a time, or 0 to let the
+ * 					implementation decide the appropriate width. See
+ * 					kernel_read_fn.
  * 	out	next			On return, the next address at which a write might
  * 					succeed.
  *
  * Returns:
  * 	A kernel_io_result.
- *
- * Errors:
- * 	Any non-success result is accompanied by an error.
  */
 typedef kernel_io_result (*kernel_write_fn)(
-		kaddr_t kaddr,
+		kaddr_t address,
 		size_t *size,
 		const void *data,
 		size_t access_width,
@@ -95,13 +89,13 @@ typedef kernel_io_result (*kernel_write_fn)(
  * 	A wrapper around mach_vm_allocate with kernel_task.
  *
  * Parameters:
- * 	out	addr			On return, the address of the allocated region.
+ * 	out	address			On return, the address of the allocated region.
  * 		size			The size of the region to allocate.
  *
  * Returns:
  * 	True if no errors were encountered.
  */
-bool kernel_allocate(kaddr_t *addr, size_t size);
+bool kernel_allocate(kaddr_t *address, size_t size);
 
 /*
  * kernel_deallocate
@@ -110,10 +104,10 @@ bool kernel_allocate(kaddr_t *addr, size_t size);
  * 	A wrapper around mach_vm_deallocate with kernel_task.
  *
  * Parameters:
- * 		addr			The address of the allocated region.
+ * 		address			The address of the allocated region.
  * 		size			The size of the region to deallocate.
  */
-void kernel_deallocate(kaddr_t addr, size_t size);
+void kernel_deallocate(kaddr_t address, size_t size);
 
 /*
  * kernel_read_word
@@ -123,7 +117,7 @@ void kernel_deallocate(kaddr_t addr, size_t size);
  *
  * Parameters:
  * 		read			The kernel_read_fn to use.
- * 		kaddr			The kernel virtual address to read.
+ * 		address			The kernel virtual address to read.
  * 	out	value			On return, the value read.
  * 		width			The width of the value to read in bytes. width must be
  * 					1, 2, 4, or 8.
@@ -132,7 +126,7 @@ void kernel_deallocate(kaddr_t addr, size_t size);
  * Returns:
  * 	A kernel_io_result.
  */
-kernel_io_result kernel_read_word(kernel_read_fn read, kaddr_t kaddr, void *value, size_t width,
+kernel_io_result kernel_read_word(kernel_read_fn read, kaddr_t address, void *value, size_t width,
 		size_t access_width);
 
 /*
@@ -143,16 +137,16 @@ kernel_io_result kernel_read_word(kernel_read_fn read, kaddr_t kaddr, void *valu
  *
  * Parameters:
  * 		write			The kernel_write_fn to use.
- * 		kaddr			The kernel virtual address to write
- * 		value			The value to write
+ * 		address			The kernel virtual address to write.
+ * 		value			The value to write.
  * 		width			The width of the value to write in bytes. width must be
  * 					1, 2, 4, or 8.
- * 		access_width		The access width. See kernel_read.
+ * 		access_width		The access width. See kernel_read_fn.
  *
  * Returns:
  * 	A kernel_io_result.
  */
-kernel_io_result kernel_write_word(kernel_write_fn write, kaddr_t kaddr, kword_t value,
+kernel_io_result kernel_write_word(kernel_write_fn write, kaddr_t address, kword_t value,
 		size_t width, size_t access_width);
 
 /*
@@ -282,7 +276,7 @@ extern bool (*kernel_virtual_to_physical)(
  * 	Get the size of a block of memory allocated with kalloc.
  *
  * Parameters:
- * 		kaddr			The address of the memory block.
+ * 		address			The address of the memory block.
  * 	out	size			The allocated size of the memory, or 0 if the memory was
  * 					not allocated with kalloc/zalloc.
  *
@@ -298,7 +292,7 @@ extern bool (*kernel_virtual_to_physical)(
  * 	implementation.
  */
 extern bool (*kalloc_size)(
-		kaddr_t kaddr,
+		kaddr_t address,
 		size_t *size);
 
 /*

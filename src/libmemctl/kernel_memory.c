@@ -126,11 +126,10 @@ kernel_deallocate(kaddr_t addr, size_t size) {
  */
 static kernel_io_result
 transfer_unsafe(kaddr_t kaddr, size_t size, void *data, size_t access, bool into_kernel) {
-	assert(access != 0);
 	uint8_t *p = (uint8_t *)data;
 	while (size > 0) {
 		size_t copysize = min(size, page_size - (kaddr & page_mask));
-		if (access < sizeof(kword_t) && access < copysize) {
+		if (access != 0 && access < copysize) {
 			copysize = access;
 		}
 		kern_return_t kr;
@@ -213,14 +212,16 @@ physical_word_write_unsafe(paddr_t paddr, uint64_t data, size_t logsize) {
 static kernel_io_result
 transfer_physical_words_unsafe(paddr_t paddr, size_t size, void *data, size_t access,
 		bool into_kernel) {
-	assert(access != 0);
 	uint8_t *p = (uint8_t *)data;
 	kword_t dummy_args[] = { 1 };
 	bool trunc_32 = !into_kernel && !kernel_call(NULL, sizeof(uint64_t), 0, 1, dummy_args);
 	while (size > 0) {
 		size_t wordsize = min(size, sizeof(kword_t) - (paddr & page_mask));
-		if (access < wordsize) {
+		if (access != 0 && access < wordsize) {
 			wordsize = access;
+		}
+		if (wordsize > sizeof(kword_t)) {
+			wordsize = sizeof(kword_t);
 		}
 		if (wordsize == sizeof(uint64_t) && trunc_32) {
 			wordsize = sizeof(uint32_t);
@@ -255,9 +256,6 @@ static kernel_io_result
 transfer_range_unsafe(kaddr_t addr, size_t *size, size_t *access, kaddr_t *next, bool into_kernel) {
 	if (next != NULL) {
 		*next = addr + *size;
-	}
-	if (*access == 0) {
-		*access = sizeof(kword_t);
 	}
 	return KERNEL_IO_SUCCESS;
 }
@@ -333,9 +331,6 @@ transfer_range_heap(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, 
 	*size = transfer_size;
 	if (next != NULL) {
 		*next = next_viable;
-	}
-	if (*access == 0) {
-		*access = sizeof(kword_t);
 	}
 	return result;
 }
@@ -431,9 +426,6 @@ transfer_range_safe(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, 
 	if (next != NULL) {
 		*next = next_viable;
 	}
-	if (*access == 0) {
-		*access = sizeof(kword_t);
-	}
 	return result;
 }
 
@@ -499,11 +491,8 @@ transfer_range_all(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, b
 			this_access = pr->access;
 			this_size   = min(phys_size, pr->end + 1 - paddr);
 		}
-		// If there's been no restrictions on the access width so far, default to the
-		// kernel word size.
-		if (this_access == 0) {
-			this_access = sizeof(kword_t);
-		}
+		// Check if this access would be compatible with the currently selected transfer
+		// range.
 		if (this_access != transfer_access) {
 			if (transfer_access == 0) {
 				transfer_access = this_access;
@@ -512,8 +501,8 @@ transfer_range_all(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, b
 				break;
 			}
 		}
-		kaddr += this_size;
-		remaining -= this_size;
+		kaddr         += this_size;
+		remaining     -= this_size;
 		transfer_size += this_size;
 	}
 	error_start();
@@ -521,7 +510,7 @@ transfer_range_all(kaddr_t kaddr, size_t *size, size_t *access, kaddr_t *next, b
 	if (next != NULL) {
 		*next = next_viable;
 	}
-	if (default_access) {
+	if (default_access && transfer_access != 0) {
 		*access = transfer_access;
 	}
 	return result;

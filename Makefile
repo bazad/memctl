@@ -108,6 +108,7 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 privilege_escalation.c \
 		 process.c \
 		 symbol_finders.c \
+		 task_memory.c \
 		 vtable.c
 
 LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
@@ -132,6 +133,7 @@ LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
 		 privilege_escalation.h \
 		 process.h \
 		 symbol_finders.h \
+		 task_memory.h \
 		 utility.h \
 		 vtable.h
 
