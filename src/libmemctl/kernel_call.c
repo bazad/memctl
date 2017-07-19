@@ -355,7 +355,7 @@ find_registry_entry_with_id(kaddr_t vtable, uint64_t id, kaddr_t *object, kaddr_
 			}
 			if (*object != 0) {
 				error_start();
-				error_internal("found two registry entries with ID %llx\n", id);
+				error_internal("found two registry entries with ID %llx", id);
 				*object = 0;
 				return false;
 			}
