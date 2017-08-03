@@ -6,9 +6,28 @@
 #include "memctl/aarch64/disasm.h"
 #include "memctl/aarch64/ksim.h"
 
-static kaddr_t _get_task_ipcspace;
-static kaddr_t _ipc_port_copyout_send;
-static kaddr_t _thread_exception_return;
+// A struct to hold symbol information.
+struct symbol {
+	const char *name;
+	kaddr_t     address;
+};
+
+// The list of symbols.
+static struct symbol symbols[] = {
+	{ "_proc_lock" },
+	{ "_proc_unlock" },
+	{ "_get_task_ipcspace" },
+	{ "_ipc_port_copyout_send" },
+	{ "_thread_exception_return" },
+};
+
+// The number of symbols.
+static const size_t symbol_count = sizeof(symbols) / sizeof(symbols[0]);
+
+// The indices of the above symbols in the pthread_callbacks structure.
+static const unsigned symbol_index[symbol_count] = {
+	19, 20, 32, 33, 38,
+};
 
 /*
  * find__pthread_kext_register
@@ -69,32 +88,45 @@ find__pthread_callbacks(kaddr_t _pthread_kext_register) {
 }
 
 /*
- * get_functions
+ * extract_symbols
  *
  * Description:
- * 	Get the useful functions from the pthread_callbacks structure.
+ * 	Extract the useful function symbols from the pthread_callbacks structure.
  *
  * Notes:
- * 	No validation is performed on the symbol values. If the pthread_callbacks structure
+ * 	Minimal validation is performed on the symbol values. If the pthread_callbacks structure
  * 	changes, then the offsets used in this function will be incorrect.
  */
-void
-get_functions(kaddr_t _pthread_callbacks) {
+static bool
+extract_symbols(kaddr_t _pthread_callbacks) {
 	const size_t head = sizeof(int) + sizeof(uint32_t);
-	const size_t task_get_ipcspace_idx       = 32;
-	const size_t ipc_port_copyout_send_idx   = 33;
-	const size_t thread_exception_return_idx = 38;
+	const int static_version = 1;
 	const struct load_command *sc = macho_segment_containing_address(&kernel.macho,
 			_pthread_callbacks);
-	assert(sc != NULL);
+	if (sc == NULL) {
+		memctl_warning("invalid pthread_callbacks address 0x%llx: no kernel segment "
+		               "contains this address", _pthread_callbacks);
+		return false;
+	}
+	// Get the static pthread_callbacks data.
 	const void *data;
 	uint64_t address;
 	size_t size;
 	macho_segment_data(&kernel.macho, sc, &data, &address, &size);
-	kaddr_t *fns = (kword_t *)((uintptr_t)data + (_pthread_callbacks - address) + head);
-	_get_task_ipcspace       = fns[task_get_ipcspace_idx];
-	_ipc_port_copyout_send   = fns[ipc_port_copyout_send_idx];
-	_thread_exception_return = fns[thread_exception_return_idx];
+	assert(address <= _pthread_callbacks && _pthread_callbacks < address + size);
+	void *pthread_callbacks = (void *)((uintptr_t)data + (_pthread_callbacks - address));
+	// Check the version.
+	int version = *(int *)pthread_callbacks;
+	if (version != static_version) {
+		memctl_warning("unrecognized pthread_callbacks version %d", version);
+		return false;
+	}
+	// Get the functions.
+	kaddr_t *fns = (kword_t *)((uintptr_t)pthread_callbacks + head);
+	for (size_t i = 0; i < symbol_count; i++) {
+		symbols[i].address = fns[symbol_index[i]];
+	}
+	return true;
 }
 
 /*
@@ -106,19 +138,17 @@ get_functions(kaddr_t _pthread_callbacks) {
 static kext_result
 find_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
 	assert(strcmp(kext->bundle_id, KERNEL_ID) == 0);
-	kaddr_t static_addr;
-	if (strcmp(symbol, "_get_task_ipcspace") == 0) {
-		static_addr = _get_task_ipcspace;
-	} else if (strcmp(symbol, "_ipc_port_copyout_send") == 0) {
-		static_addr = _ipc_port_copyout_send;
-	} else if (strcmp(symbol, "_thread_exception_return") == 0) {
-		static_addr = _thread_exception_return;
-	} else {
-		return KEXT_NOT_FOUND;
+	for (size_t i = 0; i < symbol_count; i++) {
+		if (strcmp(symbol, symbols[i].name) == 0) {
+			if (symbols[i].address == 0) {
+				break;
+			}
+			// We have no idea what the real size is, so don't set anything.
+			*addr = symbols[i].address + kext->slide;
+			return KEXT_SUCCESS;
+		}
 	}
-	*addr = static_addr + kext->slide;
-	// We have no idea what the real size is, so don't set anything.
-	return KEXT_SUCCESS;
+	return KEXT_NOT_FOUND;
 }
 
 void
@@ -137,8 +167,11 @@ kernel_symbol_finder_init_pthread_callbacks(void) {
 		WARN(_pthread_callbacks);
 		goto abort;
 	}
-	// Get the useful callbacks.
-	get_functions(_pthread_callbacks);
+	// Get the useful symbols.
+	bool success = extract_symbols(_pthread_callbacks);
+	if (!success) {
+		goto abort;
+	}
 	// Add the symbol finder.
 	kext_add_symbol_finder(KERNEL_ID, find_symbol);
 abort:
