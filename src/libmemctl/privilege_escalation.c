@@ -77,7 +77,7 @@ setuid_root() {
 }
 
 bool
-proc_copy_credentials(kaddr_t from_proc, kaddr_t to_proc) {
+proc_copy_credentials(kaddr_t to_proc, kaddr_t from_proc) {
 	assert(from_proc != 0 && to_proc != 0);
 	NEED_FN(proc_ucred);
 	NEED_FN(kauth_cred_proc_ref);

@@ -26,8 +26,8 @@ bool setuid_root(void);
  * 	process.
  *
  * Parameters:
- * 		from_proc			The proc struct of the source process.
  * 		to_proc				The proc struct of the destination process.
+ * 		from_proc			The proc struct of the source process.
  *
  * Returns:
  * 	True if no errors were encountered.
@@ -36,6 +36,6 @@ bool setuid_root(void);
  * 	kernel_task
  * 	process_init
  */
-bool proc_copy_credentials(kaddr_t from_proc, kaddr_t to_proc);
+bool proc_copy_credentials(kaddr_t to_proc, kaddr_t from_proc);
 
 #endif
