@@ -252,13 +252,14 @@
  *  	+----------------+----------------+----------------+----------------+
  *
  *  VALUE_STACK is the stack of values that will be loaded into registers using the load gadget.
- *  The JOP payload calls the load/advance gadget combination 4 times, advancing the VALUE_STACK
- *  register by 0x34 each time. Then, after the function call, the VALUE_STACK is read for function
- *  call recovery and written to to store the result. The overall layout of the VALUE_STACK is:
+ *  The JOP payload calls the load gadget 4 times and advances the VALUE_STACK register by 0x34
+ *  after each of the first 3 loads. Then, after the function call, the VALUE_STACK is read for
+ *  function call recovery and written to to store the result. The overall layout of the
+ *  VALUE_STACK is:
  *
  *  	VALUE_STACK         10                  20                  30   34             40
  *  	+---------+---------+---------+---------+---------+---------+----+----+---------+
- *  	| ~ STORE_RESUME ~~ |         |         | MOV_X8_ | MOV_X30 | _______ | STORE_R |  >---+
+ *  	| ~ STORE_RESUME ~~ |         |         | LDP_X8_ | MOV_X30 | _______ | STORE_R |  >---+
  *  	+---------+---------+---------+---------+---------+---------+----+----+---------+      |
  *  	                                                                                       |
  *  	   +-----------------------------------------------------------------------------------+

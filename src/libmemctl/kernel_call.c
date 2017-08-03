@@ -61,7 +61,7 @@
  *  overwritten with the address of the fake vtable copied into the kernel earlier.
  *
  *  At this point, when iokit_user_client_trap calls getTargetAndTrapForIndex, the trap that is
- *  returned will be the address of the IOExternalTrap method we allocated. However, the fields of
+ *  returned will be the address of the IOExternalTrap object we allocated. However, the fields of
  *  this object need to be initialized for each function call.
  *
  *  In order to actually call a kernel function, the IOExternalTrap object is overwritten so that
