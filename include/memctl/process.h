@@ -87,6 +87,34 @@ extern bool (*proc_find)(kaddr_t *proc, int pid, bool release);
 extern bool (*proc_rele)(kaddr_t proc);
 
 /*
+ * proc_lock
+ *
+ * Description:
+ * 	XNU's proc_lock. Lock a proc struct. You should already have a reference on this proc.
+ *
+ * Parameters:
+ * 		proc			The proc struct.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*proc_lock)(kaddr_t proc);
+
+/*
+ * proc_unlock
+ *
+ * Description:
+ * 	XNU's proc_unlock. Unlock a proc struct.
+ *
+ * Parameters:
+ * 		proc			The proc struct.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*proc_unlock)(kaddr_t proc);
+
+/*
  * proc_task
  *
  * Description:

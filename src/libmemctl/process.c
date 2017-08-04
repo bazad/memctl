@@ -17,6 +17,8 @@ kaddr_t currenttask;
 bool (*current_proc)(kaddr_t *proc);
 bool (*proc_find)(kaddr_t *proc, int pid, bool release);
 bool (*proc_rele)(kaddr_t proc);
+bool (*proc_lock)(kaddr_t proc);
+bool (*proc_unlock)(kaddr_t proc);
 bool (*proc_task)(kaddr_t *task, kaddr_t proc);
 bool (*proc_ucred)(kaddr_t *ucred, kaddr_t proc);
 bool (*proc_set_ucred)(kaddr_t proc, kaddr_t ucred);
@@ -34,6 +36,8 @@ static kaddr_t _kernproc;
 static kaddr_t _current_proc;
 static kaddr_t _proc_find;
 static kaddr_t _proc_rele;
+static kaddr_t _proc_lock;
+static kaddr_t _proc_unlock;
 static kaddr_t _proc_task;
 static kaddr_t _proc_ucred;
 static kaddr_t _kauth_cred_proc_ref;
@@ -61,6 +65,26 @@ proc_rele_(kaddr_t proc) {
 	bool success = kernel_call(NULL, 0, _proc_rele, 1, &proc);
 	if (!success) {
 		ERROR_CALL(_proc_rele);
+	}
+	return success;
+}
+
+static bool
+proc_lock_(kaddr_t proc) {
+	assert(proc != 0);
+	bool success = kernel_call(NULL, 0, _proc_lock, 1, &proc);
+	if (!success) {
+		ERROR_CALL(_proc_lock);
+	}
+	return success;
+}
+
+static bool
+proc_unlock_(kaddr_t proc) {
+	assert(proc != 0);
+	bool success = kernel_call(NULL, 0, _proc_unlock, 1, &proc);
+	if (!success) {
+		ERROR_CALL(_proc_unlock);
 	}
 	return success;
 }
@@ -299,6 +323,8 @@ process_init() {
 	RESOLVE1(current_proc);
 	RESOLVE1(proc_find);
 	RESOLVE1(proc_rele);
+	RESOLVE1(proc_lock);
+	RESOLVE1(proc_unlock);
 	RESOLVE1(proc_task);
 	RESOLVE1(proc_ucred);
 	RESOLVE1(kauth_cred_proc_ref);
