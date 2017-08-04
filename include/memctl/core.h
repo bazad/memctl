@@ -6,21 +6,11 @@
 #include <mach/mach.h>
 
 /*
- * The core is responsible for obtaining the kernel task, possibly using libmemctl's functionality.
- * Each vulnerability is different and has its own best exploitation strategy. It is not memctl's
- * job to figure out how to best exploit a use-after-free or arbitrary kernel write; rather, it's
- * the core's job to turn the vulnerability into a reliable interface for libmemctl to work its
- * post-exploitation magic.
- *
- * If the vulnerability is not 100% reliable (e.g. memory corruption) it's advisable to exploit the
- * bug only once per boot and have the core use a hole the exploit created.
- */
-
-/*
  * kernel_task
  *
  * Description:
- * 	The kernel task, or MACH_PORT_NULL if the kernel task port has not been opened.
+ * 	The kernel task port, or MACH_PORT_NULL if the current task does not yet have a send right
+ * 	to the kernel task.
  */
 extern mach_port_t kernel_task;
 
@@ -29,7 +19,7 @@ extern mach_port_t kernel_task;
  *
  * Description:
  * 	Load the core. This includes retrieving the kernel_task port and initializing any state
- * 	needed by the core.
+ * 	needed by the core. libmemctl does not provide an implementation of this function.
  *
  * Returns:
  * 	True if the core was successfully loaded.
@@ -40,7 +30,10 @@ extern mach_port_t kernel_task;
  *
  * Notes:
  * 	It is safe to call this function multiple times.
+ *
+ * 	libmemctl provides the API for obtaining the kernel task port so that each core depends
+ * 	only on libmemctl, regardless of what client program is using it.
  */
-bool core_load(void);
+extern bool core_load(void);
 
 #endif
