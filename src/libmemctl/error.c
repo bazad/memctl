@@ -27,18 +27,18 @@ struct header {
  */
 struct error_stack {
 	struct error *stack;
-	size_t capacity;
-	size_t count;
-	size_t stop_count;
+	unsigned capacity;
+	unsigned count;
+	unsigned stop_count;
 };
 
 /*
  * errors
  *
  * Description:
- * 	A global error stack.
+ * 	A thread-local error stack.
  */
-static struct error_stack errors;
+_Thread_local static struct error_stack errors;
 
 /*
  * reserve
@@ -63,7 +63,10 @@ reserve() {
 	if (errors.count + 3 <= errors.capacity) {
 		return true;
 	}
-	size_t new_capacity = errors.capacity + 4;
+	unsigned new_capacity = errors.capacity + 4;
+	if (new_capacity < errors.capacity) {
+		return false;
+	}
 	struct error *new_stack = realloc(errors.stack,
 			new_capacity * sizeof(*errors.stack));
 	if (new_stack == NULL) {
@@ -137,6 +140,7 @@ free_data(void *data) {
  */
 static void *
 push_internal(error_type_t type, size_t size, void (*destroy)(void *)) {
+	assert(errors.count < errors.capacity);
 	void *data = alloc_data(size, destroy);
 	if (data == NULL) {
 		return NULL;
@@ -172,7 +176,8 @@ pop_internal() {
  */
 static bool
 error_push_out_of_memory_internal() {
-	if (errors.count >= errors.capacity) {
+	assert(errors.count <= errors.capacity);
+	if (errors.count == errors.capacity) {
 		return false;
 	}
 	push_internal(out_of_memory_error, 0, NULL);

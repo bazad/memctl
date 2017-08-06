@@ -36,10 +36,13 @@ typedef const struct error *error_handle;
  * error_init
  *
  * Description:
- * 	Initialize the global error system.
+ * 	Initialize the thread-local error system.
  *
  * Returns:
  * 	True if the error system was successfully initialized.
+ *
+ * Notes:
+ * 	Calling this function at thread start is optional.
  */
 bool error_init(void);
 
@@ -47,7 +50,13 @@ bool error_init(void);
  * error_free
  *
  * Description:
- * 	Clean up internal state.
+ * 	Free all resources used by the thread-local error system.
+ *
+ * Notes:
+ * 	This function must be called before a thread exits. Failing to do so will leak memory.
+ *
+ * 	After this call, the error stack must be re-initialized with error_init before it can be
+ * 	used again.
  */
 void error_free(void);
 
@@ -85,7 +94,8 @@ void error_start(void);
  * 	NULL				Out of memory
  * 	NULL				Errors have been stopped with error_stop
  * 	Otherwise, a pointer to a region of memory capable of storing size bytes is returned.
- * 	The memory is initialized to 0.
+ * 	The memory is initialized to 0. This is the same value that would be obtained from
+ * 	error_last()->data.
  */
 void *error_push_data(error_type_t type, size_t size, void (*destroy)(void *));
 

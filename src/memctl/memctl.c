@@ -130,6 +130,7 @@ install_signal_handler() {
  */
 static bool
 default_initialize() {
+	error_init();
 	platform_init();
 	if (!install_signal_handler()) {
 		return false;
@@ -233,6 +234,9 @@ deinitialize(bool critical) {
 	}
 	if (!critical && LOADED(KERNEL_IMAGE)) {
 		kernel_deinit();
+	}
+	if (!critical) {
+		error_free();
 	}
 	if (critical) {
 		fprintf(stderr, "deinitialized\n");
@@ -940,7 +944,7 @@ main(int argc, const char *argv[]) {
 	if (success) {
 		success = command_run_argv(argc - 1, argv + 1);
 	}
-	deinitialize(false);
 	print_errors();
+	deinitialize(false);
 	return (success ? 0 : 1);
 }
