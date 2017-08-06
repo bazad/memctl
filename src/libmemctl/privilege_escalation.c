@@ -96,10 +96,10 @@ proc_copy_credentials(kaddr_t to_proc, kaddr_t from_proc) {
 	if (!success) {
 		return false;
 	}
-	error_stop();
 	if (to_cred != 0) {
+		error_stop();
 		kauth_cred_unref(to_cred);
+		error_start();
 	}
-	error_start();
 	return true;
 }

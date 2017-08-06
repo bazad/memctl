@@ -566,15 +566,22 @@ kernel_call_7(void *result, unsigned result_size,
 		return hook.hooked;
 	}
 	assert(hook.hooked); // We better have already installed the hook.
-	IOExternalTrap trap = { (args[0] == 0 ? 1 : args[0]), func, 0 };
+	// Get exactly 7 arguments. We initialize args7[0] to 1 in case there are no arguments.
+	uint64_t args7[7] = { 1 };
+	for (size_t i = 0; i < arg_count; i++) {
+		args7[i] = args[i];
+	}
+	// Copy the IOExternalTrap into the kernel.
+	IOExternalTrap trap = { args7[0], func, 0 };
 	size_t size = sizeof(trap);
 	kernel_io_result ior = kernel_write_unsafe(hook.trap, &size, &trap, 0, NULL);
 	if (ior != KERNEL_IO_SUCCESS) {
 		error_internal("could not write trap to kernel memory");
 		return false;
 	}
-	uint32_t result32 = IOConnectTrap6(hook.connection, 0, args[1], args[2], args[3], args[4],
-			args[5], args[6]);
+	// Trigger the function call and return the result.
+	uint32_t result32 = IOConnectTrap6(hook.connection, 0, args7[1], args7[2], args7[3],
+			args7[4], args7[5], args7[6]);
 	if (result_size > 0) {
 		pack_uint(result, result32, result_size);
 	}
