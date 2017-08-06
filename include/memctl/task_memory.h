@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <mach/mach_vm.h>
+#include <mach/mach.h>
 
 /*
  * task_io_result

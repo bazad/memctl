@@ -4,6 +4,7 @@
 #include "memctl/utility.h"
 
 #include <mach/mach_error.h>
+#include <mach/mach_vm.h>
 #include <mach/vm_page_size.h>
 #include <mach/vm_region.h>
 
