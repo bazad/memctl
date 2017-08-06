@@ -54,7 +54,7 @@ extern bool (*current_proc)(kaddr_t *proc);
  *
  * Description:
  * 	XNU's proc_find. Get the address of the proc struct for the given PID. If release is true,
- * 	the process is returned without an additional reference.
+ * 	then the reference added by proc_find is removed with proc_rele.
  *
  * Parameters:
  * 	out	proc			On return, the address of the proc struct for the process.
@@ -70,7 +70,51 @@ extern bool (*current_proc)(kaddr_t *proc);
  * 	The default behavior of proc_find is to return with the process with an additional
  * 	reference. If release is true, the returned proc pointer may be immediately stale.
  */
-extern bool (*proc_find)(kaddr_t *proc, int pid, bool release);
+extern bool (*proc_find)(kaddr_t *proc, pid_t pid, bool release);
+
+/*
+ * proc_pids_find_path
+ *
+ * Description:
+ * 	Find the PIDs of all processes with the given path.
+ *
+ * Parameters:
+ * 		path			The canonical path to search for.
+ * 	out	pids			On return, the array is filled with the PIDs of the
+ * 					matching processes. May be NULL.
+ * 	inout	count			On entry, the capacity of the pids array. On return, the
+ * 					number of matching PIDs found. If this is greater than the
+ * 					count on entry, then not all PIDs were stored in the array.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ *
+ * Notes:
+ * 	This function uses the proc_listallpids and proc_pidpath functions from libproc.h, which
+ * 	require special privileges on iOS.
+ */
+bool proc_pids_find_path(const char *path, pid_t *pids, size_t *count);
+
+/*
+ * proc_find_path
+ *
+ * Description:
+ * 	Get the address of the proc struct for the first process with the given path. If release is
+ * 	true, then the reference added by proc_find is removed with proc_rele.
+ *
+ * Parameters:
+ * 	out	proc			On return, the address of the proc struct for the process.
+ * 		path			The path of the process to find.
+ * 		release			Whether to drop the reference added by proc_find using
+ * 					proc_rele.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ *
+ * Notes:
+ * 	See proc_find and proc_pids_find_path.
+ */
+extern bool (*proc_find_path)(kaddr_t *proc, const char *path, bool release);
 
 /*
  * proc_rele

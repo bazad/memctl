@@ -6,6 +6,8 @@
 #include "memctl/memctl_error.h"
 #include "memctl/utility.h"
 
+#include <sys/param.h>
+
 
 #define PROC_DUMP_SIZE 128
 
@@ -15,7 +17,8 @@ kaddr_t kernproc;
 kaddr_t currentproc;
 kaddr_t currenttask;
 bool (*current_proc)(kaddr_t *proc);
-bool (*proc_find)(kaddr_t *proc, int pid, bool release);
+bool (*proc_find)(kaddr_t *proc, pid_t pid, bool release);
+bool (*proc_find_path)(kaddr_t *proc, const char *path, bool release);
 bool (*proc_rele)(kaddr_t proc);
 bool (*proc_lock)(kaddr_t proc);
 bool (*proc_unlock)(kaddr_t proc);
@@ -50,6 +53,55 @@ static kaddr_t _ipc_port_copyout_send;
 
 #define ERROR_CALL(symbol)	error_internal("could not call %s", #symbol)
 
+// iOS does not provide libproc.h or sys/proc_info.h. We will just declare prototypes for these
+// functions rather than try to include the headers. The headers would need to be heavily modified
+// to compile here.
+
+int proc_listallpids(void *buffer, int buffersize);
+int proc_pidpath(int pid, void *buffer, uint32_t buffersize);
+
+bool
+proc_pids_find_path(const char *path, pid_t *pids, size_t *count) {
+	// Get the number of processes.
+	int capacity = proc_listallpids(NULL, 0);
+	if (capacity <= 0) {
+fail_0:
+		error_functionality_unavailable("proc_listallpids fails");
+		return false;
+	}
+	capacity += 10;
+	assert(capacity > 0);
+	// Get the list of all PIDs.
+	pid_t all_pids[capacity];
+	int all_count = proc_listallpids(all_pids, capacity * sizeof(*all_pids));
+	if (all_count <= 0) {
+		goto fail_0;
+	}
+	// Find all PIDs that match the specified path. We walk the list in reverse because
+	// proc_listallpids seems to return the PIDs in reverse order.
+	pid_t *end = pids + *count;
+	size_t found = 0;
+	for (int i = all_count - 1; i >= 0; i--) {
+		pid_t pid = all_pids[i];
+		// Get this process's path.
+		char pid_path[MAXPATHLEN];
+		int len = proc_pidpath(pid, pid_path, sizeof(pid_path));
+		if (len <= 0) {
+			continue;
+		}
+		// If it's a match, add it to the list and increment the number of PIDs found.
+		if (strncmp(path, pid_path, len) == 0) {
+			if (pids < end) {
+				*pids = pid;
+				pids++;
+			}
+			found++;
+		}
+	}
+	*count = found;
+	return true;
+}
+
 static bool
 current_proc_(kaddr_t *proc) {
 	bool success = kernel_call(proc, sizeof(*proc), _current_proc, 0, NULL);
@@ -70,6 +122,93 @@ proc_rele_(kaddr_t proc) {
 }
 
 static bool
+proc_find_(kaddr_t *proc, pid_t pid, bool release) {
+	kword_t args[] = { pid };
+	kaddr_t proc0;
+	bool success = kernel_call(&proc0, sizeof(proc0), _proc_find, 1, args);
+	if (!success) {
+		ERROR_CALL(_proc_find);
+		return false;
+	}
+	if (release) {
+		success = proc_rele_(proc0);
+		if (!success) {
+			return false;
+		}
+	}
+	*proc = proc0;
+	return true;
+}
+
+#define PROC_FIND_PATH_PID_COUNT 16
+
+/*
+ * proc_find_path_once
+ *
+ * Description:
+ * 	Try to find the process with the given path.
+ */
+static bool
+proc_find_path_once(kaddr_t *proc, const char *path, bool release, bool *retry) {
+	// Get the list of all PIDs matching the given path.
+	pid_t pids[PROC_FIND_PATH_PID_COUNT];
+	size_t count = PROC_FIND_PATH_PID_COUNT;
+	bool success = proc_pids_find_path(path, pids, &count);
+	if (!success) {
+		return false;
+	}
+	// If no processes matched or if too many matched, return.
+	if (count == 0) {
+		*proc = 0;
+		return true;
+	} else if (count > PROC_FIND_PATH_PID_COUNT) {
+		error_internal("too many processes match path '%s'", path);
+		return false;
+	}
+	// Find the smallest PID.
+	pid_t pid = pids[0];
+	for (size_t i = 1; i < count; i++) {
+		if (pids[i] < pid) {
+			pid = pids[i];
+		}
+	}
+	// Get the corresponding proc struct.
+	success = proc_find(proc, pid, release);
+	if (!success) {
+		return false;
+	}
+	// If we're trying to be safe, make sure it's still the right process.
+	if (!release) {
+		char path2[MAXPATHLEN];
+		int len = proc_pidpath(pid, path2, sizeof(path2));
+		if (len <= 0 || strcmp(path, path2) != 0) {
+			// The paths didn't match. Release the process and retry.
+			error_stop();
+			success = proc_rele_(*proc);
+			error_start();
+			*retry = true;
+			return false;
+		}
+	}
+	// We've opened the process and it's still the same one, so return success.
+	return true;
+}
+
+static bool
+proc_find_path_(kaddr_t *proc, const char *path, bool release) {
+	for (unsigned tries = 0; tries < 3; tries++) {
+		bool retry = false;
+		bool success = proc_find_path_once(proc, path, release, &retry);
+		if (success || !retry) {
+			return success;
+		}
+	}
+	error_internal("proc_find_path failed: too many retries");
+	return false;
+
+}
+
+static bool
 proc_lock_(kaddr_t proc) {
 	assert(proc != 0);
 	bool success = kernel_call(NULL, 0, _proc_lock, 1, &proc);
@@ -87,25 +226,6 @@ proc_unlock_(kaddr_t proc) {
 		ERROR_CALL(_proc_unlock);
 	}
 	return success;
-}
-
-static bool
-proc_find_(kaddr_t *proc, int pid, bool release) {
-	kword_t args[] = { pid };
-	kaddr_t proc0;
-	bool success = kernel_call(&proc0, sizeof(proc0), _proc_find, 1, args);
-	if (!success) {
-		ERROR_CALL(_proc_find);
-		return false;
-	}
-	if (release) {
-		success = proc_rele_(proc0);
-		if (!success) {
-			return false;
-		}
-	}
-	*proc = proc0;
-	return true;
 }
 
 static bool
@@ -293,6 +413,12 @@ initialize_p_ucred_offset() {
 	return false;
 }
 
+/*
+ * initialize_offsets
+ *
+ * Description:
+ * 	Initialize the offsets needed by the specialized process routines.
+ */
 static void
 initialize_offsets() {
 	if (OFFSET(proc, p_ucred).valid == 0) {
@@ -303,18 +429,22 @@ initialize_offsets() {
 void
 process_init() {
 	error_stop();
-#define READ(sym, val)								\
+#define RESOLVE_KERNEL(sym)							\
 	if (sym == 0) {								\
-		kern_return_t kr = kernel_symbol(#sym, &sym, NULL);		\
-		if (kr == KEXT_SUCCESS) {					\
+		(void)kernel_symbol(#sym, &sym, NULL);				\
+	}
+#define READ(sym, val)								\
+	if (val == 0) {								\
+		RESOLVE_KERNEL(sym);						\
+		if (sym != 0) {							\
 			(void)kernel_read_word(kernel_read_unsafe,		\
 					sym, &val, sizeof(val), 0);		\
 		}								\
 	}
 #define RESOLVE(sym, fn, impl)							\
-	if (sym == 0) {								\
-		kern_return_t kr = kernel_symbol(#sym, &sym, NULL);		\
-		if (kr == KEXT_SUCCESS) {					\
+	if (fn == NULL) {							\
+		RESOLVE_KERNEL(sym);						\
+		if (sym != 0) {							\
 			fn = impl;						\
 		}								\
 	}
@@ -334,6 +464,7 @@ process_init() {
 	RESOLVE1(convert_task_to_port);
 	RESOLVE1(get_task_ipcspace);
 	RESOLVE1(ipc_port_copyout_send);
+#undef RESOLVE_KERNEL
 #undef READ
 #undef RESOLVE
 #undef RESOLVE1
@@ -346,6 +477,10 @@ process_init() {
 	initialize_offsets();
 	if (proc_set_ucred == NULL && OFFSET(proc, p_ucred).valid > 0) {
 		proc_set_ucred = proc_set_ucred_;
+	}
+	if (proc_find_path == NULL
+			&& proc_find != NULL && proc_rele != NULL) {
+		proc_find_path = proc_find_path_;
 	}
 	if (task_to_task_port == NULL
 			&& task_reference != NULL && convert_task_to_port != NULL

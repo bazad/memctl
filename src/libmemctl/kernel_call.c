@@ -270,18 +270,17 @@ fail_1:
 static bool
 open_service_with_known_connection_id(io_service_t service,
 		io_connect_t *connection, uint64_t *connection_id) {
-	bool success = false;
-	bool retry   = true;
-	for (size_t tries = 0; !success && retry; tries++) {
-		if (tries == 5) {
-			error_internal("could not open a connection to service with known "
-			               "connection id: retry limit exceeded");
-			return false;
-		}
-		success = open_service_with_known_connection_id_once(service,
+	for (size_t tries = 0; tries < 5; tries++) {
+		bool retry = false;
+		bool success = open_service_with_known_connection_id_once(service,
 				connection, connection_id, &retry);
+		if (success || !retry) {
+			return success;
+		}
 	}
-	return success;
+	error_internal("could not open a connection to service with known "
+	               "connection id: retry limit exceeded");
+	return false;
 }
 
 /*
