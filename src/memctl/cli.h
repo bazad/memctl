@@ -36,5 +36,8 @@ bool ap_command(kaddr_t address, bool unpermute);
 bool s_command(kaddr_t address);
 bool kcd_command(const char *kernelcache, const char *output);
 bool root_command(void);
+#if MEMCTL_REPL
+bool quit_command(void);
+#endif
 
 #endif

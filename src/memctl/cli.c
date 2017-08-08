@@ -367,6 +367,14 @@ HANDLER(root_handler) {
 	return root_command();
 }
 
+#if MEMCTL_REPL
+
+HANDLER(quit_handler) {
+	return quit_command();
+}
+
+#endif
+
 static struct command commands[] = {
 	{
 		"i", NULL, i_handler,
@@ -565,6 +573,13 @@ static struct command commands[] = {
 		"exec a root shell",
 		0, NULL,
 	}
+#if MEMCTL_REPL
+	, {
+		"quit", NULL, quit_handler,
+		"exit the REPL",
+		0, NULL,
+	}
+#endif
 };
 
 struct cli cli = {

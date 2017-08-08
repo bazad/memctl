@@ -328,7 +328,6 @@ run_repl() {
 		}
 		if (line == NULL || n == 0) {
 			printf("\n");
-			success = true;
 			break;
 		}
 		int argc;
@@ -341,6 +340,7 @@ run_repl() {
 		tok_reset(tok);
 		print_errors();
 	}
+	success = true;
 	free(prompt_string);
 	in_repl = false;
 	history_end(hist);
@@ -350,6 +350,16 @@ fail1:
 	el_end(el);
 fail0:
 	return success;
+}
+
+bool
+quit_command() {
+	if (!in_repl) {
+		error_usage("quit", NULL, "not currently in a REPL");
+		return false;
+	}
+	in_repl = false;
+	return true;
 }
 
 #endif // MEMCTL_REPL
