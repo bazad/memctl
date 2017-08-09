@@ -32,7 +32,7 @@ kernel_write_fn physical_write_unsafe;
 bool (*kernel_virtual_to_physical)(
 		kaddr_t kaddr,
 		paddr_t *paddr);
-bool (*kalloc_size)(
+bool (*zone_element_size)(
 		kaddr_t kaddr,
 		size_t *size);
 
@@ -56,6 +56,8 @@ static kaddr_t _IOMappedWrite64;
 
 // vm_size_t zone_element_size(void *addr, zone_t *z)
 static kaddr_t _zone_element_size;
+
+#define ERROR_CALL(symbol)	error_internal("could not call %s", #symbol)
 
 /*
  * mach_unexpected
@@ -550,7 +552,7 @@ kernel_virtual_to_physical_(kaddr_t kaddr, paddr_t *paddr) {
 	kword_t args[] = { kernel_pmap, kaddr };
 	bool success = kernel_call(&ppnum, sizeof(ppnum), _pmap_find_phys, 2, args);
 	if (!success) {
-		error_internal("could not call %s", "_pmap_find_phys");
+		ERROR_CALL(_pmap_find_phys);
 		return false;
 	}
 	if (ppnum == 0) {
@@ -562,40 +564,36 @@ kernel_virtual_to_physical_(kaddr_t kaddr, paddr_t *paddr) {
 }
 
 bool
-kalloc_size_(kaddr_t address, size_t *size) {
+zone_element_size_(kaddr_t address, size_t *size) {
 	vm_size_t vmsize;
 	kword_t args[] = { address, 0 };
 	bool success = kernel_call(&vmsize, sizeof(vmsize), _zone_element_size, 2, args);
 	if (!success) {
-		error_internal("could not call %s", "_zone_element_size");
+		ERROR_CALL(_zone_element_size);
 		return false;
 	}
-	// TODO: kalloc_size includes vm_map_lookup_kalloc_entry_locked.
 	*size = vmsize;
 	return true;
 }
 
 void
 kernel_memory_init() {
+	error_stop();
 #define SET(fn)									\
 	if (fn == NULL) {							\
 		fn = fn##_;							\
 	}
-#define RESOLVE(sym)								\
+#define RESOLVE_KERNEL(sym)							\
 	if (sym == 0 && kernel.base != 0 && kernel.slide != 0) {		\
-		error_stop();							\
-		kernel_symbol(#sym, &sym, NULL);				\
-		error_start();							\
+		(void)kernel_symbol(#sym, &sym, NULL);				\
 	}
-#define READ(var)								\
-	if (var == 0 && kernel_read_unsafe != NULL) {				\
-		kaddr_t _##var = 0;						\
-		RESOLVE(_##var);						\
-		if (_##var != 0) {						\
-			error_stop();						\
-			kernel_read_word(kernel_read_unsafe,			\
-					_##var, &var, sizeof(var), 0);		\
-			error_start();						\
+#define READ(sym, val)								\
+	if (val == 0 && kernel_read_unsafe != NULL) {				\
+		kaddr_t sym = 0;						\
+		RESOLVE_KERNEL(sym);						\
+		if (sym != 0) {							\
+			(void)kernel_read_word(kernel_read_unsafe,		\
+					sym, &val, sizeof(val), 0);		\
 		}								\
 	}
 
@@ -608,8 +606,8 @@ kernel_memory_init() {
 	}
 	// Load kernel_virtual_to_physical.
 	if (kernel_virtual_to_physical == NULL) {
-		READ(kernel_pmap);
-		RESOLVE(_pmap_find_phys);
+		READ(_kernel_pmap, kernel_pmap);
+		RESOLVE_KERNEL(_pmap_find_phys);
 		if (kernel_pmap != 0 && _pmap_find_phys != 0) {
 			kword_t dummy_args[2] = { kernel_pmap, kernel.base };
 			if (kernel_call(NULL, sizeof(ppnum_t), 0, 2, dummy_args)) {
@@ -625,14 +623,14 @@ kernel_memory_init() {
 		SET(kernel_write_all);
 	}
 	// Resolve the XNU physical memory functions.
-	RESOLVE(_IOMappedRead8);
-	RESOLVE(_IOMappedRead16);
-	RESOLVE(_IOMappedRead32);
-	RESOLVE(_IOMappedRead64);
-	RESOLVE(_IOMappedWrite8);
-	RESOLVE(_IOMappedWrite16);
-	RESOLVE(_IOMappedWrite32);
-	RESOLVE(_IOMappedWrite64);
+	RESOLVE_KERNEL(_IOMappedRead8);
+	RESOLVE_KERNEL(_IOMappedRead16);
+	RESOLVE_KERNEL(_IOMappedRead32);
+	RESOLVE_KERNEL(_IOMappedRead64);
+	RESOLVE_KERNEL(_IOMappedWrite8);
+	RESOLVE_KERNEL(_IOMappedWrite16);
+	RESOLVE_KERNEL(_IOMappedWrite32);
+	RESOLVE_KERNEL(_IOMappedWrite64);
 	// Load the unsafe physical memory read/write functions.
 	if (physical_read_unsafe == NULL && _IOMappedRead8 != 0 && _IOMappedRead16 != 0
 			&& _IOMappedRead32 != 0 && _IOMappedRead64 != 0) {
@@ -648,17 +646,18 @@ kernel_memory_init() {
 			SET(physical_write_unsafe);
 		}
 	}
-	// Load kalloc_size.
-	if (kalloc_size == NULL) {
-		RESOLVE(_zone_element_size);
+	// Load zone_element_size.
+	if (zone_element_size == NULL) {
+		RESOLVE_KERNEL(_zone_element_size);
 		if (_zone_element_size != 0) {
 			kword_t dummy_args[2] = { kernel.base, 0 };
 			if (kernel_call(NULL, sizeof(vm_size_t), 0, 2, dummy_args)) {
-				SET(kalloc_size);
+				SET(zone_element_size);
 			}
 		}
 	}
 #undef SET
-#undef RESOLVE
+#undef RESOLVE_KERNEL
 #undef READ
+	error_start();
 }

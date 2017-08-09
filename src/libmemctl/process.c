@@ -35,7 +35,6 @@ bool (*ipc_port_copyout_send)(mach_port_t *port_name, kaddr_t send_right, kaddr_
 bool (*task_to_task_port)(mach_port_t *task_port, kaddr_t task, kaddr_t sender);
 bool (*proc_to_task_port)(mach_port_t *task_port, kaddr_t proc);
 
-static kaddr_t _kernproc;
 static kaddr_t _current_proc;
 static kaddr_t _proc_find;
 static kaddr_t _proc_rele;
@@ -443,11 +442,12 @@ void
 process_init() {
 	error_stop();
 #define RESOLVE_KERNEL(sym)							\
-	if (sym == 0) {								\
+	if (sym == 0 && kernel.base != 0 && kernel.slide != 0) {		\
 		(void)kernel_symbol(#sym, &sym, NULL);				\
 	}
 #define READ(sym, val)								\
-	if (val == 0) {								\
+	if (val == 0 && kernel_read_unsafe != NULL) {				\
+		kaddr_t sym = 0;						\
 		RESOLVE_KERNEL(sym);						\
 		if (sym != 0) {							\
 			(void)kernel_read_word(kernel_read_unsafe,		\

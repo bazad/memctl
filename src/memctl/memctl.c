@@ -656,7 +656,6 @@ fpr_command(pid_t pid) {
 	kaddr_t proc;
 	bool success = proc_find(&proc, pid, true);
 	if (!success) {
-		error_message("proc_find(%d) failed", pid);
 		return false;
 	}
 	printf(KADDR_XFMT"\n", proc);
@@ -716,14 +715,13 @@ kz_command(kaddr_t address) {
 	if (!initialize(KERNEL_MEMORY)) {
 		return false;
 	}
-	if (kalloc_size == NULL) {
-		error_functionality_unavailable("kalloc_size unavailable");
+	if (zone_element_size == NULL) {
+		error_functionality_unavailable("zone_element_size unavailable");
 		return false;
 	}
 	size_t size;
-	bool success = kalloc_size(address, &size);
+	bool success = zone_element_size(address, &size);
 	if (!success) {
-		error_message("kalloc_size("KADDR_XFMT") failed", address);
 		return false;
 	}
 	printf("%zu\n", size);

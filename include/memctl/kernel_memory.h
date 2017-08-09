@@ -270,28 +270,20 @@ extern bool (*kernel_virtual_to_physical)(
 		paddr_t *paddr);
 
 /*
- * kalloc_size
+ * zone_element_size
  *
  * Description:
- * 	Get the size of a block of memory allocated with kalloc.
+ * 	Get the size of a block of memory allocated with zalloc.
  *
  * Parameters:
  * 		address			The address of the memory block.
  * 	out	size			The allocated size of the memory, or 0 if the memory was
- * 					not allocated with kalloc/zalloc.
+ * 					not allocated with zalloc.
  *
  * Returns:
  * 	True if there were no errors.
- *
- * Notes:
- * 	This function does not directly call the XNU version of this function, since XNU's
- * 	kalloc_size will panic if the given address is invalid. Consequently, this version of
- * 	kalloc_size was implemented partially in user space by calling the same API
- * 	(zone_element_size) used by kalloc_size. However, additional logic in kalloc_size was not
- * 	implemented, and so the returned value may not exactly match the result from the in-kernel
- * 	implementation.
  */
-extern bool (*kalloc_size)(
+extern bool (*zone_element_size)(
 		kaddr_t address,
 		size_t *size);
 
