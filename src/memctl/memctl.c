@@ -293,6 +293,20 @@ static bool
 run_repl() {
 	assert(!in_repl);
 	bool success = false;
+	// HACK: Print out the prompt even when there's no TTY.
+	//
+	// libedit doesn't like to show a prompt when there's no TTY. However, I very much like my
+	// prompt; I put a lot of effort into that prompt. Thus, pretend we're running inside an
+	// emacs shell if there's no TTY to get the prompt back. This will cause libedit to disable
+	// editing, which will in turn prevent libedit from permanently disabling prompt printing
+	// during initialization.
+	//
+	// Unfortunately, this seems to be an implementation detail, and the behavior can't be
+	// achieved by setting the terminal type after creation.
+	if (!isatty(fileno(stdout))) {
+		setenv("TERM", "emacs", 1);
+	}
+	// Initialize libedit.
 	EditLine *el = el_init(getprogname(), stdin, stdout, stderr);
 	if (el == NULL) {
 		error_out_of_memory();
@@ -315,6 +329,7 @@ run_repl() {
 	el_set(el, EL_PROMPT, repl_prompt);
 	el_set(el, EL_EDITOR, "emacs");
 	el_set(el, EL_GETCFN, repl_getc);
+	// Run the REPL.
 	in_repl = true;
 	asprintf(&prompt_string, "%s> ", getprogname());
 	while (in_repl) {
@@ -343,6 +358,7 @@ run_repl() {
 	success = true;
 	free(prompt_string);
 	in_repl = false;
+	// Clean up.
 	history_end(hist);
 fail2:
 	tok_end(tok);
@@ -878,7 +894,7 @@ kcd_command(const char *kernelcache_path, const char *output_path) {
 	struct kernelcache *kc;
 	struct kernelcache kc_local;
 	if (output_path == NULL) {
-		ofd = STDOUT_FILENO;
+		ofd = fileno(stdout);
 	} else {
 		ofd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (ofd < 0) {
