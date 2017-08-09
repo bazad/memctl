@@ -252,6 +252,14 @@ extern kernel_read_fn physical_read_unsafe;
 extern kernel_write_fn physical_write_unsafe;
 
 /*
+ * kernel_pmap
+ *
+ * Description:
+ * 	XNU's kernel_pmap. The kernel pmap structure.
+ */
+extern kaddr_t kernel_pmap;
+
+/*
  * kernel_virtual_to_physical
  *
  * Description:
@@ -265,9 +273,7 @@ extern kernel_write_fn physical_write_unsafe;
  * Returns:
  * 	True if no errors were encountered.
  */
-extern bool (*kernel_virtual_to_physical)(
-		kaddr_t kaddr,
-		paddr_t *paddr);
+extern bool (*kernel_virtual_to_physical)(kaddr_t kaddr, paddr_t *paddr);
 
 /*
  * zone_element_size
@@ -277,15 +283,13 @@ extern bool (*kernel_virtual_to_physical)(
  *
  * Parameters:
  * 		address			The address of the memory block.
- * 	out	size			The allocated size of the memory, or 0 if the memory was
- * 					not allocated with zalloc.
+ * 	out	size			On return, the allocated size of the memory, or 0 if the
+ * 					memory was not allocated with zalloc.
  *
  * Returns:
- * 	True if there were no errors.
+ * 	True if no errors were encountered.
  */
-extern bool (*zone_element_size)(
-		kaddr_t address,
-		size_t *size);
+extern bool (*zone_element_size)(kaddr_t address, size_t *size);
 
 /*
  * kernel_memory_init

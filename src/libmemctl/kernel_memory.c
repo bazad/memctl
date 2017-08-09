@@ -29,15 +29,11 @@ kernel_read_fn  physical_read_unsafe;
 kernel_write_fn physical_write_unsafe;
 
 // Other functions.
-bool (*kernel_virtual_to_physical)(
-		kaddr_t kaddr,
-		paddr_t *paddr);
-bool (*zone_element_size)(
-		kaddr_t kaddr,
-		size_t *size);
+bool (*kernel_virtual_to_physical)(kaddr_t kaddr, paddr_t *paddr);
+bool (*zone_element_size)(kaddr_t kaddr, size_t *size);
 
 // pmap_t kernel_pmap;
-static kaddr_t kernel_pmap;
+kaddr_t kernel_pmap;
 
 // ppnum_t pmap_find_phys(pmap_t map, addr64_t va);
 static kaddr_t _pmap_find_phys;
@@ -596,7 +592,6 @@ kernel_memory_init() {
 					sym, &val, sizeof(val), 0);		\
 		}								\
 	}
-
 	// Load the basic kernel read/write functions.
 	if (kernel_task != MACH_PORT_NULL) {
 		SET(kernel_read_unsafe);
@@ -604,11 +599,12 @@ kernel_memory_init() {
 		SET(kernel_read_heap);
 		SET(kernel_write_heap);
 	}
+	// Get the kernel_pmap.
+	READ(_kernel_pmap, kernel_pmap);
 	// Load kernel_virtual_to_physical.
-	if (kernel_virtual_to_physical == NULL) {
-		READ(_kernel_pmap, kernel_pmap);
+	if (kernel_virtual_to_physical == NULL && kernel_pmap != 0) {
 		RESOLVE_KERNEL(_pmap_find_phys);
-		if (kernel_pmap != 0 && _pmap_find_phys != 0) {
+		if (_pmap_find_phys != 0) {
 			kword_t dummy_args[2] = { kernel_pmap, kernel.base };
 			if (kernel_call(NULL, sizeof(ppnum_t), 0, 2, dummy_args)) {
 				SET(kernel_virtual_to_physical);
