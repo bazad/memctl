@@ -249,11 +249,24 @@ proc_ucred_(kaddr_t *ucred, kaddr_t proc) {
 }
 
 static bool
-proc_set_ucred_(kaddr_t proc, kaddr_t ucred) {
+proc_ucred_offset_(kaddr_t *ucred, kaddr_t proc) {
 	assert(proc != 0);
 	kaddr_t proc_cred_addr = proc + OFFSETOF(proc, p_ucred);
-	kernel_io_result kio = kernel_write_word(kernel_write_unsafe, proc_cred_addr,
-			ucred, sizeof(ucred), 0);
+	kernel_read_fn fn = (kernel_read_safe != NULL ? kernel_read_safe : kernel_read_unsafe);
+	kernel_io_result kio = kernel_read_word(fn, proc_cred_addr, ucred, sizeof(*ucred), 0);
+	if (kio != KERNEL_IO_SUCCESS) {
+		error_internal("could not read process credentials");
+		return false;
+	}
+	return true;
+}
+
+static bool
+proc_set_ucred_offset_(kaddr_t proc, kaddr_t ucred) {
+	assert(proc != 0);
+	kaddr_t proc_cred_addr = proc + OFFSETOF(proc, p_ucred);
+	kernel_write_fn fn = (kernel_write_safe != NULL ? kernel_write_safe : kernel_write_unsafe);
+	kernel_io_result kio = kernel_write_word(fn, proc_cred_addr, ucred, sizeof(ucred), 0);
 	if (kio != KERNEL_IO_SUCCESS) {
 		error_internal("could not replace process credentials");
 		return false;
@@ -475,8 +488,13 @@ process_init() {
 		proc_task(&currenttask, currentproc);
 	}
 	initialize_offsets();
-	if (proc_set_ucred == NULL && OFFSET(proc, p_ucred).valid > 0) {
-		proc_set_ucred = proc_set_ucred_;
+	if (OFFSET(proc, p_ucred.valid > 0)) {
+		if (proc_ucred == proc_ucred_) {
+			proc_ucred = proc_ucred_offset_;
+		}
+		if (proc_set_ucred == NULL) {
+			proc_set_ucred = proc_set_ucred_offset_;
+		}
 	}
 	if (proc_find_path == NULL
 			&& proc_find != NULL && proc_rele != NULL) {
