@@ -3,7 +3,6 @@
 #include "memctl/kernel.h"
 #include "memctl/memctl_error.h"
 
-#include "memctl/aarch64/disasm.h"
 #include "memctl/aarch64/ksim.h"
 
 // A struct to hold symbol information.
@@ -28,64 +27,6 @@ static const size_t symbol_count = sizeof(symbols) / sizeof(symbols[0]);
 static const unsigned symbol_index[symbol_count] = {
 	19, 20, 32, 33, 38,
 };
-
-/*
- * find__pthread_kext_register
- *
- * Description:
- * 	Find the _pthread_kext_register function.
- */
-static kaddr_t
-find__pthread_kext_register() {
-	kaddr_t _pthread_kext_register;
-	kext_result kr = kernel_symbol("_pthread_kext_register", &_pthread_kext_register, NULL);
-	// Subtract out the slide, since we're simulating using the static addresses.
-	return (kr == KEXT_SUCCESS ? _pthread_kext_register - kernel.slide : 0);
-}
-
-#define MAX__pthread_kext_register_INSTRUCTIONS 20
-
-/*
- * get_str_x1
- *
- * Description:
- * 	Stop at any store to x1, saving the stored value in the ksim context.
- */
-static bool
-get_str_x1(struct ksim *ksim, uint32_t ins) {
-	struct aarch64_ins_ldr_im str;
-	if (!aarch64_decode_ldr_ui(ins, &str) || str.load || str.size != 3 || str.wb || str.post
-			|| str.Xn != AARCH64_X1) {
-		return false;
-	}
-	uint64_t value;
-	if (ksim_reg(ksim, str.Rt, &value)) {
-		*(kaddr_t *)ksim->context = value;
-	}
-	return true;
-}
-
-/*
- * find__pthread_callbacks
- *
- * Description:
- * 	Find the _pthread_callbacks structure.
- */
-static kaddr_t
-find__pthread_callbacks(kaddr_t _pthread_kext_register) {
-	struct ksim ksim;
-	kaddr_t _pthread_callbacks = 0;
-	if (!ksim_init_kext(&ksim, &kernel, _pthread_kext_register)) {
-		return 0;
-	}
-	ksim.context = &_pthread_callbacks;
-	ksim.max_instruction_count = MAX__pthread_kext_register_INSTRUCTIONS;
-	ksim.stop_before = get_str_x1;
-	if (!ksim_run(&ksim)) {
-		return 0;
-	}
-	return _pthread_callbacks;
-}
 
 /*
  * extract_symbols
@@ -152,17 +93,20 @@ find_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *
 }
 
 void
-kernel_symbol_finder_init_pthread_callbacks(void) {
+kernel_symbol_finder_init_pthread_callbacks() {
 #define WARN(sym)	memctl_warning("could not find %s", #sym)
 	error_stop();
+	struct ksim sim;
 	// Get the address of the pthread_kext_register function.
-	kaddr_t _pthread_kext_register = find__pthread_kext_register();
+	kaddr_t _pthread_kext_register = ksim_symbol(NULL, "_pthread_kext_register");
 	if (_pthread_kext_register == 0) {
 		WARN(_pthread_kext_register);
 		goto abort;
 	}
+	ksim_init_sim(&sim, _pthread_kext_register);
 	// Get the address of the pthread_callbacks structure.
-	kaddr_t _pthread_callbacks = find__pthread_callbacks(_pthread_kext_register);
+	kaddr_t _pthread_callbacks = 0;
+	ksim_exec_until_store(&sim, NULL, AARCH64_X1, &_pthread_callbacks, 20);
 	if (_pthread_callbacks == 0) {
 		WARN(_pthread_callbacks);
 		goto abort;

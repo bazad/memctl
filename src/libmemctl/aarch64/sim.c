@@ -219,7 +219,7 @@ aarch64_sim_clear(struct aarch64_sim *sim) {
 
 void
 aarch64_sim_pc_advance(struct aarch64_sim *sim) {
-	sim->PC.value += AARCH64_SIM_INSTRUCTION_SIZE;
+	sim->PC.value += AARCH64_INSTRUCTION_SIZE;
 	assert((sim->PC.value & 3) == 0);
 	aarch64_sim_taint_meet_with(&sim->PC.taint, sim->taint_default[AARCH64_SIM_TAINT_CONSTANT]);
 }
@@ -510,12 +510,14 @@ aarch64_sim_step(struct aarch64_sim *sim) {
 		}
 	}
 
-	// Handle any branching.
+	// Handle any branching. Note that because branch_hit may abort before executing the
+	// instruction, we must be careful not to change any state before this point for branch
+	// instructions.
 	if (do_branch) {
 		run = sim->branch_hit(sim, branch_type, &branch_address, &branch_condition,
-				&take_branch);
+				&take_branch, &keep_running);
 		if (!run) {
-			keep_running = false;
+			return false;
 		}
 	}
 	// Advance PC to the next instruction.

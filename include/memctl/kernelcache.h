@@ -160,12 +160,15 @@ kext_result kernelcache_get_address(const struct kernelcache *kc,
  * 	out	bundle_id		The bundle identifier of the kext. The caller is
  * 					responsible for freeing this string. May be NULL.
  * 	out	base			The base address of the kext. May be NULL.
+ * 	out	macho			On return, an initialized macho struct describing the kext.
+ * 					See kernelcache_kext_init_macho_at_address.
  *
  * Returns:
- * 	A kext_result code.
+ * 	A kext_result code. An error is only generated if bundle_id is non-NULL and an
+ * 	out-of-memory condition is encountered.
  */
 kext_result kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
-		char **bundle_id, kaddr_t *base);
+		char **bundle_id, kaddr_t *base, struct macho *macho);
 
 /*
  * kernelcache_kext_init_macho

@@ -550,7 +550,7 @@ kext_result
 kext_containing_address(kaddr_t kaddr, char **bundle_id) {
 #if KERNELCACHE
 	return kernelcache_find_containing_address(&kernelcache, kaddr - kernel_slide, bundle_id,
-			NULL);
+			NULL, NULL);
 #else
 	return oskext_find_containing_address(kaddr, bundle_id, NULL, NULL);
 #endif

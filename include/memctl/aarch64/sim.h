@@ -11,14 +11,6 @@
 struct aarch64_sim;
 
 /*
- * macro AARCH64_SIM_INSTRUCTION_SIZE
- *
- * Description:
- * 	The size of an AArch64 instruction.
- */
-#define AARCH64_SIM_INSTRUCTION_SIZE	(sizeof(uint32_t))
-
-/*
  * aarch64_sim_taint
  *
  * Description:
@@ -154,16 +146,19 @@ enum aarch64_sim_branch_type {
  * 					(i.e., true if the branch should be taken).
  * 	out	take_branch		On return, indicates whether the simulator should take the
  * 					branch or not.
+ * 	out	keep_running		On return, indicates whether the simulator should keep
+ * 					running after this branch.
  *
  * Returns:
- * 	True if the simulator should continue, false to abort after executing the instruction.
+ * 	True if the simulator should continue, false to abort before executing the instruction.
  */
 typedef bool (*aarch64_sim_branch_hit_fn)(
 		struct aarch64_sim *sim,
 		enum aarch64_sim_branch_type type,
 		const struct aarch64_sim_word *branch,
 		const struct aarch64_sim_word *condition,
-		bool *take_branch);
+		bool *take_branch,
+		bool *keep_running);
 
 /*
  * aarch64_sim_illegal_instruction_fn
@@ -257,10 +252,10 @@ struct aarch64_sim {
 	void *context;
 
 	// Client callbacks.
-	aarch64_sim_instruction_fetch_fn instruction_fetch;
-	aarch64_sim_memory_load_fn memory_load;
-	aarch64_sim_memory_store_fn memory_store;
-	aarch64_sim_branch_hit_fn branch_hit;
+	aarch64_sim_instruction_fetch_fn   instruction_fetch;
+	aarch64_sim_memory_load_fn         memory_load;
+	aarch64_sim_memory_store_fn        memory_store;
+	aarch64_sim_branch_hit_fn          branch_hit;
 	aarch64_sim_illegal_instruction_fn illegal_instruction;
 
 	// The default taint table. See enum aarch64_sim_taint_default_type above.
@@ -334,6 +329,7 @@ void aarch64_sim_clear(struct aarch64_sim *sim);
  * 		sim			The simulator.
  */
 void aarch64_sim_pc_advance(struct aarch64_sim *sim);
+
 /*
  * aarch64_sim_step
  *

@@ -535,6 +535,7 @@ struct kernelcache_find_containing_address_context {
 	kaddr_t kaddr;
 	char **bundle_id;
 	kaddr_t *base;
+	struct macho *macho;
 	kext_result status;
 };
 
@@ -552,14 +553,13 @@ kernelcache_find_containing_address_callback(void *context, CFDictionaryRef info
 	if (base <= address && address < base + size) {
 		goto found;
 	}
-	struct macho kext;
 	// We don't need to wrap this call in error_stop() because this function never pushes
 	// errors onto the error stack.
-	kext_result kr = kernelcache_kext_init_macho_at_address(c->kc, &kext, base);
+	kext_result kr = kernelcache_kext_init_macho_at_address(c->kc, c->macho, base);
 	if (kr != KEXT_SUCCESS) {
 		return false;
 	}
-	const struct load_command *lc = macho_segment_containing_address(&kext, address);
+	const struct load_command *lc = macho_segment_containing_address(c->macho, address);
 	if (lc == NULL) {
 		return false;
 	}
@@ -580,9 +580,13 @@ found:
 
 kext_result
 kernelcache_find_containing_address(const struct kernelcache *kc, kaddr_t kaddr,
-		char **bundle_id, kaddr_t *base) {
+		char **bundle_id, kaddr_t *base, struct macho *macho) {
+	struct macho dummy_macho;
+	if (macho == NULL) {
+		macho = &dummy_macho;
+	}
 	struct kernelcache_find_containing_address_context context =
-		{ kc, kaddr, bundle_id, base, KEXT_NO_KEXT };
+		{ kc, kaddr, bundle_id, base, macho, KEXT_NO_KEXT };
 	// It's important to process the kernel itself last, since its segments contain those of
 	// all the prelinked kexts.
 	kernelcache_kext_for_each(kc, kernelcache_find_containing_address_callback, &context);

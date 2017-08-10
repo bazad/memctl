@@ -10,6 +10,14 @@
 #include <stdint.h>
 
 /*
+ * macro AARCH64_INSTRUCTION_SIZE
+ *
+ * Description:
+ * 	The size of an AArch64 instruction.
+ */
+#define AARCH64_INSTRUCTION_SIZE	(sizeof(uint32_t))
+
+/*
  * AARCH64_ZR_INS
  *
  * Description:

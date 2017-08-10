@@ -5,7 +5,6 @@
 #include "memctl/utility.h"
 
 #if __arm64__
-#include "memctl/aarch64/disasm.h"
 #include "memctl/aarch64/ksim.h"
 #include "memctl/kernel_slide.h"
 #include "memctl/kernelcache.h"
@@ -229,28 +228,6 @@ context_set_kext(struct context *context, const struct macho *macho) {
 }
 
 /*
- * stop_at_bl
- *
- * Description:
- * 	A ksim_stop_fn callback to stop execution at a BL instruction.
- */
-static bool
-stop_at_bl(struct ksim *ksim, uint32_t ins) {
-	return AARCH64_INS_TYPE(ins, BL_INS);
-}
-
-/*
- * stop_at_ret
- *
- * Description:
- * 	A ksim_stop_fn callback to stop execution at a RET instruction.
- */
-static bool
-stop_at_ret(struct ksim *ksim, uint32_t ins) {
-	return AARCH64_INS_TYPE(ins, RET_INS);
-}
-
-/*
  * get_metaclass_from_call
  *
  * Description:
@@ -259,24 +236,24 @@ stop_at_ret(struct ksim *ksim, uint32_t ins) {
  */
 static bool
 get_metaclass_from_call(struct context *c, struct ksim *ksim) {
-	uint64_t arg0, arg1, arg3;
-	if (!ksim_reg(ksim, AARCH64_X0, &arg0)
-			|| !ksim_reg(ksim, AARCH64_X1,  &arg1)
-			|| !ksim_reg(ksim, AARCH64_X3, &arg3)) {
+	kword_t arg0_metaclass  = ksim_reg(ksim, AARCH64_X0);
+	kword_t arg1_class_name = ksim_reg(ksim, AARCH64_X1);
+	kword_t arg3_size       = ksim_reg(ksim, AARCH64_X3);
+	if (arg0_metaclass == 0 || arg1_class_name == 0 || arg3_size == 0) {
 		return false;
 	}
-	if (!region_contains(&c->data, arg0)
-			|| !region_contains(&c->text, arg1)
-			|| arg3 >= UINT32_MAX) {
+	if (!region_contains(&c->data, arg0_metaclass)
+			|| !region_contains(&c->text, arg1_class_name)
+			|| arg3_size >= UINT32_MAX) {
 		return false;
 	}
-	const void *str;
+	const void *class_name;
 	size_t size;
-	region_get(&c->text, arg1, &str, &size);
-	if (strncmp(str, c->class_name, size) != 0) {
+	region_get(&c->text, arg1_class_name, &class_name, &size);
+	if (strncmp(class_name, c->class_name, size) != 0) {
 		return false;
 	}
-	c->metaclass = arg0;
+	c->metaclass = arg0_metaclass;
 	return true;
 }
 
@@ -289,29 +266,15 @@ get_metaclass_from_call(struct context *c, struct ksim *ksim) {
 static bool
 find_metaclass_from_initializer(struct context *c, kaddr_t mod_init_func) {
 	struct ksim ksim;
-	ksim_init(&ksim, c->text_exec.data, c->text_exec.size, c->text_exec.addr, mod_init_func);
-	ksim.stop_before = stop_at_bl;
+	ksim_init_sim(&ksim, mod_init_func);
 	for (;;) {
-		if (!ksim_run(&ksim)) {
+		if (!ksim_exec_until_call(&ksim, NULL, NULL, 256)) {
 			return false;
 		}
 		if (get_metaclass_from_call(c, &ksim)) {
 			return true;
 		}
 	}
-}
-
-/*
- * check_metaclass_at_return
- *
- * Description:
- * 	Check whether the method seems to be returning the metaclass pointer.
- */
-static bool
-check_metaclass_at_return(struct context *c, struct ksim *ksim) {
-	uint64_t ret;
-	return (ksim_reg(ksim, AARCH64_X0, &ret)
-			&& ret == c->metaclass);
 }
 
 #define MAX_GETMETACLASS_INSTRUCTION_COUNT 8
@@ -328,13 +291,11 @@ method_is_getmetaclass(struct context *c, kaddr_t method) {
 		return false;
 	}
 	struct ksim ksim;
-	ksim_init(&ksim, c->text_exec.data, c->text_exec.size, c->text_exec.addr, method);
-	ksim.max_instruction_count = MAX_GETMETACLASS_INSTRUCTION_COUNT;
-	ksim.stop_before = stop_at_ret;
-	if (!ksim_run(&ksim)) {
+	ksim_init_sim(&ksim, method);
+	if (!ksim_exec_until_return(&ksim, NULL, MAX_GETMETACLASS_INSTRUCTION_COUNT)) {
 		return false;
 	}
-	return check_metaclass_at_return(c, &ksim);
+	return (ksim_reg(&ksim, AARCH64_X0) == c->metaclass);
 }
 
 #define NMETHODS           12

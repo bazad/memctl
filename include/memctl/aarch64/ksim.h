@@ -1,189 +1,327 @@
 #ifndef MEMCTL__AARCH64__KSIM_H_
 #define MEMCTL__AARCH64__KSIM_H_
 
-#include "memctl/aarch64/sim.h"
 #include "memctl/aarch64/disasm.h"
-#include "memctl/kernel.h"
-
-// Forward declarations
-struct ksim;
-
-/*
- * macro KSIM_PC_UNKNOWN
- *
- * Description:
- * 	A PC value representing an unknown address.
- */
-#define KSIM_PC_UNKNOWN 0xffffffffffffffff
-
-/*
- * ksim_stop_fn
- *
- * Description:
- * 	A client-specified function that returns true when the simulator should stop.
- *
- * Parameters:
- * 		ksim			The ksim simulator.
- * 		ins			The instruction that is about to be executed (for
- * 					stop_before) or that was just executed (for stop_after).
- *
- * Returns:
- * 	True if the simulator should stop now, false to continue running.
- */
-typedef bool (*ksim_stop_fn)(
-		struct ksim *ksim,
-		uint32_t ins);
-
-/*
- * enum ksim_branch_condition
- *
- * Description:
- * 	For conditional branch instructions, the branch condition (true, false, or unknown).
- */
-enum ksim_branch_condition {
-	KSIM_BRANCH_CONDITION_UNKNOWN,
-	KSIM_BRANCH_CONDITION_TRUE,
-	KSIM_BRANCH_CONDITION_FALSE,
-};
-
-/*
- * ksim_handle_branch_fn
- *
- * Description:
- * 	A client-specified function that instructs the simulator how to handle a branch
- * 	instruction.
- *
- * Parameters:
- * 		ksim			The simulator.
- * 		ins			The branch instruction.
- * 		branch_address		The address that would be branched to if the branch
- * 					condition is true.
- * 		branch_condition	For a conditional branch instruction, the branch condition
- * 					(i.e., whether the branch would be taken).
- * 	out	take_branch		On return, instructs the simulator whether or not to take
- * 					the branch.
- * 	out	stop			On return, instructs the simulator whether to stop after
- * 					processing this instruction (overriding stop_after).
- *
- * Returns:
- * 	True to indicate that the branch was handled, false to let the simulator handle the branch
- * 	itself.
- */
-typedef bool (*ksim_handle_branch_fn)(
-		struct ksim *ksim,
-		uint32_t ins,
-		uint64_t branch_address,
-		enum ksim_branch_condition branch_condition,
-		bool *take_branch,
-		bool *stop);
+#include "memctl/aarch64/sim.h"
+#include "memctl/memctl_types.h"
 
 /*
  * struct ksim
  *
  * Description:
  * 	The AArch64 kernel/kext simulator.
- *
- * Behavior:
- * 	All general-purpose register values are initially unknown.
- *
- * 	No memory state is maintained. Values read from memory are always assumed to be unknown.
- * 	All stores are assumed to succeed.
- *
- * 	The simulator's behavior on branch instructions can be customized by specifying a
- * 	handle_branch function. By default, branches with link and conditional branches are not
- * 	taken, while every other branch type is taken. The simulator aborts on a ret instruction.
  */
 struct ksim {
 	// The aarch64_sim.
 	struct aarch64_sim sim;
 	// The bytecode being executed.
 	const void *code_data;
-	size_t code_size;
-	uint64_t code_address;
-	// Client-specified context.
-	void *context;
-	// A callback indicating if the simulation should stop before executing the current
-	// instruction.
-	ksim_stop_fn stop_before;
-	// A callback indicating if the simulation should stop after executing the current
-	// instruction.
-	ksim_stop_fn stop_after;
-	// A callback to allow the client to specify behavior on branch instructions.
-	ksim_handle_branch_fn handle_branch;
-	// The maximum number of instructions to execute before aborting.
-	size_t max_instruction_count;
-	// The current instruction count.
-	size_t instruction_count;
-	// Internal state.
-	struct {
-		bool do_stop;
-		bool did_stop_before;
-		bool clear_temporaries;
-	} internal;
+	size_t      code_size;
+	kword_t     code_address;
+	// Internal simulation state.
+	bool clear_temporaries;
+	bool did_stop;
 };
 
 /*
- * ksim_init
+ * ksim_branch
  *
  * Description:
- * 	Initialize the ksim simulator.
+ * 	The type of element in a branch descriptor array. See ksim_exec_until.
  *
- * Parameters:
- * 		ksim			The simulator.
- * 		code			The AArch64 bytecode.
- * 		size			The size of the bytecode.
- * 		address			The address of the start of the bytecode.
- * 		pc			The address at which to start simulating. This must lie
- * 					within the region spanned by the bytecode.
+ * 	The ksim_exec functions take an array of ksim_branch elements to describe the simulator's
+ * 	branching behavior on conditional branches. The elements are interpreted in-order for each
+ * 	branch that is encountered during execution. Valid values are:
+ * 	- 0 or false, to specify that the corresponding branch should not be taken.
+ * 	- 1 or true, to specify that the corresponding branch should be taken.
+ * 	- KSIM_BRANCH_ALL_FALSE to specify that the simulator should treat all further branches as
+ * 	  false and stop reading from the array.
+ *
+ * 	Passing NULL to ksim_exec_until is equivalent to specifying an array with the single value
+ * 	KSIM_BRANCH_ALL_FALSE.
  */
-void ksim_init(struct ksim *ksim, const void *code, size_t size, uint64_t address, uint64_t pc);
+typedef uint8_t ksim_branch;
+
+enum {
+	KSIM_BRANCH_ALL_FALSE = true + 1,
+};
 
 /*
- * ksim_init_kext
+ * ksim_symbol
  *
  * Description:
- * 	Initialize the ksim simulator with the specified kext.
+ * 	Return the static address of the symbol in the given kernel extension.
  *
  * Parameters:
- * 		ksim			The simulator.
- * 		kext			The kernel extension to simulate.
- * 		pc			The address at which to start simulating.
+ * 		kext			The bundle ID of the kernel extension, or NULL for the
+ * 					kernel.
+ * 		symbol			The symbol name.
  *
  * Returns:
- * 	True if the segment name was found in the kext.
+ * 	The address of the symbol or 0 if the symbol was not found.
  */
-bool ksim_init_kext(struct ksim *ksim, const struct kext *kext, uint64_t pc);
+kaddr_t ksim_symbol(const char *kext, const char *symbol);
 
 /*
- * ksim_run
+ * ksim_init_sim
  *
  * Description:
- * 	Run the simulator until any stop condition is met (see stop_before, stop_after, and
- * 	handle_branch).
+ * 	Initialize the simulator state to prepare it for execution. All registers are cleared and
+ * 	PC is set to the specified value.
+ *
+ * 	This function must be called before any ksim_exec function can be used.
  *
  * Parameters:
- * 		ksim			The simulator.
+ * 		ksim			The ksim struct to initialize.
+ * 		pc			The PC value. May be 0.
+ */
+void ksim_init_sim(struct ksim *ksim, kaddr_t pc);
+
+/*
+ * ksim_clearregs
+ *
+ * Description:
+ * 	Clear all the registers in the ksim struct except PC.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ */
+void ksim_clearregs(struct ksim *ksim);
+
+/*
+ * ksim_set_pc
+ *
+ * Description:
+ * 	Set the PC register in the simulator.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		pc			The PC value.
+ *
+ * Notes:
+ * 	An assertion error is raised if the PC does not lie within the kernel or any kernel
+ * 	extension.
+ */
+void ksim_set_pc(struct ksim *ksim, kaddr_t pc);
+
+// Constants to use for ksim_scan_for functions.
+enum {
+	KSIM_FW =  1,
+	KSIM_BW = -1,
+};
+
+/*
+ * ksim_scan_for
+ *
+ * Description:
+ * 	Advance PC at most count times until the specified instruction is found.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		direction		The direction to scan: KSIM_FW for forwards, KSIM_BW for
+ * 					backwards.
+ * 		ins			The instruction to find.
+ * 		mask			Which bits in ins to match against.
+ * 		index			The index of the matching instruction to stop at. Specify 0
+ * 					to stop at the first matching instruction, 1 for the
+ * 					second, and so on.
+ * 		count			The maximum number of instructions to scan forward.
  *
  * Returns:
- * 	True if the simulator was stopped, false if the simulator aborted.
+ * 	True if the instruction was found.
  */
-bool ksim_run(struct ksim *ksim);
+bool ksim_scan_for(struct ksim *ksim, int direction, uint32_t ins, uint32_t mask, unsigned index,
+		unsigned count);
+
+/*
+ * ksim_scan_for_jump
+ *
+ * Description:
+ * 	Advance PC until a B instruction is found.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		direction		The direction to scan: KSIM_FW for forwards, KSIM_BW for
+ * 					backwards.
+ * 	out	target			On return, the branch target.
+ * 		index			The index of the branch instruction.
+ * 		count			The maximum number of instructions to scan forward.
+ *
+ * Returns:
+ * 	True if the jump instruction was encountered.
+ */
+bool ksim_scan_for_jump(struct ksim *ksim, int direction, unsigned index, kaddr_t *target,
+		unsigned count);
+
+/*
+ * ksim_scan_for_call
+ *
+ * Description:
+ * 	Advance PC until a BL instruction is found.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		direction		The direction to scan: KSIM_FW for forwards, KSIM_BW for
+ * 					backwards.
+ * 	out	target			On return, the branch target.
+ * 		index			The index of the branch instruction.
+ * 		count			The maximum number of instructions to scan forward.
+ *
+ * Returns:
+ * 	True if the call instruction was encountered.
+ */
+bool ksim_scan_for_call(struct ksim *ksim, int direction, unsigned index, kaddr_t *target,
+		unsigned count);
+
+/*
+ * ksim_setreg
+ *
+ * Description:
+ * 	Set the value of an AArch64 general-purpose register.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		reg			The general-purpose register to set.
+ * 		value			The new value of the register.
+ */
+void ksim_setreg(struct ksim *ksim, aarch64_gpreg reg, kword_t value);
+
+/*
+ * ksim_getreg
+ *
+ * Description:
+ * 	Get the value of an AArch64 general-purpose register.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		reg			The general-purpose register to read.
+ * 	out	value			On return, the value of the register, if it is known.
+ *
+ * Returns:
+ * 	True if the register's value was known and successfully retrieved.
+ */
+bool ksim_getreg(struct ksim *ksim, aarch64_gpreg reg, kword_t *value);
 
 /*
  * ksim_reg
  *
  * Description:
- * 	Get the contents of the given register number.
+ * 	A wrapper around ksim_getreg that returns the register's value if it is known and 0
+ * 	otherwise.
  *
  * Parameters:
- * 		ksim			The simulator.
- * 		reg			The register name.
- * 	out	value			On return, the value of the register.
+ * 		ksim			The ksim struct.
+ * 		reg			The general-purpose register to read.
  *
  * Returns:
- * 	True if the register value was read successfully. If the register value is unknown, false
- * 	is returned.
+ * 	The register's value or 0.
  */
-bool ksim_reg(struct ksim *ksim, aarch64_gpreg reg, uint64_t *value);
+static inline kword_t ksim_reg(struct ksim *ksim, aarch64_gpreg reg) {
+	kword_t value;
+	bool success = ksim_getreg(ksim, reg, &value);
+	return (success ? value : 0);
+}
+
+/*
+ * ksim_exec_until_callback
+ *
+ * Description:
+ * 	A callback that specifies when ksim_exec_until should terminate.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		context			Caller-supplied context.
+ * 		pc			The PC register.
+ * 		ins			The current instruction that is about to be executed.
+ *
+ * Returns:
+ * 	True if execution should stop here.
+ */
+typedef bool (*ksim_exec_until_callback)(void *context, struct ksim *ksim, kaddr_t pc,
+		uint32_t ins);
+
+/*
+ * ksim_exec_until
+ *
+ * Description:
+ * 	Run the simulator for the specified number of steps, or until the callback specifies
+ * 	execution should stop.
+ *
+ * 	Execution stops whenever the until callback returns true or whenever execution takes a
+ * 	branch (without link) to an unknown location. Branches with link are not taken, but
+ * 	temporary registers are marked as unknown to simulate a function call.
+ *
+ * 	If the until callback stopped execution, the PC register will be set to the instruction at
+ * 	which until returned true. Otherwise, the PC register will be set to the instruction that
+ * 	triggered the stop.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		until			A callback specifying when execution should stop. May be
+ * 					NULL.
+ * 		context			A context value passed to the callback.
+ * 		branches		An array of ksim_branch elements specifying conditional
+ * 					branching behavior. See ksim_branch. May be NULL.
+ * 		count			The maximum number of instructions to execute.
+ *
+ * Returns:
+ * 	True if the stop condition was encountered.
+ */
+bool ksim_exec_until(struct ksim *ksim, ksim_exec_until_callback until, void *context,
+		ksim_branch *branches, unsigned count);
+
+/*
+ * ksim_exec_until_call
+ *
+ * Description:
+ * 	Run the simulator until a function call (BL instruction).
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		branches		The branching behavior. See ksim_exec_until.
+ * 	out	target			The call target. May be NULL.
+ * 		count			The maximum number of instructions to execute.
+ *
+ * Returns:
+ * 	True if the call instruction was encountered.
+ */
+bool ksim_exec_until_call(struct ksim *ksim, ksim_branch *branches, kaddr_t *target,
+		unsigned count);
+
+/*
+ * ksim_exec_until_return
+ *
+ * Description:
+ * 	Run the simulator until a return (RET instruction).
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		branches		The branching behavior. See ksim_exec_until.
+ * 		count			The maximum number of instructions to execute.
+ *
+ * Returns:
+ * 	True if the return instruction was encountered.
+ */
+bool ksim_exec_until_return(struct ksim *ksim, ksim_branch *branches, unsigned count);
+
+/*
+ * ksim_exec_until_store
+ *
+ * Description:
+ * 	Run the simulator until a store (STR, STRB, or STRH instruction) with the specified
+ * 	base register.
+ *
+ * Parameters:
+ * 		ksim			The ksim struct.
+ * 		branches		The branching behavior. See ksim_exec_until.
+ * 		base			The general-purpose base register.
+ * 	out	value			On return, the value stored, if it is known.
+ * 		count			The maximum number of instructions to execute.
+ *
+ * Returns:
+ * 	True if the store instruction was encountered.
+ */
+bool ksim_exec_until_store(struct ksim *ksim, ksim_branch *branches, aarch64_gpreg base,
+		kword_t *value, unsigned count);
 
 #endif
