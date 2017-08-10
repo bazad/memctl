@@ -129,7 +129,7 @@ proc_find_(kaddr_t *proc, pid_t pid, bool release) {
 		ERROR_CALL(_proc_find);
 		return false;
 	}
-	if (release) {
+	if (release && proc0 != 0) {
 		success = proc_rele_(proc0);
 		if (!success) {
 			return false;
