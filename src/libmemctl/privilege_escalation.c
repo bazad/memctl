@@ -18,30 +18,35 @@
 		return false;								\
 	}
 
+/*
+ * set_svuidgid_0
+ *
+ * Description:
+ * 	Set the specified process's UID and GID to root. The process must not already be root.
+ */
 static bool
-set_svuidgid_0() {
+set_svuidgid_0(kaddr_t proc) {
+	assert(proc != 0);
 	// Make sure we have the functions we need.
-	NEED_VAL(currentproc);
 	NEED_FN(kauth_cred_proc_ref);
 	NEED_FN(kauth_cred_setsvuidgid);
 	NEED_FN(proc_set_ucred);
 	NEED_FN(kauth_cred_unref);
-	// Add a reference to the current process's credentials and get a pointer to the
-	// credentials.
+	// Add a reference to the process's credentials and get a pointer to the credentials.
 	kaddr_t cred;
-	bool success = kauth_cred_proc_ref(&cred, currentproc);
+	bool success = kauth_cred_proc_ref(&cred, proc);
 	if (!success) {
 		return false;
 	}
-	// Create a new credentials structure based on our current one that has saved UID/GID 0.
+	// Create a new credentials structure based on the current one that has saved UID/GID 0.
 	kaddr_t cred0;
 	success = kauth_cred_setsvuidgid(&cred0, cred, 0, 0);
 	if (!success) {
 		// Leak the credential.
 		return false;
 	}
-	// Replace our old unprivileged credentials with our new privileged credentials.
-	success = proc_set_ucred(currentproc, cred0);
+	// Replace the old unprivileged credentials with the new privileged credentials.
+	success = proc_set_ucred(proc, cred0);
 	if (!success) {
 		// Leak the credential.
 		return false;
@@ -63,7 +68,8 @@ setuid_root() {
 		return true;
 	}
 	// Set our saved UID/GID to root.
-	if (!set_svuidgid_0()) {
+	NEED_VAL(currentproc);
+	if (!set_svuidgid_0(currentproc)) {
 		return false;
 	}
 	seteuid(0);
