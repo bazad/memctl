@@ -86,6 +86,20 @@ sim_clear_regs(struct aarch64_sim *sim) {
 }
 
 /*
+ * sim_clear_temps
+ *
+ * Description:
+ * 	Clear the temporary registers, simulating a function call.
+ */
+static void
+sim_clear_temps(struct aarch64_sim *sim) {
+	for (size_t n = TEMPREGS_START; n <= TEMPREGS_END; n++) {
+		aarch64_sim_word_clear(sim, &sim->X[n]);
+	}
+	aarch64_sim_pstate_clear(sim, &sim->PSTATE);
+}
+
+/*
  *
  * sim_get_instruction
  *
@@ -155,6 +169,15 @@ find_reference_branch_hit(struct aarch64_sim *sim, enum aarch64_sim_branch_type 
 		const struct aarch64_sim_word *branch, const struct aarch64_sim_word *condition,
 		bool *take_branch, bool *keep_running) {
 	*take_branch = false;
+	if (type == AARCH64_SIM_BRANCH_TYPE_BRANCH || type == AARCH64_SIM_BRANCH_TYPE_RETURN) {
+		// For an unconditional branch, we have no idea what jumps to right after it, so
+		// clear all registers.
+		sim_clear_regs(sim);
+	} else if (type == AARCH64_SIM_BRANCH_TYPE_BRANCH_AND_LINK) {
+		// For a branch with link, assume it's a function call and clear only the temporary
+		// registers.
+		sim_clear_temps(sim);
+	}
 	return true;
 }
 
@@ -247,20 +270,6 @@ ksim_string_reference(const char *kext_id, const char *reference) {
 void
 ksim_clearregs(struct ksim *ksim) {
 	sim_clear_regs(&ksim->sim);
-}
-
-/*
- * ksim_cleartemps
- *
- * Description:
- * 	Clear the temporary registers, simulating a function call.
- */
-static void
-ksim_cleartemps(struct ksim *ksim) {
-	for (size_t n = TEMPREGS_START; n <= TEMPREGS_END; n++) {
-		aarch64_sim_word_clear(&ksim->sim, &ksim->sim.X[n]);
-	}
-	aarch64_sim_pstate_clear(&ksim->sim, &ksim->sim.PSTATE);
 }
 
 /*
@@ -429,7 +438,7 @@ ksim_exec_instruction_fetch(struct aarch64_sim *sim) {
 	}
 	// Clear temporary registers if we are resuming after a function call.
 	if (ksim->clear_temporaries) {
-		ksim_cleartemps(ksim);
+		sim_clear_temps(sim);
 		ksim->clear_temporaries = false;
 	}
 	// Check if the client wants to stop before this instruction. If so, set the did_stop field
