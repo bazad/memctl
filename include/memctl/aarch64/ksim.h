@@ -3,7 +3,7 @@
 
 #include "memctl/aarch64/disasm.h"
 #include "memctl/aarch64/sim.h"
-#include "memctl/memctl_types.h"
+#include "memctl/mapped_region.h"
 
 /*
  * struct ksim
@@ -15,9 +15,7 @@ struct ksim {
 	// The aarch64_sim.
 	struct aarch64_sim sim;
 	// The bytecode being executed.
-	const void *code_data;
-	size_t      code_size;
-	kword_t     code_address;
+	struct mapped_region code;
 	// Internal simulation state.
 	bool clear_temporaries;
 	bool did_stop;
@@ -61,6 +59,22 @@ enum {
  * 	The address of the symbol or 0 if the symbol was not found.
  */
 kaddr_t ksim_symbol(const char *kext, const char *symbol);
+
+/*
+ * ksim_string_reference
+ *
+ * Description:
+ * 	Find the address of the first instruction that references the specified string.
+ *
+ * Parameters:
+ * 		kext			The bundle ID of the kernel extension, or NULL for the
+ * 					kernel.
+ * 		reference		The string to find a reference to.
+ *
+ * Returns:
+ * 	The address of the instruction or 0 if no instruction creates a reference to the string.
+ */
+kaddr_t ksim_string_reference(const char *kext, const char *reference);
 
 /*
  * ksim_init_sim
@@ -125,13 +139,14 @@ enum {
  * 		index			The index of the matching instruction to stop at. Specify 0
  * 					to stop at the first matching instruction, 1 for the
  * 					second, and so on.
+ * 	out	pc			On return, the PC of the instruction, if it was found.
  * 		count			The maximum number of instructions to scan forward.
  *
  * Returns:
  * 	True if the instruction was found.
  */
 bool ksim_scan_for(struct ksim *ksim, int direction, uint32_t ins, uint32_t mask, unsigned index,
-		unsigned count);
+		kaddr_t *pc, unsigned count);
 
 /*
  * ksim_scan_for_jump
@@ -143,15 +158,16 @@ bool ksim_scan_for(struct ksim *ksim, int direction, uint32_t ins, uint32_t mask
  * 		ksim			The ksim struct.
  * 		direction		The direction to scan: KSIM_FW for forwards, KSIM_BW for
  * 					backwards.
- * 	out	target			On return, the branch target.
  * 		index			The index of the branch instruction.
+ * 	out	pc			On return, the PC of the instruction, if it was found.
+ * 	out	target			On return, the branch target.
  * 		count			The maximum number of instructions to scan forward.
  *
  * Returns:
  * 	True if the jump instruction was encountered.
  */
-bool ksim_scan_for_jump(struct ksim *ksim, int direction, unsigned index, kaddr_t *target,
-		unsigned count);
+bool ksim_scan_for_jump(struct ksim *ksim, int direction, unsigned index, kaddr_t *pc,
+		kaddr_t *target, unsigned count);
 
 /*
  * ksim_scan_for_call
@@ -163,15 +179,16 @@ bool ksim_scan_for_jump(struct ksim *ksim, int direction, unsigned index, kaddr_
  * 		ksim			The ksim struct.
  * 		direction		The direction to scan: KSIM_FW for forwards, KSIM_BW for
  * 					backwards.
- * 	out	target			On return, the branch target.
  * 		index			The index of the branch instruction.
+ * 	out	pc			On return, the PC of the instruction, if it was found.
+ * 	out	target			On return, the branch target.
  * 		count			The maximum number of instructions to scan forward.
  *
  * Returns:
  * 	True if the call instruction was encountered.
  */
-bool ksim_scan_for_call(struct ksim *ksim, int direction, unsigned index, kaddr_t *target,
-		unsigned count);
+bool ksim_scan_for_call(struct ksim *ksim, int direction, unsigned index, kaddr_t *pc,
+		kaddr_t *target, unsigned count);
 
 /*
  * ksim_setreg

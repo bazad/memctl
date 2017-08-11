@@ -184,7 +184,6 @@ kext_result kernelcache_find_containing_address(const struct kernelcache *kc, ka
  *
  * Returns:
  * 	KEXT_SUCCESS			Success.
- * 	KEXT_ERROR			An error was encountered.
  * 	KEXT_NO_KEXT			The kext was not found.
  *
  * Notes:
@@ -205,7 +204,8 @@ kext_result kernelcache_kext_init_macho(const struct kernelcache *kc, struct mac
  * 		base			The static address of the Mach-O header.
  *
  * Returns:
- * 	KEXT_SUCCESS or KEXT_NO_KEXT.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_NO_KEXT			The kext was not found.
  *
  * Notes:
  * 	Because kexts in the kernelcache are split, the returned macho struct will describe a

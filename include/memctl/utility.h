@@ -114,7 +114,7 @@ testbit(uintmax_t x, unsigned n) {
 }
 
 /*
- * MACRO bext
+ * bext
  *
  * Description:
  * 	Extract bits lo to hi of x, inclusive, sign extending the result if sign is 1. Return the

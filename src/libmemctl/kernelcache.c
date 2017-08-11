@@ -604,14 +604,13 @@ kernelcache_kext_init_macho(const struct kernelcache *kc, struct macho *macho,
 	size_t size;
 	kext_result kr = kernelcache_get_address(kc, bundle_id, &base, &size);
 	if (kr != KEXT_SUCCESS) {
-		return kr;
+		assert(kr == KEXT_NO_KEXT);
+		return KEXT_NO_KEXT;
 	}
 	kr = kernelcache_kext_init_macho_at_address(kc, macho, base);
-	if (kr != KEXT_SUCCESS) {
-		error_kernelcache("prelink info error: could not initialize kext %s at base "
-		                  "address %llx", bundle_id, (unsigned long long)base);
-		return KEXT_ERROR;
-	}
+	// This should never fail; if it does, then the kernelcache's __PRELINK_INFO section
+	// incorrectly identified the address of the kext Mach-O.
+	assert(kr == KEXT_SUCCESS);
 	return KEXT_SUCCESS;
 }
 

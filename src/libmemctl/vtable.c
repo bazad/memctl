@@ -10,6 +10,8 @@
 #include "memctl/kernelcache.h"
 #endif
 
+#include "memctl_common.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -79,59 +81,6 @@ adjust_vtable_from_symbol(kaddr_t *vtable, size_t *size) {
  *  correct OSMetaClass instance. This will be the virtual method table we are looking for.
  */
 
-// Kernel extension memory regions
-
-/*
- * struct region
- *
- * Description:
- * 	Records information about a region of memory mapped by the Mach-O file.
- */
-struct region {
-	const void *data;
-	kaddr_t     addr;
-	size_t      size;
-};
-
-/*
- * region_contains
- *
- * Description:
- * 	Returns true if the region contains the given address.
- */
-static bool
-region_contains(const struct region *region, kaddr_t addr) {
-	return region->addr <= addr && addr < region->addr + region->size;
-}
-
-/*
- * region_get
- *
- * Description:
- * 	Retrieves the contents of the region at the given address.
- */
-static void
-region_get(const struct region *region, kaddr_t addr, const void **data, size_t *size) {
-	assert(region_contains(region, addr));
-	kaddr_t offset = addr - region->addr;
-	*data = (const void *)((uintptr_t)region->data + offset);
-	*size = region->size - offset;
-}
-
-/*
- * region_address
- *
- * Description:
- * 	Get the address of the given data pointer in the memory region.
- */
-static kaddr_t
-region_address(const struct region *region, const void *data) {
-	assert(region->data <= data);
-	uintptr_t offset = (uintptr_t)data - (uintptr_t)region->data;
-	assert(offset <= region->size);
-	return region->addr + offset;
-}
-
 // Vtable discovery
 
 /*
@@ -150,15 +99,15 @@ struct context {
 	// Intermediate values.
 	kaddr_t metaclass;
 	// __DATA_CONST
-	struct region data_const;
+	struct mapped_region data_const;
 	// __DATA_CONST.__const
-	struct region data_const_const;
+	struct mapped_region data_const_const;
 	// __TEXT_EXEC
-	struct region text_exec;
+	struct mapped_region text_exec;
 	// __TEXT
-	struct region text;
+	struct mapped_region text;
 	// __DATA
-	struct region data;
+	struct mapped_region data;
 	// __DATA_CONST.__mod_init_func
 	const kaddr_t *mod_init_func;
 	size_t         mod_init_func_count;
@@ -242,14 +191,13 @@ get_metaclass_from_call(struct context *c, struct ksim *ksim) {
 	if (arg0_metaclass == 0 || arg1_class_name == 0 || arg3_size == 0) {
 		return false;
 	}
-	if (!region_contains(&c->data, arg0_metaclass)
-			|| !region_contains(&c->text, arg1_class_name)
+	if (!mapped_region_contains(&c->data, arg0_metaclass, sizeof(kword_t))
+			|| !mapped_region_contains(&c->text, arg1_class_name, 2)
 			|| arg3_size >= UINT32_MAX) {
 		return false;
 	}
-	const void *class_name;
 	size_t size;
-	region_get(&c->text, arg1_class_name, &class_name, &size);
+	const void *class_name = mapped_region_get(&c->text, arg1_class_name, &size);
 	if (strncmp(class_name, c->class_name, size) != 0) {
 		return false;
 	}
@@ -287,7 +235,7 @@ find_metaclass_from_initializer(struct context *c, kaddr_t mod_init_func) {
  */
 static bool
 method_is_getmetaclass(struct context *c, kaddr_t method) {
-	if (!region_contains(&c->text_exec, method)) {
+	if (!mapped_region_contains(&c->text_exec, method, 1)) {
 		return false;
 	}
 	struct ksim ksim;
@@ -330,7 +278,7 @@ next:;
 found:
 	// Skip the first 2 (empty) slots in the vtable.
 	v += 2;
-	*c->vtable = region_address(&c->data_const_const, v) + kernel_slide;
+	*c->vtable = mapped_region_address(&c->data_const_const, v) + kernel_slide;
 	if (c->vtable_size != NULL) {
 		// The vtable runs until the end of the section or the first NULL pointer.
 		size_t i = NMETHODS;

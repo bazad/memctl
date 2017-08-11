@@ -62,12 +62,14 @@ LIBMEMCTL_arm64_SRCS = sim.c \
 		       kernel_call_aarch64.c \
 		       ksim.c \
 		       memory_region.c \
-		       pthread_callbacks_finder.c \
-		       zone_element_size_finder.c
+		       finder/kauth_cred_setsvuidgid.c \
+		       finder/pthread_callbacks.c \
+		       finder/zone_element_size.c
 
 LIBMEMCTL_arm64_HDRS = kernel_call_aarch64.h \
-		       pthread_callbacks_finder.h \
-		       zone_element_size_finder.h
+		       finder/kauth_cred_setsvuidgid.h \
+		       finder/pthread_callbacks.h \
+		       finder/zone_element_size.h
 
 LIBMEMCTL_arm64_INCS = sim.h \
 		       disasm.h \
@@ -100,6 +102,7 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 kernel_slide.c \
 		 kernelcache.c \
 		 macho.c \
+		 mapped_region.c \
 		 memctl_common.c \
 		 memctl_error.c \
 		 memctl_signal.c \
@@ -123,6 +126,7 @@ LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
 		 kernel_slide.h \
 		 kernelcache.h \
 		 macho.h \
+		 mapped_region.h \
 		 memctl_error.h \
 		 memctl_signal.h \
 		 memctl_types.h \

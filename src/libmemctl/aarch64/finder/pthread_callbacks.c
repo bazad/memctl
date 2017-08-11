@@ -1,4 +1,4 @@
-#include "aarch64/pthread_callbacks_finder.h"
+#include "aarch64/finder/pthread_callbacks.h"
 
 #include "memctl/kernel.h"
 #include "memctl/memctl_error.h"

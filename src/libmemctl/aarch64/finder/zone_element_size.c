@@ -1,4 +1,4 @@
-#include "aarch64/zone_element_size_finder.h"
+#include "aarch64/finder/zone_element_size.h"
 
 /*
  * Locating _zone_element_size
@@ -50,13 +50,13 @@ kernel_symbol_finder_init_zone_element_size() {
 		goto abort;
 	}
 	ksim_set_pc(&sim, __FREE);
-	ksim_scan_for_jump(&sim, KSIM_FW, 0, &_kfree_addr, 8);
+	ksim_scan_for_jump(&sim, KSIM_FW, 0, NULL, &_kfree_addr, 8);
 	if (_kfree_addr == 0) {
 		WARN(_kfree_addr);
 		goto abort;
 	}
 	ksim_set_pc(&sim, _kfree_addr);
-	ksim_scan_for_call(&sim, KSIM_FW, 0, &_zone_element_size, 12);
+	ksim_scan_for_call(&sim, KSIM_FW, 0, NULL, &_zone_element_size, 12);
 	if (_zone_element_size == 0) {
 		WARN(_zone_element_size);
 		goto abort;

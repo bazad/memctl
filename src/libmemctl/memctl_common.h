@@ -5,7 +5,7 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 
-#define BUNDLE_ID_BUFFER_SIZE	2048
+// Files
 
 /*
  * mmap_file
@@ -22,6 +22,11 @@
  * 	True if the mapping was successful.
  */
 bool mmap_file(const char *file, const void **data, size_t *size);
+
+// CoreFoundation helpers
+
+// The recommended size of buffer for CFStringGetCStringOrConvert.
+#define BUNDLE_ID_BUFFER_SIZE	2048
 
 /*
  * CFStringGetCStringOrConvert
