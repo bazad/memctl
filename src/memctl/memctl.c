@@ -959,6 +959,7 @@ root_command() {
 	deinitialize(false);
 	char *argv[] = { "/bin/sh", NULL };
 	execve(argv[0], argv, NULL);
+	fprintf(stderr, "error: could not exec %s\n", argv[0]);
 	exit(1);
 }
 
