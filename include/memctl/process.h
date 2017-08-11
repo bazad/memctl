@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 
+DECLARE_OFFSET(proc, task);
 DECLARE_OFFSET(proc, p_ucred);
 
 /*

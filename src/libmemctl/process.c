@@ -11,6 +11,7 @@
 
 #define PROC_DUMP_SIZE 128
 
+DEFINE_OFFSET(proc, task);
 DEFINE_OFFSET(proc, p_ucred);
 
 kaddr_t kernproc;
@@ -238,6 +239,19 @@ proc_task_(kaddr_t *task, kaddr_t proc) {
 }
 
 static bool
+proc_task_offset_(kaddr_t *task, kaddr_t proc) {
+	assert(proc != 0);
+	kaddr_t proc_task_addr = proc + OFFSETOF(proc, task);
+	kernel_read_fn fn = (kernel_read_safe != NULL ? kernel_read_safe : kernel_read_unsafe);
+	kernel_io_result kio = kernel_read_word(fn, proc_task_addr, task, sizeof(*task), 0);
+	if (kio != KERNEL_IO_SUCCESS) {
+		error_internal("could not read process task");
+		return false;
+	}
+	return true;
+}
+
+static bool
 proc_ucred_(kaddr_t *ucred, kaddr_t proc) {
 	assert(proc != 0);
 	bool success = kernel_call(ucred, sizeof(*ucred), _proc_ucred, 1, &proc);
@@ -398,8 +412,11 @@ proc_to_task_port_(mach_port_t *task_port, kaddr_t proc) {
 }
 
 static bool
-initialize_p_ucred_offset() {
+initialize_proc_dump_offsets() {
 	// Dump the contents of the current proc struct.
+	if (currentproc == 0) {
+		return false;
+	}
 	kword_t proc_data[PROC_DUMP_SIZE];
 	size_t readsize = sizeof(proc_data);
 	kernel_io_result kio = kernel_read_unsafe(currentproc, &readsize, proc_data, 0, NULL);
@@ -407,19 +424,30 @@ initialize_p_ucred_offset() {
 		return false;
 	}
 	const unsigned max_idx = readsize / sizeof(kword_t);
-	// Get the credentials pointer for the current process.
-	kaddr_t cred;
-	bool success = proc_ucred(&cred, currentproc);
-	if (!success) {
-		return false;
+	// Get the index of the task in the proc struct.
+	if (OFFSET(proc, task).valid == 0 && currenttask != 0) {
+		for (unsigned idx = 0; idx < max_idx; idx++) {
+			if (proc_data[idx] == currenttask) {
+				OFFSET(proc, task).offset = idx * sizeof(kword_t);
+				OFFSET(proc, task).valid  = 2;
+				break;
+			}
+		}
 	}
 	// Get the index of the credentials in the proc struct.
-	unsigned cred_idx;
-	for (cred_idx = 0; cred_idx < max_idx; cred_idx++) {
-		if (proc_data[cred_idx] == cred) {
-			OFFSET(proc, p_ucred).offset = cred_idx * sizeof(kword_t);
-			OFFSET(proc, p_ucred).valid  = 2;
-			return true;
+	if (OFFSET(proc, p_ucred).valid == 0 && proc_ucred != NULL) {
+		kaddr_t ucred;
+		bool success = proc_ucred(&ucred, currentproc);
+		if (!success) {
+			return false;
+		}
+		assert(ucred != 0);
+		for (unsigned idx = 0; idx < max_idx; idx++) {
+			if (proc_data[idx] == ucred) {
+				OFFSET(proc, p_ucred).offset = idx * sizeof(kword_t);
+				OFFSET(proc, p_ucred).valid  = 2;
+				break;
+			}
 		}
 	}
 	return false;
@@ -433,9 +461,7 @@ initialize_p_ucred_offset() {
  */
 static void
 initialize_offsets() {
-	if (OFFSET(proc, p_ucred).valid == 0) {
-		initialize_p_ucred_offset();
-	}
+	initialize_proc_dump_offsets();
 }
 
 void
@@ -488,13 +514,17 @@ process_init() {
 		proc_task(&currenttask, currentproc);
 	}
 	initialize_offsets();
-	if (OFFSET(proc, p_ucred.valid > 0)) {
+	if (OFFSET(proc, p_ucred).valid > 0) {
 		if (proc_ucred == proc_ucred_) {
 			proc_ucred = proc_ucred_offset_;
 		}
 		if (proc_set_ucred == NULL) {
 			proc_set_ucred = proc_set_ucred_offset_;
 		}
+	}
+	if (OFFSET(proc, task).valid > 0
+			&& proc_task == proc_task_) {
+		proc_task = proc_task_offset_;
 	}
 	if (proc_find_path == NULL
 			&& proc_find != NULL && proc_rele != NULL) {

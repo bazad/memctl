@@ -24,7 +24,7 @@ struct offset {
  * Description:
  * 	A convenience macro for generating a name for an offset.
  */
-#define OFFSET(base, object)	(base##__offset__##object)
+#define OFFSET(base, object)	(_##base##__offset__##object##_)
 
 /*
  * macro OFFSETOF
@@ -42,7 +42,7 @@ struct offset {
  * Description:
  * 	A convenience macro for generating a name for an address offset.
  */
-#define ADDRESS(kext, object)	(kext##__address__##object)
+#define ADDRESS(kext, object)	(_##kext##__address__##object##_)
 
 /*
  * macro ADDRESSOF
