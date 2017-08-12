@@ -14,51 +14,8 @@ const CFStringRef kCFPrelinkInfoDictionaryKey = CFSTR(kPrelinkInfoDictionaryKey)
 const CFStringRef kCFPrelinkExecutableLoadKey = CFSTR(kPrelinkExecutableLoadKey);
 const CFStringRef kCFPrelinkExecutableSizeKey = CFSTR(kPrelinkExecutableSizeKey);
 
-// TODO: reimplement
-// Source:
 // https://opensource.apple.com/source/BootX/BootX-81/bootx.tproj/sl.subproj/lzss.c.auto.html
-static int
-decompress_lzss(uint8_t *dst, const uint8_t *src, uint32_t srclen) {
-#define N         4096  /* size of ring buffer - must be power of 2 */
-#define F         18    /* upper limit for match_length */
-#define THRESHOLD 2     /* encode string into position and length
-                           if match_length is greater than this */
-	/* ring buffer of size N, with extra F-1 bytes to aid string comparison */
-	uint8_t text_buf[N + F - 1];
-	uint8_t *dststart = dst;
-	const uint8_t *srcend = src + srclen;
-	int  i, j, k, r, c;
-	unsigned int flags;
-
-	for (i = 0; i < N - F; i++)
-		text_buf[i] = ' ';
-	r = N - F;
-	flags = 0;
-	for (;;) {
-		if (((flags >>= 1) & 0x100) == 0) {
-			if (src < srcend) c = *src++; else break;
-			flags = c | 0xFF00;  /* uses higher byte cleverly to count eight */
-		}
-		if (flags & 1) {
-			if (src < srcend) c = *src++; else break;
-			*dst++ = c;
-			text_buf[r++] = c;
-			r &= (N - 1);
-		} else {
-			if (src < srcend) i = *src++; else break;
-			if (src < srcend) j = *src++; else break;
-			i |= ((j & 0xF0) << 4);
-			j  =  (j & 0x0F) + THRESHOLD;
-			for (k = 0; k <= j; k++) {
-				c = text_buf[(i + k) & (N - 1)];
-				*dst++ = c;
-				text_buf[r++] = c;
-				r &= (N - 1);
-			}
-		}
-	}
-	return dst - dststart;
-}
+extern int decompress_lzss(uint8_t *dst, const uint8_t *src, uint32_t srclen);
 
 /*
  * decompress_complzss
@@ -68,7 +25,7 @@ decompress_lzss(uint8_t *dst, const uint8_t *src, uint32_t srclen) {
  */
 static bool
 decompress_complzss(const void *src, size_t srclen, void *dest, size_t destlen) {
-	// TODO: Use a real implementation that safely decompresses into the buffer.
+	// TODO: Use an implementation that safely decompresses into the buffer.
 	return decompress_lzss(dest, src, srclen) == destlen;
 }
 
