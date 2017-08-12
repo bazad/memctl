@@ -4,6 +4,15 @@
 #include "memctl/kernel_memory.h"
 
 /*
+ * safe_memory
+ *
+ * Description:
+ * 	A flag indicating whether safe memory operations should be preferred, possibly at the
+ * 	expense of being able to access fewer memory regions. Defaults to false.
+ */
+extern bool safe_memory;
+
+/*
  * read_memory
  *
  * Description:

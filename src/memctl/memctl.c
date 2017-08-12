@@ -123,6 +123,22 @@ install_signal_handler() {
 }
 
 /*
+ * initialize_environment
+ *
+ * Description:
+ * 	Initialize memctl state that is controlled by environment variables.
+ */
+static void
+initialize_environment() {
+	const char *env_safe_memory = getenv("MEMCTL_SAFE_MEMORY");
+	if (env_safe_memory != NULL && strtol(env_safe_memory, NULL, 10) > 0) {
+		memctl_warning("using safe memory functions; "
+		               "some functionality may be unavailable");
+		safe_memory = true;
+	}
+}
+
+/*
  * default_initialize
  *
  * Description:
@@ -135,6 +151,7 @@ default_initialize() {
 	if (!install_signal_handler()) {
 		return false;
 	}
+	initialize_environment();
 	return true;
 }
 
@@ -544,7 +561,7 @@ i_command() {
 
 bool
 r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t access, bool dump) {
-	if (!initialize(KERNEL_MEMORY)) {
+	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
 		return false;
 	}
 	if (!check_address(address, length, physical)) {
@@ -559,7 +576,7 @@ r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t ac
 
 bool
 rb_command(kaddr_t address, size_t length, bool physical, size_t access) {
-	if (!initialize(KERNEL_MEMORY)) {
+	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
 		return false;
 	}
 	if (!check_address(address, length, physical)) {
@@ -572,7 +589,7 @@ rb_command(kaddr_t address, size_t length, bool physical, size_t access) {
 
 bool
 ri_command(kaddr_t address, size_t length, bool physical, size_t access) {
-	if (!initialize(KERNEL_MEMORY)) {
+	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
 		return false;
 	}
 	if (!check_address(address, length, physical)) {
@@ -583,7 +600,7 @@ ri_command(kaddr_t address, size_t length, bool physical, size_t access) {
 
 bool
 rif_command(const char *function, const char *kext, size_t access) {
-	if (!initialize(KERNEL_MEMORY)) {
+	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
 		return false;
 	}
 	kaddr_t address;
@@ -599,7 +616,7 @@ rif_command(const char *function, const char *kext, size_t access) {
 
 bool
 rs_command(kaddr_t address, size_t length, bool physical, size_t access) {
-	if (!initialize(KERNEL_MEMORY)) {
+	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
 		return false;
 	}
 	// If the user didn't specify a length, then length is -1, which will result in an overflow
@@ -612,15 +629,12 @@ rs_command(kaddr_t address, size_t length, bool physical, size_t access) {
 
 bool
 w_command(kaddr_t address, kword_t value, bool physical, size_t width, size_t access) {
-	if (!initialize(KERNEL_MEMORY)) {
-		return false;
-	}
 	return wd_command(address, &value, width, physical, access);
 }
 
 bool
 wd_command(kaddr_t address, const void *data, size_t length, bool physical, size_t access) {
-	if (!initialize(KERNEL_MEMORY)) {
+	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
 		return false;
 	}
 	if (!check_address(address, length, physical)) {
