@@ -39,7 +39,7 @@ task_transfer(vm_map_t task, mach_vm_address_t address, size_t *size, void *data
 	size_t left = *size;
 	while (left > 0) {
 		// Only transfer up to a page boundary at a time.
-		size_t transfer_size = vm_kernel_page_size - (address &  vm_kernel_page_mask);
+		size_t transfer_size = vm_kernel_page_size - (address & vm_kernel_page_mask);
 		if (left < transfer_size) {
 			transfer_size = left;
 		}
