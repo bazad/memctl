@@ -30,11 +30,13 @@ bool (*kauth_cred_proc_ref)(kaddr_t *cred, kaddr_t proc);
 bool (*kauth_cred_unref)(kaddr_t cred);
 bool (*kauth_cred_setsvuidgid)(kaddr_t *newcred, kaddr_t cred, uid_t uid, gid_t gid);
 bool (*task_reference)(kaddr_t task);
+bool (*task_deallocate)(kaddr_t task);
 bool (*convert_task_to_port)(kaddr_t *ipc_port, kaddr_t task);
 bool (*get_task_ipcspace)(kaddr_t *ipc_space, kaddr_t task);
 bool (*ipc_port_copyout_send)(mach_port_t *port_name, kaddr_t send_right, kaddr_t ipc_space);
 bool (*task_to_task_port)(mach_port_t *task_port, kaddr_t task, kaddr_t sender);
 bool (*proc_to_task_port)(mach_port_t *task_port, kaddr_t proc);
+bool (*port_name_to_task)(kaddr_t *task, mach_port_t task_port);
 
 static kaddr_t _current_proc;
 static kaddr_t _proc_find;
@@ -47,9 +49,11 @@ static kaddr_t _kauth_cred_proc_ref;
 static kaddr_t _kauth_cred_unref;
 static kaddr_t _kauth_cred_setsvuidgid;
 static kaddr_t _task_reference;
+static kaddr_t _task_deallocate;
 static kaddr_t _convert_task_to_port;
 static kaddr_t _get_task_ipcspace;
 static kaddr_t _ipc_port_copyout_send;
+static kaddr_t _port_name_to_task;
 
 #define ERROR_CALL(symbol)	error_internal("could not call %s", #symbol)
 
@@ -344,6 +348,16 @@ task_reference_(kaddr_t task) {
 }
 
 static bool
+task_deallocate_(kaddr_t task) {
+	assert(task != 0);
+	bool success = kernel_call(NULL, 0, _task_deallocate, 1, &task);
+	if (!success) {
+		ERROR_CALL(_task_deallocate);
+	}
+	return success;
+}
+
+static bool
 convert_task_to_port_(kaddr_t *ipc_port, kaddr_t task) {
 	assert(task != 0);
 	bool success = kernel_call(ipc_port, sizeof(*ipc_port), _convert_task_to_port, 1, &task);
@@ -409,6 +423,16 @@ proc_to_task_port_(mach_port_t *task_port, kaddr_t proc) {
 		return false;
 	}
 	return task_to_task_port(task_port, task, currenttask);
+}
+
+static bool
+port_name_to_task_(kaddr_t *task, mach_port_t task_port) {
+	kword_t args[] = { task_port };
+	bool success = kernel_call(task, sizeof(*task), _port_name_to_task, 1, args);
+	if (!success) {
+		ERROR_CALL(_port_name_to_task);
+	}
+	return success;
 }
 
 static bool
@@ -500,9 +524,11 @@ process_init() {
 	RESOLVE1(kauth_cred_unref);
 	RESOLVE1(kauth_cred_setsvuidgid);
 	RESOLVE1(task_reference);
+	RESOLVE1(task_deallocate);
 	RESOLVE1(convert_task_to_port);
 	RESOLVE1(get_task_ipcspace);
 	RESOLVE1(ipc_port_copyout_send);
+	RESOLVE1(port_name_to_task);
 #undef RESOLVE_KERNEL
 #undef READ
 #undef RESOLVE

@@ -282,6 +282,20 @@ extern bool (*kauth_cred_setsvuidgid)(kaddr_t *newcred, kaddr_t cred, uid_t uid,
 extern bool (*task_reference)(kaddr_t task);
 
 /*
+ * task_deallocate
+ *
+ * Description:
+ * 	XNU's task_deallocate. Remove a reference on a task.
+ *
+ * Parameters:
+ * 		task			The task from which to remove a reference.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*task_deallocate)(kaddr_t task);
+
+/*
  * convert_task_to_port
  *
  * Description:
@@ -328,9 +342,7 @@ extern bool (*get_task_ipcspace)(kaddr_t *ipc_space, kaddr_t task);
  * Returns:
  * 	True if no errors were encountered.
  */
-extern bool (*ipc_port_copyout_send)(
-		mach_port_t *port_name,
-		kaddr_t send_right,
+extern bool (*ipc_port_copyout_send)(mach_port_t *port_name, kaddr_t send_right,
 		kaddr_t ipc_space);
 
 /*
@@ -359,13 +371,29 @@ extern bool (*task_to_task_port)(mach_port_t *task_port, kaddr_t task, kaddr_t s
  * 	task_to_task_port.
  *
  * Parameters:
- * 	out	task_port		A mach task port for the process's task.
+ * 	out	task_port		A Mach task port for the process's task.
  * 		proc			The proc struct.
  *
  * Returns:
  * 	True if no errors were encountered.
  */
 extern bool (*proc_to_task_port)(mach_port_t *task_port, kaddr_t proc);
+
+/*
+ * port_name_to_task
+ *
+ * Description:
+ * 	XNU's port_name_to_task. Converts a port name into a task pointer, which must be freed with
+ * 	task_deallocate if it is not TASK_NULL.
+ *
+ * Parameters:
+ * 	out	task			The task corresponding to the Mach port, or TASK_NULL (0).
+ * 		task_port		The Mach task port.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*port_name_to_task)(kaddr_t *task, mach_port_t task_port);
 
 /*
  * process_init
