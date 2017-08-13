@@ -4,6 +4,7 @@
 #include "memctl/memctl_types.h"
 
 #include "disassemble.h"
+#include "memory.h"
 
 /*
  * memctl_read
@@ -14,14 +15,14 @@
  * Parameters:
  * 		address			The kernel address to read.
  * 		size			The number of bytes to read.
- * 		physical		Read physical rather than virtual memory.
+ * 		flags			Memory access flags.
  * 		width			The formatting width.
  * 		access			The access width while reading.
  *
  * Returns:
  * 	True if the read was successful.
  */
-bool memctl_read(kaddr_t address, size_t size, bool physical, size_t width, size_t access);
+bool memctl_read(kaddr_t address, size_t size, memflags flags, size_t width, size_t access);
 
 /*
  * memctl_dump
@@ -32,14 +33,14 @@ bool memctl_read(kaddr_t address, size_t size, bool physical, size_t width, size
  * Parameters:
  * 		address			The kernel address to read.
  * 		size			The number of bytes to read.
- * 		physical		Read physical rather than virtual memory.
+ * 		flags			Memory access flags.
  * 		width			The formatting width.
  * 		access			The access width while reading.
  *
  * Returns:
  * 	True if the read was successful.
  */
-bool memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size_t access);
+bool memctl_dump(kaddr_t address, size_t size, memflags flags, size_t width, size_t access);
 
 /*
  * memctl_dump_binary
@@ -50,13 +51,13 @@ bool memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size
  * Parameters:
  * 		address			The kernel address to read.
  * 		size			The number of bytes to read.
- * 		physical		Read physical rather than virtual memory.
+ * 		flags			Memory access flags.
  * 		access			The access width while reading.
  *
  * Returns:
  * 	True if the read was successful.
  */
-bool memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t access);
+bool memctl_dump_binary(kaddr_t address, size_t size, memflags flags, size_t access);
 
 #if MEMCTL_DISASSEMBLY
 
@@ -69,13 +70,13 @@ bool memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t acce
  * Parameters:
  * 		address			The kernel address to start disassembling at.
  * 		length			The number of bytes to read.
- * 		physical		Read physical rather than virtual memory.
+ * 		flags			Memory access flags.
  * 		access			The access width while reading.
  *
  * Returns:
  * 	True if the read was successful.
  */
-bool memctl_disassemble(kaddr_t address, size_t length, bool physical, size_t access);
+bool memctl_disassemble(kaddr_t address, size_t length, memflags flags, size_t access);
 
 #endif // MEMCTL_DISASSEMBLY
 
@@ -88,12 +89,12 @@ bool memctl_disassemble(kaddr_t address, size_t length, bool physical, size_t ac
  * Parameters:
  * 		address			The kernel address to read.
  * 		size			The maximum number of bytes to read.
- * 		physical		Read physical rather than virtual memory.
+ * 		flags			Memory access flags.
  * 		access			The access width while reading.
  *
  * Returns:
  * 	True if the read was successful.
  */
-bool memctl_read_string(kaddr_t address, size_t size, bool physical, size_t access);
+bool memctl_read_string(kaddr_t address, size_t size, memflags flags, size_t access);
 
 #endif

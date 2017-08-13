@@ -12,14 +12,14 @@
 #include <string.h>
 
 bool
-memctl_read(kaddr_t address, size_t size, bool physical, size_t width, size_t access) {
+memctl_read(kaddr_t address, size_t size, memflags flags, size_t width, size_t access) {
 	assert(ispow2(width) && 0 < width && width <= 8);
 	assert(ispow2(access) && access <= 8);
 	uint8_t data[page_size];
 	unsigned n = min(16 / width,  8);
 	while (size > 0) {
 		size_t readsize = min(size, sizeof(data));
-		bool read_success = read_memory(address, &readsize, data, physical, access);
+		bool read_success = read_kernel(address, &readsize, data, flags, access);
 		size_t end = readsize / width;
 		for (size_t i = 0; i < end; i++) {
 			if (interrupted) {
@@ -43,7 +43,7 @@ memctl_read(kaddr_t address, size_t size, bool physical, size_t width, size_t ac
 }
 
 bool
-memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size_t access) {
+memctl_dump(kaddr_t address, size_t size, memflags flags, size_t width, size_t access) {
 	assert(ispow2(width) && 0 < width && width <= 8);
 	assert(ispow2(access) && access <= 8);
 	uint8_t data[page_size];
@@ -78,7 +78,7 @@ memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size_t ac
 				}
 				/* Grab more data from the kernel. */
 				size_t readsize = min(size, sizeof(data));
-				read_success = read_memory(address + i, &readsize, data, physical,
+				read_success = read_kernel(address + i, &readsize, data, flags,
 						access);
 				if (interrupted) {
 					error_interrupt();
@@ -114,7 +114,7 @@ memctl_dump(kaddr_t address, size_t size, bool physical, size_t width, size_t ac
 }
 
 bool
-memctl_read_string(kaddr_t address, size_t size, bool physical, size_t access) {
+memctl_read_string(kaddr_t address, size_t size, memflags flags, size_t access) {
 	assert(ispow2(access) && access <= 8);
 	uint8_t data[page_size + 1];
 	bool have_printed = false;
@@ -122,7 +122,7 @@ memctl_read_string(kaddr_t address, size_t size, bool physical, size_t access) {
 	bool end = false;
 	while (!end) {
 		size_t readsize = min(size, sizeof(data) - 1);
-		read_success = read_memory(address, &readsize, data, physical, access);
+		read_success = read_kernel(address, &readsize, data, flags, access);
 		if (interrupted) {
 			error_interrupt();
 			return false;
@@ -139,12 +139,12 @@ memctl_read_string(kaddr_t address, size_t size, bool physical, size_t access) {
 }
 
 bool
-memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t access) {
+memctl_dump_binary(kaddr_t address, size_t size, memflags flags, size_t access) {
 	assert(ispow2(access) && access <= 8);
 	uint8_t data[page_size];
 	while (size > 0) {
 		size_t readsize = min(size, sizeof(data));
-		bool read_success = read_memory(address, &readsize, data, physical, access);
+		bool read_success = read_kernel(address, &readsize, data, flags, access);
 		uint8_t *p = data;
 		size_t left = readsize;
 		while (left > 0) {
@@ -171,11 +171,11 @@ memctl_dump_binary(kaddr_t address, size_t size, bool physical, size_t access) {
 #if MEMCTL_DISASSEMBLY
 
 bool
-memctl_disassemble(kaddr_t address, size_t length, bool physical, size_t access) {
+memctl_disassemble(kaddr_t address, size_t length, memflags flags, size_t access) {
 	uint8_t data[page_size];
 	for (;;) {
 		size_t size = min(length, sizeof(data));
-		bool read_success = read_memory(address, &size, data, physical, access);
+		bool read_success = read_kernel(address, &size, data, flags, access);
 		if (interrupted) {
 			error_interrupt();
 			return false;

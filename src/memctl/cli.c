@@ -155,83 +155,91 @@ HANDLER(i_handler) {
 HANDLER(r_handler) {
 	size_t width    = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
 	bool dump       = OPT_PRESENT(1, "d");
-	bool physical   = OPT_PRESENT(2, "p");
-	size_t access   = OPT_GET_WIDTH_OR(3, "x", "access", 0);
-	kaddr_t address = ARG_GET_ADDRESS(4, "address");
+	bool force      = OPT_PRESENT(2, "f");
+	bool physical   = OPT_PRESENT(3, "p");
+	size_t access   = OPT_GET_WIDTH_OR(4, "x", "access", 0);
+	kaddr_t address = ARG_GET_ADDRESS(5, "address");
 	size_t length;
-	if (ARG_PRESENT(5, "length")) {
-		length = ARG_GET_UINT(5, "length");
+	if (ARG_PRESENT(6, "length")) {
+		length = ARG_GET_UINT(6, "length");
 	} else if (dump) {
 		length = 256;
 	} else {
 		length = width;
 	}
-	return r_command(address, length, physical, width, access, dump);
+	return r_command(address, length, force, physical, width, access, dump);
 }
 
 HANDLER(rb_handler) {
-	bool physical   = OPT_PRESENT(0, "p");
-	size_t access   = OPT_GET_WIDTH_OR(1, "x", "access", 0);
-	kaddr_t address = ARG_GET_ADDRESS(2, "address");
-	size_t length   = ARG_GET_UINT(3, "length");
-	return rb_command(address, length, physical, access);
+	bool force      = OPT_PRESENT(0, "f");
+	bool physical   = OPT_PRESENT(1, "p");
+	size_t access   = OPT_GET_WIDTH_OR(2, "x", "access", 0);
+	kaddr_t address = ARG_GET_ADDRESS(3, "address");
+	size_t length   = ARG_GET_UINT(4, "length");
+	return rb_command(address, length, force, physical, access);
 }
 
 #if MEMCTL_DISASSEMBLY
 
 HANDLER(ri_handler) {
-	bool physical   = OPT_PRESENT(0, "p");
-	size_t access   = OPT_GET_WIDTH_OR(1, "x", "access", 0);
-	kaddr_t address = ARG_GET_ADDRESS(2, "address");
-	size_t length   = ARG_GET_UINT(3, "length");
+	bool force      = OPT_PRESENT(0, "f");
+	bool physical   = OPT_PRESENT(1, "p");
+	size_t access   = OPT_GET_WIDTH_OR(2, "x", "access", 0);
+	kaddr_t address = ARG_GET_ADDRESS(3, "address");
+	size_t length   = ARG_GET_UINT(4, "length");
 #if __arm__ || __arm64__
 	if (address & 3) {
 		error_usage("ri", NULL, "address "KADDR_XFMT" is unaligned", address);
 		return false;
 	}
 #endif
-	return ri_command(address, length, physical, access);
+	return ri_command(address, length, force, physical, access);
 }
 
 HANDLER(rif_handler) {
-	size_t access             = OPT_GET_WIDTH_OR(0, "x", "access", 0);
-	struct argsymbol function = ARG_GET_SYMBOL(1, "function");
-	return rif_command(function.symbol, function.kext, access);
+	bool   force              = OPT_PRESENT(0, "f");
+	size_t access             = OPT_GET_WIDTH_OR(1, "x", "access", 0);
+	struct argsymbol function = ARG_GET_SYMBOL(2, "function");
+	return rif_command(function.symbol, function.kext, force, access);
 }
 
 #endif // MEMCTL_DISASSEMBLY
 
 HANDLER(rs_handler) {
-	bool physical   = OPT_PRESENT(0, "p");
-	size_t access   = OPT_GET_WIDTH_OR(1, "x", "access", 0);
-	kaddr_t address = ARG_GET_ADDRESS(2, "address");
-	size_t length   = ARG_GET_UINT_OR(3, "length", -1);
-	return rs_command(address, length, physical, access);
+	bool force      = OPT_PRESENT(0, "f");
+	bool physical   = OPT_PRESENT(1, "p");
+	size_t access   = OPT_GET_WIDTH_OR(2, "x", "access", 0);
+	kaddr_t address = ARG_GET_ADDRESS(3, "address");
+	size_t length   = ARG_GET_UINT_OR(4, "length", -1);
+	return rs_command(address, length, force, physical, access);
 }
 
 HANDLER(w_handler) {
 	size_t width    = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
-	bool physical   = OPT_PRESENT(1, "p");
-	size_t access   = OPT_GET_WIDTH_OR(2, "x", "access", 0);
-	kaddr_t address = ARG_GET_ADDRESS(3, "address");
-	kword_t value   = ARG_GET_UINT(4, "value");
-	return w_command(address, value, physical, width, access);
+	bool force      = OPT_PRESENT(1, "f");
+	bool physical   = OPT_PRESENT(2, "p");
+	size_t access   = OPT_GET_WIDTH_OR(3, "x", "access", 0);
+	kaddr_t address = ARG_GET_ADDRESS(4, "address");
+	kword_t value   = ARG_GET_UINT(5, "value");
+	return w_command(address, value, force, physical, width, access);
 }
 
 HANDLER(wd_handler) {
-	bool physical       = OPT_PRESENT(0, "p");
-	size_t access       = OPT_GET_WIDTH_OR(1, "x", "access", 0);
-	kaddr_t address     = ARG_GET_ADDRESS(2, "address");
-	struct argdata data = ARG_GET_DATA(3, "data");
-	return wd_command(address, data.data, data.length, physical, access);
+	bool force          = OPT_PRESENT(0, "f");
+	bool physical       = OPT_PRESENT(1, "p");
+	size_t access       = OPT_GET_WIDTH_OR(2, "x", "access", 0);
+	kaddr_t address     = ARG_GET_ADDRESS(3, "address");
+	struct argdata data = ARG_GET_DATA(4, "data");
+	return wd_command(address, data.data, data.length, force, physical, access);
 }
 
 HANDLER(ws_handler) {
-	bool physical      = OPT_PRESENT(0, "p");
-	size_t access      = OPT_GET_WIDTH_OR(1, "x", "access", 0);
-	kaddr_t address    = ARG_GET_ADDRESS(2, "address");
-	const char *string = ARG_GET_STRING(3, "string");
-	return ws_command(address, string, physical, access);
+	bool force         = OPT_PRESENT(0, "f");
+	bool physical      = OPT_PRESENT(1, "p");
+	size_t access      = OPT_GET_WIDTH_OR(2, "x", "access", 0);
+	kaddr_t address    = ARG_GET_ADDRESS(3, "address");
+	const char *string = ARG_GET_STRING(4, "string");
+	return ws_command(address, string, force, physical, access);
 }
 
 HANDLER(f_handler) {
@@ -383,9 +391,10 @@ static struct command commands[] = {
 	}, {
 		"r", NULL, r_handler,
 		"read kernel memory",
-		6, (struct argspec *) &(struct argspec[6]) {
+		7, (struct argspec *) &(struct argspec[7]) {
 			{ "",       "width",   ARG_WIDTH,   "display width"               },
 			{ "d",      NULL,      ARG_NONE,    "use dump format"             },
+			{ "f",      NULL,      ARG_NONE,    "force read (unsafe)"         },
 			{ "p",      NULL,      ARG_NONE,    "read physical memory"        },
 			{ "x",      "access",  ARG_WIDTH,   "memory access width"         },
 			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"         },
@@ -394,7 +403,8 @@ static struct command commands[] = {
 	}, {
 		"rb", "r", rb_handler,
 		"read raw binary data",
-		4, (struct argspec *) &(struct argspec[4]) {
+		5, (struct argspec *) &(struct argspec[5]) {
+			{ "f",      NULL,      ARG_NONE,    "force read (unsafe)"         },
 			{ "p",      NULL,      ARG_NONE,    "read physical memory"        },
 			{ "x",      "access",  ARG_WIDTH,   "memory access width"         },
 			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"         },
@@ -404,7 +414,8 @@ static struct command commands[] = {
 	}, {
 		"ri", "r", ri_handler,
 		"read instructions (disassemble)",
-		4, (struct argspec *) &(struct argspec[4]) {
+		5, (struct argspec *) &(struct argspec[5]) {
+			{ "f",      NULL,      ARG_NONE,    "force read (unsafe)"                },
 			{ "p",      NULL,      ARG_NONE,    "read physical memory"               },
 			{ "x",      "access",  ARG_WIDTH,   "memory access width"                },
 			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"                },
@@ -413,7 +424,8 @@ static struct command commands[] = {
 	}, {
 		"rif", "ri", rif_handler,
 		"disassemble function",
-		2, (struct argspec *) &(struct argspec[2]) {
+		3, (struct argspec *) &(struct argspec[3]) {
+			{ "f",      NULL,       ARG_NONE,   "force read (unsafe)"         },
 			{ "x",      "access",   ARG_WIDTH,  "memory access width"         },
 			{ ARGUMENT, "function", ARG_SYMBOL, "the function to disassemble" },
 		},
@@ -421,7 +433,8 @@ static struct command commands[] = {
 	}, {
 		"rs", "r", rs_handler,
 		"read string",
-		4, (struct argspec *) &(struct argspec[4]) {
+		5, (struct argspec *) &(struct argspec[5]) {
+			{ "f",      NULL,      ARG_NONE,    "force read (unsafe)"   },
 			{ "p",      NULL,      ARG_NONE,    "read physical memory"  },
 			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
 			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"   },
@@ -430,8 +443,9 @@ static struct command commands[] = {
 	}, {
 		"w", NULL, w_handler,
 		"write memory",
-		5, (struct argspec *) &(struct argspec[5]) {
+		6, (struct argspec *) &(struct argspec[6]) {
 			{ "",       "width",   ARG_WIDTH,   "value width"           },
+			{ "f",      NULL,      ARG_NONE,    "force write (unsafe)"  },
 			{ "p",      NULL,      ARG_NONE,    "write physical memory" },
 			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
 			{ ARGUMENT, "address", ARG_ADDRESS, "the address to write"  },
@@ -440,7 +454,8 @@ static struct command commands[] = {
 	}, {
 		"wd", "w", wd_handler,
 		"write data to memory",
-		4, (struct argspec *) &(struct argspec[4]) {
+		5, (struct argspec *) &(struct argspec[5]) {
+			{ "f",      NULL,      ARG_NONE,    "force write (unsafe)"  },
 			{ "p",      NULL,      ARG_NONE,    "write physical memory" },
 			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
 			{ ARGUMENT, "address", ARG_ADDRESS, "the address to write"  },
@@ -449,7 +464,8 @@ static struct command commands[] = {
 	}, {
 		"ws", "w", ws_handler,
 		"write string to memory",
-		4, (struct argspec *) &(struct argspec[4]) {
+		5, (struct argspec *) &(struct argspec[5]) {
+			{ "f",      NULL,      ARG_NONE,    "force write (unsafe)"  },
 			{ "p",      NULL,      ARG_NONE,    "write physical memory" },
 			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
 			{ ARGUMENT, "address", ARG_ADDRESS, "the address to write"  },

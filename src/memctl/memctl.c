@@ -175,6 +175,17 @@ quit_command() {
 #endif // MEMCTL_REPL
 
 /*
+ * make_memflags
+ *
+ * Description:
+ * 	Create flags for read_kernel/write_kernel based on command-line parameters.
+ */
+static memflags
+make_memflags(bool force, bool physical) {
+	return (force ? MEM_FORCE : 0) | (physical ? MEM_PHYS : 0);
+}
+
+/*
  * looks_like_physical_address
  *
  * Description:
@@ -337,47 +348,42 @@ i_command() {
 }
 
 bool
-r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t access, bool dump) {
-	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
+r_command(kaddr_t address, size_t length, bool force, bool physical, size_t width, size_t access,
+		bool dump) {
+	if (!force && !check_address(address, length, physical)) {
 		return false;
 	}
-	if (!check_address(address, length, physical)) {
-		return false;
-	}
+	memflags flags = make_memflags(force, physical);
 	if (dump) {
-		return memctl_dump(address, length, physical, width, access);
+		return memctl_dump(address, length, flags, width, access);
 	} else {
-		return memctl_read(address, length, physical, width, access);
+		return memctl_read(address, length, flags, width, access);
 	}
 }
 
 bool
-rb_command(kaddr_t address, size_t length, bool physical, size_t access) {
-	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
+rb_command(kaddr_t address, size_t length, bool force, bool physical, size_t access) {
+	if (!force && !check_address(address, length, physical)) {
 		return false;
 	}
-	if (!check_address(address, length, physical)) {
-		return false;
-	}
-	return memctl_dump_binary(address, length, physical, access);
+	memflags flags = make_memflags(force, physical);
+	return memctl_dump_binary(address, length, flags, access);
 }
 
 #if MEMCTL_DISASSEMBLY
 
 bool
-ri_command(kaddr_t address, size_t length, bool physical, size_t access) {
-	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
+ri_command(kaddr_t address, size_t length, bool force, bool physical, size_t access) {
+	if (!force && !check_address(address, length, physical)) {
 		return false;
 	}
-	if (!check_address(address, length, physical)) {
-		return false;
-	}
-	return memctl_disassemble(address, length, physical, access);
+	memflags flags = make_memflags(force, physical);
+	return memctl_disassemble(address, length, flags, access);
 }
 
 bool
-rif_command(const char *function, const char *kext, size_t access) {
-	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
+rif_command(const char *function, const char *kext, bool force, size_t access) {
+	if (!initialize(KERNEL_SYMBOLS)) {
 		return false;
 	}
 	kaddr_t address;
@@ -386,44 +392,42 @@ rif_command(const char *function, const char *kext, size_t access) {
 	if (kext_error(kr, kext, function, 0)) {
 		return false;
 	}
-	return memctl_disassemble(address, size, false, access);
+	memflags flags = make_memflags(force, false);
+	return memctl_disassemble(address, size, flags, access);
 }
 
 #endif // MEMCTL_DISASSEMBLY
 
 bool
-rs_command(kaddr_t address, size_t length, bool physical, size_t access) {
-	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
-		return false;
-	}
+rs_command(kaddr_t address, size_t length, bool force, bool physical, size_t access) {
 	// If the user didn't specify a length, then length is -1, which will result in an overflow
 	// error. Instead we check for one page of validity.
-	if (!check_address(address, page_size, physical)) {
+	if (!force && !check_address(address, page_size, physical)) {
 		return false;
 	}
-	return memctl_read_string(address, length, physical, access);
+	memflags flags = make_memflags(force, physical);
+	return memctl_read_string(address, length, flags, access);
 }
 
 bool
-w_command(kaddr_t address, kword_t value, bool physical, size_t width, size_t access) {
-	return wd_command(address, &value, width, physical, access);
+w_command(kaddr_t address, kword_t value, bool force, bool physical, size_t width, size_t access) {
+	return wd_command(address, &value, width, force, physical, access);
 }
 
 bool
-wd_command(kaddr_t address, const void *data, size_t length, bool physical, size_t access) {
-	if (!initialize(safe_memory ? KERNEL_MEMORY_BASIC : KERNEL_MEMORY)) {
+wd_command(kaddr_t address, const void *data, size_t length, bool force, bool physical,
+		size_t access) {
+	if (!force && !check_address(address, length, physical)) {
 		return false;
 	}
-	if (!check_address(address, length, physical)) {
-		return false;
-	}
-	return write_memory(address, &length, data, physical, access);
+	memflags flags = make_memflags(force, physical);
+	return write_kernel(address, &length, data, flags, access);
 }
 
 bool
-ws_command(kaddr_t address, const char *string, bool physical, size_t access) {
+ws_command(kaddr_t address, const char *string, bool force, bool physical, size_t access) {
 	size_t length = strlen(string) + 1;
-	return wd_command(address, string, length, physical, access);
+	return wd_command(address, string, length, force, physical, access);
 }
 
 bool

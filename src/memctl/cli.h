@@ -7,17 +7,19 @@
 bool default_action(void);
 
 bool i_command(void);
-bool r_command(kaddr_t address, size_t length, bool physical, size_t width, size_t access,
-		bool dump);
-bool rb_command(kaddr_t address, size_t length, bool physical, size_t access);
+bool r_command(kaddr_t address, size_t length, bool force, bool physical, size_t width,
+		size_t access, bool dump);
+bool rb_command(kaddr_t address, size_t length, bool force, bool physical, size_t access);
 #if MEMCTL_DISASSEMBLY
-bool ri_command(kaddr_t address, size_t length, bool physical, size_t access);
-bool rif_command(const char *function, const char *kext, size_t access);
+bool ri_command(kaddr_t address, size_t length, bool force, bool physical, size_t access);
+bool rif_command(const char *function, const char *kext, bool force, size_t access);
 #endif
-bool rs_command(kaddr_t address, size_t length, bool physical, size_t access);
-bool w_command(kaddr_t address, kword_t value, bool physical, size_t width, size_t access);
-bool wd_command(kaddr_t address, const void *data, size_t length, bool physical, size_t access);
-bool ws_command(kaddr_t address, const char *string, bool physical, size_t access);
+bool rs_command(kaddr_t address, size_t length, bool force, bool physical, size_t access);
+bool w_command(kaddr_t address, kword_t value, bool force, bool physical, size_t width,
+		size_t access);
+bool wd_command(kaddr_t address, const void *data, size_t length, bool force, bool physical,
+		size_t access);
+bool ws_command(kaddr_t address, const char *string, bool force, bool physical, size_t access);
 bool f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical, bool heap,
 		size_t access, size_t alignment);
 bool fpr_command(pid_t pid);
