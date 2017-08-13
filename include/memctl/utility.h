@@ -144,35 +144,68 @@ bext(uintmax_t x, unsigned sign, unsigned hi, unsigned lo, unsigned shift) {
 #endif
 
 /*
- * msb1
+ * hibit_pos
  *
  * Description:
- * 	Computes the index (starting at 0) of the most significant 1 bit. If the input is 0, then
+ * 	Returns the index (starting at 0) of the most significant 1 bit. If the input is 0, then
  * 	-1 is returned.
  *
  * TODO: Use a faster implementation.
  */
 static inline int
-msb1(uintmax_t n) {
+hibit_pos(uintmax_t x) {
 	unsigned msb = -1;
-	while (n > 0) {
-		n >>= 1;
+	while (x > 0) {
+		x >>= 1;
 		msb += 1;
 	}
 	return msb;
 }
 
-
 /*
  * MACRO ilog2
  *
  * Description:
- * 	Computes the integer part (floor) of the logarithm base 2 of the given integer. If the
+ * 	Returns the integer part (floor) of the logarithm base 2 of the given integer. If the
  * 	input is 0, -1 is returned.
  */
 static inline int
-ilog2(uintmax_t n) {
-	return msb1(n);
+ilog2(uintmax_t x) {
+	return hibit_pos(x);
+}
+
+/*
+ * hibit
+ *
+ * Description:
+ * 	Returns a mask of the most significant 1 bit.
+ */
+static inline uintmax_t
+hibit(uintmax_t x) {
+	return ((uintmax_t)1 << hibit_pos(x));
+}
+
+/*
+ * lobit
+ *
+ * Description:
+ * 	Returns a mask of the least significant 1 bit.
+ */
+static inline uintmax_t
+lobit(uintmax_t x) {
+	return (x & (-x));
+}
+
+/*
+ * lobit_pos
+ *
+ * Description:
+ * 	Returns the index (starting at 0) of the least significant 1 bit. If the input is 0, then
+ * 	-1 is returned.
+ */
+static inline int
+lobit_pos(uintmax_t x) {
+	return hibit_pos(lobit(x));
 }
 
 /*
