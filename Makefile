@@ -176,6 +176,7 @@ MEMCTL_SRCS = $(MEMCTL_ARCH_SRCS) \
 	      error.c \
 	      find.c \
 	      format.c \
+	      initialize.c \
 	      memctl.c \
 	      memory.c \
 	      read.c \
@@ -189,6 +190,7 @@ MEMCTL_HDRS = $(MEMCTL_ARCH_HDRS) \
 	      error.h \
 	      find.h \
 	      format.h \
+	      initialize.h \
 	      memory.h \
 	      read.h \
 	      strparse.h \
