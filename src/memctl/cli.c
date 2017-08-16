@@ -2,9 +2,12 @@
 
 #include "error.h"
 #include "format.h"
+#include "initialize.h"
 
+#include "memctl/core.h"
 #include "memctl/kernel.h"
 
+#include <mach/mach_vm.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -77,17 +80,56 @@
 	ARG_GET_OR_(n_, arg_, ((struct argrange) { start_, end_, true, true }), ARG_RANGE, range)
 
 // Default values for argrange start and end values.
-// TODO: This is a hack. It should be possible to have memctl configure these by loading the core
-// and querying the kernel map.
-#if __arm64__
-# define RANGE_DEFAULT_START	0xfffffff000000000
-# define RANGE_DEFAULT_END	0xfffffff280000000
-#elif __x86_64__
-# define RANGE_DEFAULT_START	0xffffff7f80000000
-# define RANGE_DEFAULT_END	0xffffff9400000000
-#else
-# error No default kernel virtual memory range for architecture.
-#endif
+kaddr_t range_default_virtual_start;
+kaddr_t range_default_virtual_end;
+
+/*
+ * range_default_init
+ *
+ * Description:
+ * 	Initialize default values for memory ranges.
+ */
+static bool
+range_default_init() {
+	kern_return_t kr;
+	if (range_default_virtual_start == 0) {
+		if (!initialize(KERNEL_TASK)) {
+			goto fail_0;
+		}
+		mach_vm_address_t address = 0;
+		mach_vm_size_t size = 0;
+		struct vm_region_basic_info_64 info;
+		mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+		mach_port_t object_name = MACH_PORT_NULL;
+		kr = mach_vm_region(kernel_task, &address, &size, VM_REGION_BASIC_INFO_64,
+				(vm_region_recurse_info_t) &info, &count, &object_name);
+		if (kr != KERN_SUCCESS) {
+			goto fail_1;
+		}
+		kaddr_t start = address;
+		for (;;) {
+			address += size;
+			size = 0;
+			count = VM_REGION_BASIC_INFO_COUNT_64;
+			object_name = MACH_PORT_NULL;
+			kr = mach_vm_region(kernel_task, &address, &size, VM_REGION_BASIC_INFO_64,
+					(vm_region_recurse_info_t) &info, &count, &object_name);
+			if (kr == KERN_INVALID_ADDRESS) {
+				range_default_virtual_start = start;
+				range_default_virtual_end   = address;
+				break;
+			} else if (kr != KERN_SUCCESS) {
+				goto fail_1;
+			}
+		}
+	}
+	return true;
+fail_1:
+	error_internal("mach_vm_region error: %s", mach_error_string(kr));
+fail_0:
+	error_internal("could not initialize default address range");
+	return false;
+}
 
 /*
  * default_virtual_range
@@ -96,14 +138,18 @@
  * 	If either endpoint of the range was a default, then specify a realistic virtual address
  * 	instead.
  */
-static void
+static bool
 default_virtual_range(struct argrange *range) {
+	if (!range_default_init()) {
+		return false;
+	}
 	if (range->default_start) {
-		range->start = RANGE_DEFAULT_START;
+		range->start = range_default_virtual_start;
 	}
 	if (range->default_end) {
-		range->end = RANGE_DEFAULT_END;
+		range->end = range_default_virtual_end;
 	}
+	return true;
 }
 
 /*
@@ -255,7 +301,9 @@ HANDLER(f_handler) {
 		return false;
 	}
 	if (!heap && !physical) {
-		default_virtual_range(&range);
+		if (!default_virtual_range(&range)) {
+			return false;
+		}
 	}
 	return f_command(range.start, range.end, value, width, physical, heap, access, alignment);
 }
@@ -293,7 +341,9 @@ HANDLER(kp_handler) {
 
 HANDLER(kpm_handler) {
 	struct argrange range = ARG_GET_RANGE(0, "range");
-	default_virtual_range(&range);
+	if (!default_virtual_range(&range)) {
+		return false;
+	}
 	return kpm_command(range.start, range.end);
 }
 
