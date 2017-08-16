@@ -152,7 +152,7 @@ transfer_physical_words_unsafe(vm_map_t task, mach_vm_address_t paddr, size_t *s
 	bool trunc_32 = !is_write && !kernel_call(NULL, sizeof(uint64_t), 0, 1, dummy_args);
 	task_io_result result = TASK_IO_SUCCESS;
 	while (left > 0) {
-		size_t align    = min(sizeof(kword_t), lobit(paddr));
+		size_t align    = lobit(paddr | sizeof(kword_t));
 		size_t wordsize = min(left, align);
 		if (access != 0 && access < wordsize) {
 			wordsize = access;
