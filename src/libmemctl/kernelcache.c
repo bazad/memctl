@@ -59,7 +59,9 @@ kernelcache_init_file(struct kernelcache *kc, const char *file) {
 	if (!mmap_file(file, &data, &size)) {
 		return KEXT_ERROR;
 	}
-	return kernelcache_init(kc, data, size);
+	bool success = kernelcache_init(kc, data, size);
+	munmap((void *)data, size);
+	return success;
 }
 
 /*
@@ -103,15 +105,15 @@ kernelcache_decompress_complzss(const void *data, size_t size,
 	// Allocate memory to decompress the kernelcache.
 	size_t dsize = ntohl(h->uncompressed_size);
 	size_t csize = ntohl(h->compressed_size);
-	void *ddata = mmap(NULL, dsize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
-	if (ddata == MAP_FAILED) {
+	void *ddata = malloc(dsize);
+	if (ddata == NULL) {
 		error_out_of_memory();
 		goto fail;
 	}
 	// Decompress the kernelcache.
 	if (!decompress_complzss(p, csize, ddata, dsize)) {
 		error_internal("decompression failed");
-		munmap(ddata, dsize);
+		free(ddata);
 		goto fail;
 	}
 	*decompressed      = ddata;
@@ -138,12 +140,11 @@ kernelcache_init_decompress_lzfse(const void *data, size_t size,
 	size_t dalloc = 4 * size;
 	void *ddata;
 	size_t dsize;
-	size_t csize = size - ((uintptr_t)lzfse - (uintptr_t)data);
+	const size_t csize = size - ((uintptr_t)lzfse - (uintptr_t)data);
 	uint8_t dbuf[compression_decode_scratch_buffer_size(COMPRESSION_LZFSE)];
 	for (;;) {
-		ddata = mmap(NULL, dalloc, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0,
-				0);
-		if (ddata == MAP_FAILED) {
+		ddata = malloc(dalloc);
+		if (ddata == NULL) {
 			error_out_of_memory();
 			goto fail;
 		}
@@ -152,9 +153,9 @@ kernelcache_init_decompress_lzfse(const void *data, size_t size,
 		if (dsize < dalloc) {
 			break;
 		}
-		munmap(ddata, dalloc);
-		dalloc *= 2;
 		memctl_warning("decompress_lzfse: reallocating decompression buffer");
+		free(ddata);
+		dalloc *= 2;
 	}
 	*decompressed      = ddata;
 	*decompressed_size = dsize;
@@ -190,19 +191,26 @@ kernelcache_init(struct kernelcache *kc, const void *data, size_t size) {
 	size_t decompressed_size;
 	bool is_compressed = kernelcache_decompress(data, size, &decompressed, &decompressed_size);
 	if (is_compressed) {
-		munmap((void *)data, size);
 		if (decompressed == NULL) {
 			// This is a compressed kernelcache but there was an error during the
 			// decompression.
 			error_kernelcache("could not decompress kernelcache");
 			return KEXT_ERROR;
 		}
-		data = decompressed;
 		size = decompressed_size;
+	} else {
+		// This is a decompressed kernelcache. Copy the data into our own memory.
+		decompressed = malloc(size);
+		if (decompressed == NULL) {
+			error_out_of_memory();
+			return KEXT_ERROR;
+		}
+		memcpy((void *)decompressed, data, size);
 	}
+	data = decompressed;
 	if (size < 0x1000) {
 		error_kernelcache("kernelcache too small");
-		munmap((void *)data, size);
+		free((void *)data);
 		return KEXT_ERROR;
 	}
 	return kernelcache_init_uncompressed(kc, data, size);
@@ -362,7 +370,7 @@ fail:
 void
 kernelcache_deinit(struct kernelcache *kc) {
 	if (kc->data != NULL) {
-		munmap((void *)kc->data, kc->size);
+		free((void *)kc->data);
 		kc->data = NULL;
 		kc->size = 0;
 		kc->kernel.mh = NULL;

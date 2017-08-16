@@ -31,6 +31,15 @@ struct kernelcache {
  * Description:
  * 	Initialize the kernelcache from the given file.
  *
+ * Parameters:
+ * 	out	kc			The kernelcache to initialize.
+ * 		file			The path to the kernelcache file.
+ *
+ * Returns:
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_ERROR			Could not open file, file I/O error, out of memory, could
+ * 					not decompress, invalid kernelcache, or parse failure.
+ *
  * Notes:
  * 	Call kernelcache_deinit to free any resources allocated to the kernelcache object.
  */
@@ -44,14 +53,19 @@ kext_result kernelcache_init_file(struct kernelcache *kc, const char *file);
  *
  * Parameters:
  * 	out	kc			The kernelcache to initialize.
- * 		data			The kernelcache data. Must be allocated with mmap.
+ * 		data			The kernelcache data. The data is copied internally.
  * 		size			The size of the kernelcache data.
  *
- * Notes:
- * 	data must be a region allocated with mmap.
+ * Returns:
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_ERROR			Out of memory, could not decompress, invalid kernelcache,
+ * 					or parse failure.
  *
- * 	kernelcache_init assumes ownership of data. In particular, if initialization fails, the
- * 	memory region is unmapped.
+ * Notes:
+ * 	Call kernelcache_deinit to free any resources allocated to the kernelcache object.
+ *
+ * 	kernelcache_init does not assume ownership of the data; it is safe to modify the data after
+ * 	this function returns.
  */
 kext_result kernelcache_init(struct kernelcache *kc, const void *data, size_t size);
 
@@ -63,14 +77,21 @@ kext_result kernelcache_init(struct kernelcache *kc, const void *data, size_t si
  *
  * Parameters:
  * 	out	kc			The kernelcache to initialize.
- * 		data			The kernelcache data. Must be allocated with mmap.
+ * 		data			The kernelcache data. Will be deallocated with free.
  * 		size			The size of the kernelcache data.
  *
+ * Returns:
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_ERROR			Out of memory, invalid kernelcache, or parse failure.
+ *
  * Notes:
- * 	See kernelcache_init.
+ * 	Call kernelcache_deinit to free any resources allocated to the kernelcache object.
+ *
+ * 	kernelcache_init_uncompressed assumes ownership of the supplied data. This data should not
+ * 	be modified after this function is called. This pointer will be deallocated using free()
+ * 	during kernelcache_deinit.
  */
-kext_result kernelcache_init_uncompressed(struct kernelcache *kc, const void *data,
-		size_t size);
+kext_result kernelcache_init_uncompressed(struct kernelcache *kc, const void *data, size_t size);
 
 /*
  * kernelcache_deinit
