@@ -13,7 +13,7 @@ typedef void (*fn_t)(void);
 static fn_t
 select_fn(const char *io, memflags flags,
 		fn_t *kernel_unsafe, fn_t *kernel_heap, fn_t *kernel_safe, fn_t *kernel_all,
-		fn_t *physical_unsafe) {
+		fn_t *physical_unsafe, fn_t *physical_safe) {
 #define INIT(features)				\
 	if (!initialize(features)) {		\
 		return NULL;			\
@@ -23,7 +23,7 @@ select_fn(const char *io, memflags flags,
 	bool physical = flags & MEM_PHYS;
 	if (physical) {
 		INIT(KERNEL_MEMORY);
-		fn = *physical_unsafe;
+		fn = *(force ? physical_unsafe : physical_safe);
 	} else {
 		if (force) {
 			INIT(KERNEL_MEMORY_BASIC);
@@ -49,7 +49,8 @@ select_fn(const char *io, memflags flags,
 			(fn_t *)&kernel_##io##_heap,				\
 			(fn_t *)&kernel_##io##_safe,				\
 			(fn_t *)&kernel_##io##_all,				\
-			(fn_t *)&physical_##io##_unsafe);			\
+			(fn_t *)&physical_##io##_unsafe,			\
+			(fn_t *)&physical_##io##_safe);				\
 	if (io == NULL) {							\
 		*size = 0;							\
 		return false;							\

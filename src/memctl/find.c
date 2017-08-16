@@ -12,11 +12,17 @@ bool
 memctl_find(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical, bool heap,
 		size_t access, size_t alignment) {
 	// Select the read function.
-	kernel_read_fn read = kernel_read_all;
-	if (heap || read == NULL) {
-		read = kernel_read_heap;
-	} else if (physical) {
-		error_internal("physical memory find not implemented"); // TODO
+	kernel_read_fn read;
+	if (physical) {
+		read = physical_read_safe;
+	} else {
+		read = kernel_read_all;
+		if (heap || read == NULL) {
+			read = kernel_read_safe;
+		}
+	}
+	if (read == NULL) {
+		error_internal("cannot scan %s memory", (physical ? "physical" : "kernel"));
 		return false;
 	}
 	// Initialize the loop.

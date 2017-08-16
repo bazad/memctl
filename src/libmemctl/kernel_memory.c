@@ -27,6 +27,8 @@ kernel_read_fn  kernel_read_all;
 kernel_write_fn kernel_write_all;
 kernel_read_fn  physical_read_unsafe;
 kernel_write_fn physical_write_unsafe;
+kernel_read_fn  physical_read_safe;
+kernel_write_fn physical_write_safe;
 
 // Other functions.
 bool (*kernel_virtual_to_physical)(kaddr_t kaddr, paddr_t *paddr);
@@ -445,6 +447,45 @@ transfer_range_all(vm_map_t task, mach_vm_address_t kaddr, size_t *size, size_t 
 }
 
 /*
+ * physical_transfer_range_cache_safe
+ *
+ * Description:
+ * 	Find the transfer range for the given physical transfer, but only consider regions without
+ * 	the VM_MEM_GUARDED cache attribute bit set. Needs pmap_cache_attributes.
+ */
+static task_io_result
+physical_transfer_range_cache_safe(vm_map_t task, mach_vm_address_t address, size_t *size,
+		size_t *access, mach_vm_address_t *next, bool is_write) {
+	assert(pmap_cache_attributes != NULL);
+	paddr_t paddr         = address;
+	size_t left           = *size;
+	paddr_t next_viable   = paddr + left;
+	task_io_result result = TASK_IO_SUCCESS;
+	error_stop();
+	while (left > 0) {
+		unsigned cacheattr = 0;
+		bool success = pmap_cache_attributes(&cacheattr, paddr >> page_shift);
+		if (!success) {
+			break;
+		}
+		if (cacheattr & VM_MEM_GUARDED) {
+			result      = TASK_IO_PROTECTION;
+			next_viable = (paddr & ~page_mask) + page_size;
+			break;
+		}
+		size_t phys_size = min(left, page_size - (paddr & page_mask));
+		paddr += phys_size;
+		left  -= phys_size;
+	}
+	error_start();
+	*size = paddr - address;
+	if (next != NULL) {
+		*next = next_viable;
+	}
+	return result;
+}
+
+/*
  * kernel_io
  *
  * Description:
@@ -543,6 +584,21 @@ physical_write_unsafe_(paddr_t paddr, size_t *size, const void *data, size_t acc
 	return kernel_io(paddr, size, (void *)data, access_width, next, task_transfer_range_all,
 			transfer_physical_words_unsafe, true);
 }
+
+static kernel_io_result
+physical_read_safe_(paddr_t paddr, size_t *size, void *data, size_t access_width,
+		kaddr_t *next) {
+	return kernel_io(paddr, size, data, access_width, next, physical_transfer_range_cache_safe,
+			transfer_physical_words_unsafe, false);
+}
+
+static kernel_io_result
+physical_write_safe_(paddr_t paddr, size_t *size, const void *data, size_t access_width,
+		kaddr_t *next) {
+	return kernel_io(paddr, size, (void *)data, access_width, next,
+			physical_transfer_range_cache_safe, transfer_physical_words_unsafe, true);
+}
+
 
 bool
 kernel_virtual_to_physical_(kaddr_t kaddr, paddr_t *paddr) {
@@ -674,6 +730,20 @@ kernel_memory_init() {
 				SET(pmap_cache_attributes);
 			}
 		}
+	}
+	// Load the safe physical read/write functions.
+	// TODO: Checking that physical_*_unsafe are the default implementations is a hack to
+	// ensure that transfer_physical_words_unsafe is usable. Ideally, there should be a way to
+	// reuse any implementation of physical_*_unsafe.
+	if (physical_read_safe == NULL
+			&& physical_read_unsafe == physical_read_unsafe_
+			&& pmap_cache_attributes != NULL) {
+		SET(physical_read_safe);
+	}
+	if (physical_write_safe == NULL
+			&& physical_write_unsafe == physical_write_unsafe_
+			&& pmap_cache_attributes != NULL) {
+		SET(physical_write_safe);
 	}
 #undef SET
 #undef RESOLVE_KERNEL

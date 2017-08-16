@@ -6,9 +6,17 @@
 #include <stdint.h>
 #include <mach/vm_page_size.h>
 
+// Page-size macros.
 #define page_size	vm_kernel_page_size
 #define page_shift	vm_kernel_page_shift
 #define page_mask	vm_kernel_page_mask
+
+// Machine-independent WIMG bits.
+// Defined in osfmk/vm/pmap.h.
+#define VM_MEM_GUARDED		0x1
+#define VM_MEM_COHERENT		0x2
+#define VM_MEM_NOT_CACHEABLE	0x4
+#define VM_MEM_WRITE_THROUGH	0x8
 
 /*
  * kernel_io_result
@@ -250,6 +258,24 @@ extern kernel_read_fn physical_read_unsafe;
  * 	A kernel_write_fn that writes physical memory without any safety checks.
  */
 extern kernel_write_fn physical_write_unsafe;
+
+/*
+ * physical_read_safe
+ *
+ * Description:
+ * 	A kernel_read_fn that reads physical memory with basic safety checks. All non-accessible
+ * 	addresses return KERNEL_IO_PROTECTION.
+ */
+extern kernel_read_fn physical_read_safe;
+
+/*
+ * physical_write_safe
+ *
+ * Description:
+ * 	A kernel_write_fn that writes physical memory with basic safety checks. All non-accessible
+ * 	addresses return KERNEL_IO_PROTECTION.
+ */
+extern kernel_write_fn physical_write_safe;
 
 /*
  * kernel_pmap
