@@ -292,6 +292,21 @@ extern bool (*kernel_virtual_to_physical)(kaddr_t kaddr, paddr_t *paddr);
 extern bool (*zone_element_size)(kaddr_t address, size_t *size);
 
 /*
+ * pmap_cache_attributes
+ *
+ * Description:
+ * 	XNU's pmap_cache_attributes. Retrieve cache attributes for the specified physical page.
+ *
+ * Parameters:
+ * 	out	cacheattr		The cache attributes bits.
+ * 		page			The physical page.
+ *
+ * Returns:
+ * 	True if no errors were encountered.
+ */
+extern bool (*pmap_cache_attributes)(unsigned int *cacheattr, ppnum_t page);
+
+/*
  * kernel_memory_init
  *
  * Description:

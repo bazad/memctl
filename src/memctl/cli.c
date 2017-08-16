@@ -302,6 +302,12 @@ HANDLER(kz_handler) {
 	return kz_command(address);
 }
 
+HANDLER(pca_handler) {
+	bool is_virtual = OPT_PRESENT(0, "v");
+	kaddr_t address = ARG_GET_ADDRESS(1, "address");
+	return pca_command(address, is_virtual);
+}
+
 HANDLER(vt_handler) {
 	const char *bundle_id = OPT_GET_STRING_OR(0, "b", "kext", NULL);
 	bool in_kernel        = OPT_PRESENT(1, "k");
@@ -516,6 +522,13 @@ static struct command commands[] = {
 		"get size of kalloc memory",
 		1, (struct argspec *) &(struct argspec[1]) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "kalloc address" },
+		},
+	}, {
+		"pca", NULL, pca_handler,
+		"show physical cache attributes",
+		2, (struct argspec *) &(struct argspec[2]) {
+			{ "v",      NULL,      ARG_NONE,    "use a virtual address"       },
+			{ ARGUMENT, "address", ARG_ADDRESS, "physical or virtual address" },
 		},
 	}, {
 		"vt", NULL, vt_handler,

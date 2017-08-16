@@ -31,6 +31,7 @@ kernel_write_fn physical_write_unsafe;
 // Other functions.
 bool (*kernel_virtual_to_physical)(kaddr_t kaddr, paddr_t *paddr);
 bool (*zone_element_size)(kaddr_t kaddr, size_t *size);
+bool (*pmap_cache_attributes)(unsigned int *cacheattr, ppnum_t page);
 
 // pmap_t kernel_pmap;
 kaddr_t kernel_pmap;
@@ -52,6 +53,9 @@ static kaddr_t _IOMappedWrite64;
 
 // vm_size_t zone_element_size(void *addr, zone_t *z)
 static kaddr_t _zone_element_size;
+
+// unsigned int pmap_cache_attributes(ppnum_t pn);
+static kaddr_t _pmap_cache_attributes;
 
 #define ERROR_CALL(symbol)	error_internal("could not call %s", #symbol)
 
@@ -570,6 +574,16 @@ zone_element_size_(kaddr_t address, size_t *size) {
 	return true;
 }
 
+bool
+pmap_cache_attributes_(unsigned int *cacheattr, ppnum_t page) {
+	kword_t args[] = { page };
+	bool success = kernel_call(cacheattr, sizeof(*cacheattr), _pmap_cache_attributes, 1, args);
+	if (!success) {
+		ERROR_CALL(_pmap_cache_attributes);
+	}
+	return success;
+}
+
 void
 kernel_memory_init() {
 	error_stop();
@@ -647,6 +661,16 @@ kernel_memory_init() {
 			kword_t dummy_args[2] = { kernel.base, 0 };
 			if (kernel_call(NULL, sizeof(vm_size_t), 0, 2, dummy_args)) {
 				SET(zone_element_size);
+			}
+		}
+	}
+	// Load pmap_cache_attributes.
+	if (pmap_cache_attributes == NULL) {
+		RESOLVE_KERNEL(_pmap_cache_attributes);
+		if (_pmap_cache_attributes != 0) {
+			kword_t dummy_args[1] = { 0 };
+			if (kernel_call(NULL, sizeof(unsigned int), 0, 1, dummy_args)) {
+				SET(pmap_cache_attributes);
 			}
 		}
 	}

@@ -65,11 +65,13 @@ LIBMEMCTL_arm64_SRCS = sim.c \
 		       ksim.c \
 		       memory_region.c \
 		       finder/kauth_cred_setsvuidgid.c \
+		       finder/pmap_cache_attributes.c \
 		       finder/pthread_callbacks.c \
 		       finder/zone_element_size.c
 
 LIBMEMCTL_arm64_HDRS = kernel_call_aarch64.h \
 		       finder/kauth_cred_setsvuidgid.h \
+		       finder/pmap_cache_attributes.h \
 		       finder/pthread_callbacks.h \
 		       finder/zone_element_size.h
 

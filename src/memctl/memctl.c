@@ -524,6 +524,36 @@ kz_command(kaddr_t address) {
 }
 
 bool
+pca_command(kaddr_t address, bool is_virtual) {
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
+	if (pmap_cache_attributes == NULL) {
+		error_functionality_unavailable("pmap_cache_attributes unavailable");
+		return false;
+	}
+	if (is_virtual) {
+		kaddr_t physaddr;
+		bool success = kernel_virtual_to_physical(address, &physaddr);
+		if (!success) {
+			return false;
+		}
+		if (physaddr == 0) {
+			error_address_unmapped(address);
+			return false;
+		}
+		address = physaddr;
+	}
+	unsigned cacheattr;
+	bool success = pmap_cache_attributes(&cacheattr, address >> page_shift);
+	if (!success) {
+		return false;
+	}
+	printf("%x\n", cacheattr);
+	return true;
+}
+
+bool
 vt_command(const char *classname, const char *bundle_id) {
 	kaddr_t address;
 	size_t size;
