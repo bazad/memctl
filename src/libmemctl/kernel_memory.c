@@ -455,6 +455,7 @@ kernel_io(kaddr_t kaddr, size_t *size, void *data, size_t access, kaddr_t *next,
 		task_transfer_range_fn transfer_range, task_transfer_fn transfer, bool is_write) {
 	task_io_result result = task_perform_transfer(kernel_task, kaddr, size, data, access, next,
 			transfer_range, transfer, is_write);
+	kaddr += *size;
 	switch (result) {
 		case TASK_IO_SUCCESS:                                         return KERNEL_IO_SUCCESS;
 		case TASK_IO_ERROR:        error_kernel_io(kaddr);            return KERNEL_IO_ERROR;
