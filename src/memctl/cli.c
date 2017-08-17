@@ -159,36 +159,37 @@ default_virtual_range(struct argrange *range) {
  * 	Parse the given protection string (e.g. 'r-x').
  */
 static bool
-parse_protection(const char *command, const char *protection, int *pprot) {
-	int prot = 0;
+parse_protection(const char *command, const char *protection, int *prot) {
+	int prot_ = 0;
+	const char *template = "rwx";
+	const int flag[] = { VM_PROT_READ, VM_PROT_WRITE, VM_PROT_EXECUTE };
+	const char *p = protection;
 	for (size_t i = 0; ; i++) {
-		char c = protection[i];
-		if (c == 0) {
-			if (i == 0) {
+		// Handle end-of-argument.
+		char pc = *p;
+		if (pc == 0) {
+			if (p == protection) {
 				break;
 			}
-			*pprot = prot;
+			*prot = prot_;
 			return true;
-		} else if (i == 3) {
+		}
+		// Make sure protection isn't too long.
+		char tc = template[i];
+		if (tc == 0) {
 			break;
 		}
-		c = tolower(c);
-		int flag;
-		if (c == 'r') {
-			flag = VM_PROT_READ;
-		} else if (c == 'w') {
-			flag = VM_PROT_WRITE;
-		} else if (c == 'x') {
-			flag = VM_PROT_EXECUTE;
-		} else if (c == '-') {
+		// Advance to the next character if we have a match or skip.
+		if (pc == '-' || pc == tc) {
+			p++;
+		}
+		// If this isn't a match, try the next character.
+		if (tc != pc) {
 			continue;
-		} else {
-			break;
 		}
-		if (prot & flag) {
-			break;
-		}
-		prot |= flag;
+		// Set the flag.
+		assert((prot_ & flag[i]) == 0);
+		prot_ |= flag[i];
 	}
 	error_usage(command, NULL, "invalid protection '%s'", protection);
 	return false;
