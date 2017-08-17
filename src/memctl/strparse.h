@@ -6,6 +6,23 @@
 #include <stdlib.h>
 
 /*
+ * strnchr
+ *
+ * Description:
+ * 	Find the first occurrence of a character in a length-limited string.
+ *
+ * Parameters:
+ * 		str			The string to search.
+ * 		len			The maximum length of the string.
+ * 		ch			The character to search for.
+ *
+ * Returns:
+ * 	A pointer to the first occurrence of the character in the string, or NULL if the character
+ * 	was not found.
+ */
+const char *strnchr(const char *str, size_t len, int ch);
+
+/*
  * hex_digit
  *
  * Description:
@@ -32,7 +49,7 @@ enum strtoint_result {
 	STRTOINT_BADDIGIT,
 	// No digits were found.
 	STRTOINT_NODIGITS,
-	// A (signed or unsigned) overflow was encountered while processing the integer. end will
+	// A signed or unsigned overflow was encountered while processing the integer. end will
 	// point to the first digit that caused the overflow.
 	STRTOINT_OVERFLOW,
 };
@@ -45,6 +62,7 @@ enum strtoint_result {
  *
  * Parameters:
  * 		str			The string to parse.
+ * 		len			The maximum length of the string.
  * 		sign			Whether the integer to parse is signed or unsigned. If sign
  * 					is true, then the string representation of the integer may
  * 					optionally start with a "+" or "-" to indicate the sign.
@@ -69,7 +87,7 @@ enum strtoint_result {
  * 	will actually return the value 2, not 0xB10, since the leading "0b" will be recognized as
  * 	the base specifier.
  */
-enum strtoint_result strtoint(const char *str, bool sign, unsigned base,
+enum strtoint_result strtoint(const char *str, size_t len, bool sign, unsigned base,
 		uintmax_t *value, const char **end);
 
 /*

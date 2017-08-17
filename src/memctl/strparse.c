@@ -2,6 +2,23 @@
 
 #include "memctl/utility.h"
 
+const char *
+strnchr(const char *str, size_t len, int ch) {
+	const char *end = str + len;
+	for (;;) {
+		if (str == end) {
+			return NULL;
+		}
+		if (*str == ch) {
+			return str;
+		}
+		if (*str == 0) {
+			return NULL;
+		}
+		str++;
+	}
+}
+
 int
 hex_digit(int c) {
 	if ('0' <= c && c <= '9') {
@@ -22,11 +39,11 @@ hex_digit(int c) {
  * 	Process the base prefix and set the base according to this prefix.
  */
 static void
-handle_base_prefix(const char **str0, unsigned *base0) {
+handle_base_prefix(const char **str0, const char *last, unsigned *base0) {
 	const char *str = *str0;
 	unsigned base = *base0;
 	assert(2 <= base && base <= 16);
-	if (str[0] != '0') {
+	if (str == last || str + 1 == last || str[0] != '0') {
 		return;
 	}
 	if (str[1] == 'x') {
@@ -43,8 +60,14 @@ handle_base_prefix(const char **str0, unsigned *base0) {
 }
 
 enum strtoint_result
-strtoint(const char *str, bool sign, unsigned base, uintmax_t *value, const char **end) {
+strtoint(const char *str, size_t len, bool sign, unsigned base,
+		uintmax_t *value, const char **end) {
 	enum strtoint_result result = STRTOINT_OK;
+	const char *last = str + len;
+	if (str == last) {
+		result = STRTOINT_NODIGITS;
+		goto fail;
+	}
 	// Check for any sign.
 	bool negate = false;
 	if (sign && (str[0] == '+' || str[0] == '-')) {
@@ -52,21 +75,29 @@ strtoint(const char *str, bool sign, unsigned base, uintmax_t *value, const char
 		str += 1;
 	}
 	// Check for any base-specifying prefix.
-	handle_base_prefix(&str, &base);
+	handle_base_prefix(&str, last, &base);
 	// Process the digits.
-	const char *start = str;
 	uintmax_t value_ = 0;
-	do {
+	// Initial loop entry.
+	if (str == last) {
+		goto nochars;
+	}
+	int d = hex_digit(str[0]);
+	if (d < 0 || d >= base) {
+nochars:
+		result = STRTOINT_NODIGITS;
+		goto fail;
+	}
+	goto loop_entry;
+	// Subsequent loop entry.
+	while (str != last && str[0] != 0) {
 		// Convert this digit.
-		int d = hex_digit(str[0]);
+		d = hex_digit(str[0]);
 		if (d < 0 || d >= base) {
-			if (str == start) {
-				result = STRTOINT_NODIGITS;
-				goto fail;
-			}
 			result = STRTOINT_BADDIGIT;
 			break;
 		}
+loop_entry:;
 		uintmax_t new_value = value_ * base + d;
 		// Check for overflow.
 		if (sign) {
@@ -91,7 +122,7 @@ strtoint(const char *str, bool sign, unsigned base, uintmax_t *value, const char
 		// Move to the next character.
 		value_ = new_value;
 		str += 1;
-	} while (str[0] != 0);
+	}
 	// Compute the final value.
 	if (negate) {
 		value_ = (uintmax_t)(-(intmax_t)value_);
@@ -108,7 +139,7 @@ strtodata(const char *str, unsigned base, void *data, size_t *size, const char *
 	// Check for any base-specifying prefix.
 	assert(base == 2 || base == 4 || base == 16);
 	const char *start = str;
-	handle_base_prefix(&str, &base);
+	handle_base_prefix(&str, str - 1, &base);
 	if (base != 2 && base != 4 && base != 16) {
 		str = start;
 		result = STRTODATA_BADBASE;

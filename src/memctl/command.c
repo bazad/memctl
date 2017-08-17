@@ -1,6 +1,7 @@
 #include "command.h"
 
 #include "error.h"
+#include "format.h"
 #include "initialize.h"
 #include "strparse.h"
 
@@ -341,7 +342,7 @@ parse_none(struct state *s) {
  * 	Parse an integer value of the given argument type.
  */
 static bool
-parse_int_internal(struct state *s, enum argtype argtype) {
+parse_int_internal(struct state *s, struct argument *argument, enum argtype argtype, size_t len) {
 	const char *end;
 	uintmax_t address;
 	unsigned base = 10;
@@ -353,18 +354,18 @@ parse_int_internal(struct state *s, enum argtype argtype) {
 		intptr = &address;
 		typename = "address";
 	} else if (argtype == ARG_UINT) {
-		intptr = &s->argument->uint;
+		intptr = &argument->uint;
 	} else {
-		intptr = (uintmax_t *)&s->argument->sint;
+		intptr = (uintmax_t *)&argument->sint;
 		sign = true;
 	}
-	enum strtoint_result sr = strtoint(s->arg, sign, base, intptr, &end);
+	enum strtoint_result sr = strtoint(s->arg, len, sign, base, intptr, &end);
 	if (sr == STRTOINT_OVERFLOW) {
-		ERROR_OPTION(s, "integer overflow: '%s'", s->arg);
+		ERROR_OPTION(s, "integer overflow: '%.*s'", len, s->arg);
 		return false;
 	} else if (sr == STRTOINT_NODIGITS) {
 fail:
-		ERROR_OPTION(s, "invalid %s: '%s'", typename, s->arg);
+		ERROR_OPTION(s, "invalid %s: '%.*s'", typename, len, s->arg);
 		return false;
 	}
 	// If we didn't process the whole current argument, and if either this is not the first
@@ -373,9 +374,9 @@ fail:
 		goto fail;
 	}
 	if (argtype == ARG_ADDRESS) {
-		s->argument->address = address;
+		argument->address = address;
 	}
-	s->argument->type = argtype;
+	argument->type = argtype;
 	s->arg = end;
 	return true;
 }
@@ -386,7 +387,7 @@ parse_int(struct state *s) {
 		ERROR_OPTION(s, "missing integer");
 		return false;
 	}
-	return parse_int_internal(s, ARG_INT);
+	return parse_int_internal(s, s->argument, ARG_INT, -1);
 }
 
 static bool
@@ -395,7 +396,7 @@ parse_uint(struct state *s) {
 		ERROR_OPTION(s, "missing integer");
 		return false;
 	}
-	return parse_int_internal(s, ARG_UINT);
+	return parse_int_internal(s, s->argument, ARG_UINT, -1);
 }
 
 static bool
@@ -404,7 +405,7 @@ parse_width(struct state *s) {
 		ERROR_OPTION(s, "missing width");
 		return false;
 	}
-	if (!parse_int_internal(s, ARG_UINT)) {
+	if (!parse_int_internal(s, s->argument, ARG_UINT, -1)) {
 		return false;
 	}
 	size_t width = s->argument->uint;
@@ -479,15 +480,15 @@ parse_argv(struct state *s) {
  * 	Initialize a symbol from the given string.
  */
 static bool
-extract_symbol(struct argument *argument, const char *str, bool force) {
+extract_symbol(struct argument *argument, const char *str, size_t len, bool force) {
 	if (!force) {
 		// We consider a string as a potential symbol if either it begins with "_" or
 		// contains ":".
-		if (str[0] != '_' && strchr(str, ':') == NULL) {
+		if (str[0] != '_' && strnchr(str, len, ':') == NULL) {
 			return false;
 		}
 	}
-	char *sym = strdup(str);
+	char *sym = strndup(str, len);
 	char *sep = strchr(sym, ':');
 	if (sep == NULL) {
 		argument->symbol.kext   = KERNEL_ID;
@@ -531,8 +532,9 @@ parse_symbol(struct state *s) {
 		ERROR_OPTION(s, "missing symbol");
 		return false;
 	}
-	extract_symbol(s->argument, s->arg, true);
-	s->arg += strlen(s->arg);
+	size_t len = strlen(s->arg);
+	extract_symbol(s->argument, s->arg, len, true);
+	s->arg += len;
 	assert(*s->arg == 0);
 	return true;
 }
@@ -557,6 +559,31 @@ resolve_symbol_address(kaddr_t *address, const struct argsymbol *symbol) {
 	return (kr == KEXT_SUCCESS);
 }
 
+/*
+ * parse_address_internal
+ *
+ * Description:
+ * 	Parse an address. If the current argument looks like a symbol, it will be resolved into an
+ * 	address.
+ */
+static bool
+parse_address_internal(struct state *s, struct argument *argument, size_t len) {
+	if (extract_symbol(argument, s->arg, len, false)) {
+		kaddr_t address;
+		bool found = resolve_symbol_address(&address, &argument->symbol);
+		free_symbol(argument);
+		if (!found) {
+			ERROR_OPTION(s, "could not resolve symbol '%.*s' to address", len, s->arg);
+			return false;
+		}
+		argument->address = address;
+		argument->type = ARG_ADDRESS;
+		s->arg += len;
+		return true;
+	}
+	return parse_int_internal(s, argument, ARG_ADDRESS, len);
+}
+
 // TODO: Arithmetic.
 static bool
 parse_address(struct state *s) {
@@ -564,64 +591,71 @@ parse_address(struct state *s) {
 		ERROR_OPTION(s, "missing address");
 		return false;
 	}
-	if (extract_symbol(s->argument, s->arg, false)) {
-		kaddr_t address;
-		bool found = resolve_symbol_address(&address, &s->argument->symbol);
-		free_symbol(s->argument);
-		if (!found) {
-			ERROR_OPTION(s, "could not resolve symbol '%s' to address", s->arg);
-			return false;
-		}
-		s->argument->address = address;
-		s->argument->type = ARG_ADDRESS;
-		s->arg += strlen(s->arg);
-		assert(*s->arg == 0);
-		return true;
-	}
-	return parse_int_internal(s, ARG_ADDRESS);
+	return parse_address_internal(s, s->argument, strlen(s->arg));
 }
 
-// TODO: Use parse_address.
 static bool
 parse_range(struct state *s) {
 	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing address range");
 		return false;
 	}
-	const char *str = s->arg;
-	char *end = (char *)str;
-	if (str[0] == 0) {
-		goto fail1;
-	} else if (str[0] == '-') {
-		s->argument->range.start = 0;
+	const char *arg_start = s->arg;
+	struct argument address;
+	// Parse the first component of the range.
+	if (s->arg[0] == 0) {
+		goto fail_1;
+	} else if (s->arg[0] == '-') {
+		s->argument->range.start         = 0;
 		s->argument->range.default_start = true;
 	} else {
-		s->argument->range.start = strtoumax(str, &end, 16);
-		if (*end != '-') {
-			goto fail1;
+		const char *end = strchr(s->arg, '-');
+		if (end == NULL) {
+			goto fail_1;
 		}
+		size_t len = end - s->arg;
+		if (!parse_address_internal(s, &address, len)) {
+			goto fail_1;
+		}
+		s->argument->range.start         = address.address;
+		s->argument->range.default_start = false;
 	}
-	str = end + 1;
-	if (str[0] == '-') {
-		goto fail2;
-	} else if (str[0] == 0) {
-		end = (char *)str;
-		s->argument->range.end = (kaddr_t)(-1);
+	// Check that we have the separator.
+	if (s->arg[0] != '-') {
+		goto fail_1;
+	}
+	s->arg++;
+	// Parse the second component of the range.
+	if (s->arg[0] == 0) {
+		s->argument->range.end         = (kaddr_t)(-1);
 		s->argument->range.default_end = true;
 	} else {
-		s->argument->range.end = strtoumax(str, &end, 16);
-		if (*end != 0) {
-			goto fail2;
+		size_t len = strlen(s->arg);
+		if (!parse_address_internal(s, &address, len)) {
+			goto fail_1;
 		}
+		if (s->arg[0] != 0) {
+			goto fail_1;
+		}
+		s->argument->range.end         = address.address;
+		s->argument->range.default_end = false;
 	}
+	// Check that the range is well-defined.
+	if (s->argument->range.start > s->argument->range.end) {
+		goto fail_2;
+	}
+	// Finish.
 	s->argument->type = ARG_RANGE;
-	s->arg = end;
+	assert(s->arg[0] == 0);
 	return true;
-fail1:
+fail_1:
+	s->arg = arg_start;
 	ERROR_OPTION(s, "invalid address range: '%s'", s->arg);
 	return false;
-fail2:
-	ERROR_OPTION(s, "invalid address: '%s'", str);
+fail_2:
+	s->arg = arg_start;
+	ERROR_OPTION(s, "bad address range "KADDR_XFMT"-"KADDR_XFMT,
+			s->argument->range.start, s->argument->range.end);
 	return false;
 }
 
