@@ -1,6 +1,7 @@
 #include "command.h"
 
 #include "error.h"
+#include "initialize.h"
 #include "strparse.h"
 
 #include "memctl/kernel.h"
@@ -471,41 +472,116 @@ parse_argv(struct state *s) {
 	return true;
 }
 
+/*
+ * extract_symbol
+ *
+ * Description:
+ * 	Initialize a symbol from the given string.
+ */
+static bool
+extract_symbol(struct argument *argument, const char *str, bool force) {
+	if (!force) {
+		// We consider a string as a potential symbol if either it begins with "_" or
+		// contains ":".
+		if (str[0] != '_' && strchr(str, ':') == NULL) {
+			return false;
+		}
+	}
+	char *sym = strdup(str);
+	char *sep = strchr(sym, ':');
+	if (sep == NULL) {
+		argument->symbol.kext   = KERNEL_ID;
+		argument->symbol.symbol = sym;
+	} else if (sep == sym) {
+		argument->symbol.kext   = NULL;
+		argument->symbol.symbol = sym + 1;
+	} else {
+		*sep = 0;
+		argument->symbol.kext   = sym;
+		argument->symbol.symbol = sep + 1;
+	}
+	argument->type = ARG_SYMBOL;
+	return true;
+}
+
+/*
+ * free_symbol
+ *
+ * Description:
+ * 	Free a symbol initialized with extract_symbol.
+ */
+static void
+free_symbol(struct argument *argument) {
+	assert(argument->type == ARG_SYMBOL);
+	void *to_free;
+	if (argument->symbol.kext == KERNEL_ID) {
+		to_free = (void *)argument->symbol.symbol;
+	} else if (argument->symbol.kext == NULL) {
+		to_free = (void *)(argument->symbol.symbol - 1);
+	} else {
+		to_free = (void *)argument->symbol.kext;
+	}
+	free(to_free);
+	argument->type = ARG_NONE;
+}
+
 static bool
 parse_symbol(struct state *s) {
 	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing symbol");
 		return false;
 	}
-	char *str = strdup(s->arg);
-	char *sep = strchr(str, ':');
-	if (sep == NULL) {
-		s->argument->symbol.kext   = KERNEL_ID;
-		s->argument->symbol.symbol = str;
-	} else if (sep == str) {
-		s->argument->symbol.kext   = NULL;
-		s->argument->symbol.symbol = str + 1;
-	} else {
-		*sep = 0;
-		s->argument->symbol.kext   = str;
-		s->argument->symbol.symbol = sep + 1;
-	}
-	s->argument->type = ARG_SYMBOL;
+	extract_symbol(s->argument, s->arg, true);
 	s->arg += strlen(s->arg);
 	assert(*s->arg == 0);
 	return true;
 }
 
-// TODO: Resolve symbols + arithmetic.
+/*
+ * resolve_symbol_address
+ *
+ * Description:
+ * 	Resolve the symbol into an address.
+ */
+static bool
+resolve_symbol_address(kaddr_t *address, const struct argsymbol *symbol) {
+	if (!initialize(KERNEL_SYMBOLS)) {
+		return false;
+	}
+	kext_result kr = resolve_symbol(symbol->kext, symbol->symbol, address, NULL);
+	if (kr == KEXT_NOT_FOUND) {
+		error_kext_symbol_not_found(symbol->kext, symbol->symbol);
+	} else if (kr == KEXT_NO_KEXT) {
+		error_kext_not_found(symbol->kext);
+	}
+	return (kr == KEXT_SUCCESS);
+}
+
+// TODO: Arithmetic.
 static bool
 parse_address(struct state *s) {
 	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing address");
 		return false;
 	}
+	if (extract_symbol(s->argument, s->arg, false)) {
+		kaddr_t address;
+		bool found = resolve_symbol_address(&address, &s->argument->symbol);
+		free_symbol(s->argument);
+		if (!found) {
+			ERROR_OPTION(s, "could not resolve symbol '%s' to address", s->arg);
+			return false;
+		}
+		s->argument->address = address;
+		s->argument->type = ARG_ADDRESS;
+		s->arg += strlen(s->arg);
+		assert(*s->arg == 0);
+		return true;
+	}
 	return parse_int_internal(s, ARG_ADDRESS);
 }
 
+// TODO: Use parse_address.
 static bool
 parse_range(struct state *s) {
 	if (s->arg == NULL) {
@@ -557,20 +633,13 @@ fail2:
  */
 static void
 cleanup_argument(struct argument *argument) {
-	void *to_free;
 	switch (argument->type) {
 		case ARG_DATA:
 			free(argument->data.data);
 			break;
 		case ARG_SYMBOL:
-			if (argument->symbol.kext == KERNEL_ID) {
-				to_free = (void *)argument->symbol.symbol;
-			} else if (argument->symbol.kext == NULL) {
-				to_free = (void *)(argument->symbol.symbol - 1);
-			} else {
-				to_free = (void *)argument->symbol.kext;
-			}
-			free(to_free);
+			free_symbol(argument);
+			break;
 		default:
 			break;
 	}
