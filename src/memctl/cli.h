@@ -32,6 +32,8 @@ bool pca_command(kaddr_t address, bool is_virtual);
 bool vt_command(const char *classname, const char *bundle_id);
 bool vm_command(kaddr_t address, unsigned depth);
 bool vmm_command(kaddr_t start, kaddr_t end, unsigned depth);
+bool vma_command(size_t size);
+bool vmd_command(kaddr_t address, size_t size);
 bool vmp_command(kaddr_t address, size_t length, int prot);
 bool ks_command(kaddr_t address, bool unslide);
 bool a_command(const char *symbol, const char *kext);

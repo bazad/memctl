@@ -321,7 +321,7 @@ kauth_cred_unref_(kaddr_t cred) {
 	}
 	successful = true;
 fail_1:
-	kernel_deallocate(pcred, sizeof(cred));
+	kernel_deallocate(pcred, sizeof(cred), false);
 fail_0:
 	return successful;
 }

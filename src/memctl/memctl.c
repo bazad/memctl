@@ -573,6 +573,34 @@ vmm_command(kaddr_t start, kaddr_t end, unsigned depth) {
 }
 
 bool
+vma_command(size_t size) {
+	if (!initialize(KERNEL_TASK)) {
+		return false;
+	}
+	kaddr_t address;
+	bool success = kernel_allocate(&address, size);
+	if (!success) {
+		error_message("could not allocate region of size %zu", size);
+		return false;
+	}
+	printf(KADDR_XFMT"\n", address);
+	return true;
+}
+
+bool
+vmd_command(kaddr_t address, size_t size) {
+	if (!initialize(KERNEL_TASK)) {
+		return false;
+	}
+	bool success = kernel_deallocate(address, size, true);
+	if (!success) {
+		error_message("could not deallocate %zu bytes at address "KADDR_XFMT,
+				size, address);
+	}
+	return success;
+}
+
+bool
 vmp_command(kaddr_t address, size_t length, int prot) {
 	if (!check_address(address, length, false)) {
 		return false;

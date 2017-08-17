@@ -677,11 +677,11 @@ kernel_call_deinit() {
 		hook.connection = IO_OBJECT_NULL;
 	}
 	if (hook.hooked_vtable != 0) {
-		kernel_deallocate(hook.hooked_vtable, hook.vtable_size);
+		kernel_deallocate(hook.hooked_vtable, hook.vtable_size, false);
 		hook.hooked_vtable = 0;
 	}
 	if (hook.trap != 0) {
-		kernel_deallocate(hook.trap, sizeof(IOExternalTrap));
+		kernel_deallocate(hook.trap, sizeof(IOExternalTrap), false);
 		hook.trap = 0;
 	}
 }

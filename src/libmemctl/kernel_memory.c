@@ -88,12 +88,14 @@ kernel_allocate(kaddr_t *addr, size_t size) {
 	return true;
 }
 
-void
-kernel_deallocate(kaddr_t addr, size_t size) {
+bool
+kernel_deallocate(kaddr_t addr, size_t size, bool error) {
 	kern_return_t kr = mach_vm_deallocate(kernel_task, addr, size);
 	if (kr != KERN_SUCCESS) {
-		mach_unexpected(false, "mach_vm_deallocate", kr);
+		mach_unexpected(error, "mach_vm_deallocate", kr);
+		return !error;
 	}
+	return true;
 }
 
 /*

@@ -114,8 +114,13 @@ bool kernel_allocate(kaddr_t *address, size_t size);
  * Parameters:
  * 		address			The address of the allocated region.
  * 		size			The size of the region to deallocate.
+ * 		error			If deallocation fails, generate an error message and fail.
+ *
+ * Returns:
+ * 	True if no errors were encountered. If error is false, then this function always returns
+ * 	true.
  */
-void kernel_deallocate(kaddr_t address, size_t size);
+bool kernel_deallocate(kaddr_t address, size_t size, bool error);
 
 /*
  * kernel_read_word

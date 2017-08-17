@@ -893,7 +893,7 @@ fail:
 void
 kernel_call_deinit_aarch64() {
 	if (jop_payload != 0) {
-		kernel_deallocate(jop_payload, strategy->payload_size);
+		kernel_deallocate(jop_payload, strategy->payload_size, false);
 		jop_payload = 0;
 	}
 }

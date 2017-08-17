@@ -4,6 +4,25 @@
 #include "memctl/memctl_types.h"
 
 /*
+ * memctl_vmregion
+ *
+ * Description:
+ * 	Return the start address and size of the virtual memory region containing the specified
+ * 	address. If address is beyond the end of the last memory region, then true is returned
+ * 	without setting start or size.
+ *
+ * Parameters:
+ * 	out	start			On return, the start address. May be NULL.
+ * 	out	size			On return, the region size. May be NULL.
+ * 		address			The virtual memory address.
+ *
+ * Returns:
+ * 	True if the virtual memory region was found, or if the address is beyond the end of the
+ * 	last virtual memory region.
+ */
+bool memctl_vmregion(kaddr_t *start, size_t *size, kaddr_t address);
+
+/*
  * memctl_vmmap
  *
  * Description:

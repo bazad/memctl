@@ -3,11 +3,11 @@
 #include "error.h"
 #include "format.h"
 #include "initialize.h"
+#include "vmmap.h"
 
 #include "memctl/core.h"
 #include "memctl/kernel.h"
 
-#include <mach/mach_vm.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -91,42 +91,28 @@ kaddr_t range_default_virtual_end;
  */
 static bool
 range_default_init() {
-	kern_return_t kr;
 	if (range_default_virtual_start == 0) {
-		if (!initialize(KERNEL_TASK)) {
-			goto fail_0;
+		kaddr_t start = 0;
+		size_t size = 0;
+		if (!memctl_vmregion(&start, &size, start) || size == 0) {
+			goto fail;
 		}
-		mach_vm_address_t address = 0;
-		mach_vm_size_t size = 0;
-		struct vm_region_basic_info_64 info;
-		mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
-		mach_port_t object_name = MACH_PORT_NULL;
-		kr = mach_vm_region(kernel_task, &address, &size, VM_REGION_BASIC_INFO_64,
-				(vm_region_recurse_info_t) &info, &count, &object_name);
-		if (kr != KERN_SUCCESS) {
-			goto fail_1;
-		}
-		kaddr_t start = address;
+		kaddr_t end = start;
 		for (;;) {
-			address += size;
+			end += size;
 			size = 0;
-			count = VM_REGION_BASIC_INFO_COUNT_64;
-			object_name = MACH_PORT_NULL;
-			kr = mach_vm_region(kernel_task, &address, &size, VM_REGION_BASIC_INFO_64,
-					(vm_region_recurse_info_t) &info, &count, &object_name);
-			if (kr == KERN_INVALID_ADDRESS) {
+			if (!memctl_vmregion(&end, &size, end)) {
+				goto fail;
+			}
+			if (size == 0) {
 				range_default_virtual_start = start;
-				range_default_virtual_end   = address;
+				range_default_virtual_end   = end;
 				break;
-			} else if (kr != KERN_SUCCESS) {
-				goto fail_1;
 			}
 		}
 	}
 	return true;
-fail_1:
-	error_internal("mach_vm_region error: %s", mach_error_string(kr));
-fail_0:
+fail:
 	error_internal("could not initialize default address range");
 	return false;
 }
@@ -149,6 +135,24 @@ default_virtual_range(struct argrange *range) {
 	if (range->default_end) {
 		range->end = range_default_virtual_end;
 	}
+	return true;
+}
+
+/*
+ * vm_region_size
+ *
+ * Description:
+ * 	Try to get the size for a virtual memory region.
+ */
+static bool
+vm_region_size(size_t *size, kaddr_t address) {
+	kaddr_t vmaddress;
+	size_t vmsize;
+	if (!memctl_vmregion(&vmaddress, &vmsize, address)) {
+		error_internal("could not find region size for address "KADDR_XFMT, address);
+		return false;
+	}
+	*size = vmsize - (address - vmaddress);
 	return true;
 }
 
@@ -385,6 +389,24 @@ HANDLER(vmm_handler) {
 	return vmm_command(range.start, range.end, depth);
 }
 
+HANDLER(vma_handler) {
+	size_t size = ARG_GET_UINT(0, "size");
+	return vma_command(size);
+}
+
+HANDLER(vmd_handler) {
+	kaddr_t address = ARG_GET_ADDRESS(0, "address");
+	size_t size;
+	if (ARG_PRESENT(1, "size")) {
+		size = ARG_GET_UINT(1, "size");
+	} else {
+		if (!vm_region_size(&size, address)) {
+			return false;
+		}
+	}
+	return vmd_command(address, size);
+}
+
 HANDLER(vmp_handler) {
 	const char *protection = ARG_GET_STRING(0, "protection");
 	kaddr_t address        = ARG_GET_ADDRESS(1, "address");
@@ -603,6 +625,19 @@ static struct command commands[] = {
 			{ "d",      "depth", ARG_UINT,  "submap depth"             },
 			{ OPTIONAL, "range", ARG_RANGE, "kernel virtual addresses" },
 		},
+	}, {
+		"vma", "vm", vma_handler,
+		"allocate virtual memory (mach_vm_allocate)",
+		1, (struct argspec *) &(struct argspec[1]) {
+			{ ARGUMENT, "size", ARG_UINT, "number of bytes to allocate" },
+		}
+	}, {
+		"vmd", "vm", vmd_handler,
+		"deallocate virtual memory",
+		2, (struct argspec *) &(struct argspec[2]) {
+			{ ARGUMENT, "address", ARG_ADDRESS, "address to deallocate"         },
+			{ OPTIONAL, "size",    ARG_UINT,    "number of bytes to deallocate" },
+		}
 	}, {
 		"vmp", "vm", vmp_handler,
 		"set virtual memory protection",

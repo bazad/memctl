@@ -10,6 +10,35 @@
 #include <mach/mach_vm.h>
 #include <stdio.h>
 
+bool
+memctl_vmregion(kaddr_t *start, size_t *size, kaddr_t address) {
+	if (!initialize(KERNEL_TASK)) {
+		return false;
+	}
+	mach_vm_address_t vmaddress = address;
+	mach_vm_size_t vmsize = 0;
+	struct vm_region_basic_info_64 info;
+	mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+	mach_port_t object_name = MACH_PORT_NULL;
+	kern_return_t kr = mach_vm_region(kernel_task, &vmaddress, &vmsize,
+			VM_REGION_BASIC_INFO_64, (vm_region_recurse_info_t) &info, &count,
+			&object_name);
+	if (kr == KERN_INVALID_ADDRESS) {
+		return true;
+	}
+	if (kr != KERN_SUCCESS) {
+		error_internal("mach_vm_region error: %s", mach_error_string(kr));
+		return false;
+	}
+	if (start != NULL) {
+		*start = vmaddress;
+	}
+	if (size != NULL) {
+		*size = vmsize;
+	}
+	return true;
+}
+
 /*
  * share_mode_name
  *
