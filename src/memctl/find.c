@@ -1,6 +1,7 @@
 #include "find.h"
 
 #include "format.h"
+#include "initialize.h"
 
 #include "memctl/kernel_memory.h"
 #include "memctl/memctl_signal.h"
@@ -11,6 +12,10 @@
 bool
 memctl_find(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical, bool heap,
 		size_t access, size_t alignment) {
+	// Initialize the read function.
+	if (!initialize(KERNEL_MEMORY)) {
+		return false;
+	}
 	// Select the read function.
 	kernel_read_fn read;
 	if (physical) {

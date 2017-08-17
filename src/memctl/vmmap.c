@@ -2,6 +2,7 @@
 
 #include "error.h"
 #include "format.h"
+#include "initialize.h"
 
 #include "memctl/core.h"
 #include "memctl/memctl_signal.h"
@@ -32,6 +33,9 @@ share_mode_name(unsigned char share_mode) {
 
 bool
 memctl_vmmap(kaddr_t kaddr, kaddr_t end, uint32_t depth) {
+	if (!initialize(KERNEL_TASK)) {
+		return false;
+	}
 	for (bool first = true;; first = false) {
 		mach_vm_address_t address = kaddr;
 		mach_vm_size_t size = 0;
@@ -82,6 +86,9 @@ memctl_vmmap(kaddr_t kaddr, kaddr_t end, uint32_t depth) {
 
 bool
 memctl_vmprotect(kaddr_t address, size_t size, int prot) {
+	if (!initialize(KERNEL_TASK)) {
+		return false;
+	}
 	kern_return_t kr = mach_vm_protect(kernel_task, address, size, FALSE, prot);
 	if (kr != KERN_SUCCESS) {
 		error_internal("mach_vm_protect failed: %s", mach_error_string(kr));

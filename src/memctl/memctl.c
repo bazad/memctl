@@ -433,9 +433,6 @@ ws_command(kaddr_t address, const char *string, bool force, bool physical, size_
 bool
 f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool physical, bool heap,
 		size_t access, size_t alignment) {
-	if (!initialize(KERNEL_CALL | KERNEL_MEMORY)) {
-		return false;
-	}
 	return memctl_find(start, end, value, width, physical, heap, access, alignment);
 }
 
@@ -465,7 +462,7 @@ fc_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle
 	if (!success) {
 		return false;
 	}
-	return f_command(start, end, address, sizeof(address), false, true, access,
+	return memctl_find(start, end, address, sizeof(address), false, true, access,
 			sizeof(address));
 }
 
@@ -567,25 +564,16 @@ vt_command(const char *classname, const char *bundle_id) {
 
 bool
 vm_command(kaddr_t address, unsigned depth) {
-	if (!initialize(KERNEL_TASK)) {
-		return false;
-	}
 	return memctl_vmmap(address, address, depth);
 }
 
 bool
 vmm_command(kaddr_t start, kaddr_t end, unsigned depth) {
-	if (!initialize(KERNEL_TASK)) {
-		return false;
-	}
 	return memctl_vmmap(start, end, depth);
 }
 
 bool
 vmp_command(kaddr_t address, size_t length, int prot) {
-	if (!initialize(KERNEL_TASK)) {
-		return false;
-	}
 	if (!check_address(address, length, false)) {
 		return false;
 	}
