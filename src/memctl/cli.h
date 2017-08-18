@@ -30,6 +30,7 @@ bool kpm_command(kaddr_t start, kaddr_t end);
 bool zs_command(kaddr_t address);
 bool pca_command(kaddr_t address, bool is_virtual);
 bool vt_command(const char *classname, const char *bundle_id);
+bool vtl_command(kaddr_t address);
 bool vm_command(kaddr_t address, unsigned depth);
 bool vmm_command(kaddr_t start, kaddr_t end, unsigned depth);
 bool vma_command(size_t size);

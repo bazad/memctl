@@ -442,7 +442,7 @@ fpr_command(pid_t pid) {
 		return false;
 	}
 	if (proc_find == NULL) {
-		error_functionality_unavailable("proc_find unavailable");
+		error_api_unavailable("proc_find");
 		return false;
 	}
 	kaddr_t proc;
@@ -508,7 +508,7 @@ zs_command(kaddr_t address) {
 		return false;
 	}
 	if (zone_element_size == NULL) {
-		error_functionality_unavailable("zone_element_size unavailable");
+		error_api_unavailable("zone_element_size");
 		return false;
 	}
 	size_t size;
@@ -526,7 +526,7 @@ pca_command(kaddr_t address, bool is_virtual) {
 		return false;
 	}
 	if (pmap_cache_attributes == NULL) {
-		error_functionality_unavailable("pmap_cache_attributes unavailable");
+		error_api_unavailable("pmap_cache_attributes");
 		return false;
 	}
 	if (is_virtual) {
@@ -559,6 +559,24 @@ vt_command(const char *classname, const char *bundle_id) {
 		return false;
 	}
 	printf(KADDR_XFMT"  (%zu)\n", address, size);
+	return true;
+}
+
+bool
+vtl_command(kaddr_t address) {
+	if (!initialize(KERNEL_SYMBOLS)) {
+		return false;
+	}
+	char *class_name;
+	kext_result kr = vtable_lookup(address, &class_name);
+	if (kr == KEXT_NOT_FOUND) {
+		error_message("cannot find class for vtable "KADDR_XFMT, address);
+		return false;
+	} else if (kext_error(kr, NULL, NULL, address)) {
+		return false;
+	}
+	printf("%s\n", class_name);
+	free(class_name);
 	return true;
 }
 
@@ -680,16 +698,9 @@ s_command(kaddr_t address) {
 	if (!initialize(KERNEL_SYMBOLS)) {
 		return false;
 	}
-	char *bundle_id = NULL;
-	kext_result kr = kext_containing_address(address, &bundle_id);
-	if (kext_error(kr, NULL, NULL, address)) {
-		return false;
-	}
 	struct kext kext;
-	kr = kext_init(&kext, bundle_id);
-	bool is_error = kext_error(kr, bundle_id, NULL, 0);
-	free(bundle_id);
-	if (is_error) {
+	kext_result kr = kext_init_containing_address(&kext, address);
+	if (kext_error(kr, NULL, NULL, address)) {
 		return false;
 	}
 	const char *segname = NULL;
@@ -699,6 +710,7 @@ s_command(kaddr_t address) {
 	size_t size = 0;
 	size_t offset = 0;
 	kr = kext_resolve_address(&kext, address, &name, &size, &offset);
+	bool is_error = false;
 	if (kr == KEXT_SUCCESS && strlen(name) > 0 && offset < size) {
 		assert(segname != NULL);
 		if (offset == 0) {

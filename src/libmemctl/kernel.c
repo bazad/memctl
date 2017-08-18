@@ -275,6 +275,18 @@ fail:
 	return KEXT_ERROR;
 }
 
+kext_result
+kext_init_containing_address(struct kext *kext, kaddr_t address) {
+	char *bundle_id;
+	kext_result kr = kext_containing_address(address, &bundle_id);
+	if (kr != KEXT_SUCCESS) {
+		return kr;
+	}
+	kr = kext_init(kext, bundle_id);
+	free(bundle_id);
+	return kr;
+}
+
 void
 kext_deinit(struct kext *kext) {
 	if (kext->macho.mh == kernel.macho.mh) {
@@ -474,9 +486,15 @@ kext_resolve_address(const struct kext *kext, kaddr_t addr, const char **name, s
 			size, offset);
 	if (mr != MACHO_SUCCESS) {
 		if (mr == MACHO_NOT_FOUND) {
-			*name = NULL;
-			*size = 0;
-			*offset = addr - kext->base;
+			if (name != NULL) {
+				*name = NULL;
+			}
+			if (size != NULL) {
+				*size = 0;
+			}
+			if (offset != NULL) {
+				*offset = addr - kext->base;
+			}
 			return KEXT_NOT_FOUND;
 		}
 		assert(mr == MACHO_ERROR);
@@ -547,12 +565,12 @@ kext_for_each(kext_for_each_callback_fn callback, void *context) {
 }
 
 kext_result
-kext_containing_address(kaddr_t kaddr, char **bundle_id) {
+kext_containing_address(kaddr_t address, char **bundle_id) {
 #if KERNELCACHE
-	return kernelcache_find_containing_address(&kernelcache, kaddr - kernel_slide, bundle_id,
+	return kernelcache_find_containing_address(&kernelcache, address - kernel_slide, bundle_id,
 			NULL, NULL);
 #else
-	return oskext_find_containing_address(kaddr, bundle_id, NULL, NULL);
+	return oskext_find_containing_address(address, bundle_id, NULL, NULL);
 #endif
 }
 

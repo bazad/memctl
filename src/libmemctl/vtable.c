@@ -19,20 +19,68 @@
 #define VTABLE_FOR_CLASS_DISASSEMBLE 1
 #endif
 
+// The adjustment between the vtable symbol and the actual vtable.
+#define VTABLE_ADJUSTMENT (2 * sizeof(kword_t))
+
+// The size of a buffer for a vtable symbol.
+#define VTABLE_SYMBOL_BUFFER_SIZE(class_name)	(strlen(class_name) + 32)
+
 /*
  * vtable_symbol
  *
  * Description:
- * 	Generate the symbol name for the vtable of the specified class.
+ * 	Generate the symbol name for the vtable of the specified class. The symbol buffer must be
+ * 	of size VTABLE_SYMBOL_BUFFER_SIZE(class_name).
  */
-static char *
-vtable_symbol(const char *class_name) {
-	char *symbol;
-	asprintf(&symbol, "__ZTV%zu%s", strlen(class_name), class_name);
-	if (symbol == NULL) {
-		error_out_of_memory();
+static void
+vtable_symbol(const char *class_name, char *symbol) {
+	sprintf(symbol, "__ZTV%zu%s", strlen(class_name), class_name);
+}
+
+/*
+ * class_name_from_vtable_symbol
+ *
+ * Description:
+ * 	Extract the class name from the vtable symbol.
+ *
+ * Note:
+ * 	This does not handle embedded classes.
+ */
+static const char *
+class_name_from_vtable_symbol(const char *symbol) {
+	// Check that the string begins with the right mangled prefix.
+	const char *prefix = "__ZTV";
+	unsigned length = strlen(prefix);
+	if (strncmp(symbol, prefix, length) != 0) {
+		return NULL;
 	}
-	return symbol;
+	symbol += length;
+	// Parse out the length specifier.
+	if (*symbol == '0') {
+		return NULL;
+	}
+	length = 0;
+	for (;;) {
+		char ch = *symbol;
+		if (ch < '0' || ch > '9') {
+			break;
+		}
+		unsigned newlength = length * 10 + (ch - '0');
+		if (newlength < length) {
+			return NULL;
+		}
+		length = newlength;
+		symbol++;
+	}
+	if (length == 0) {
+		return NULL;
+	}
+	// Check that the class name is actually the specified length.
+	const char *classname = symbol;
+	if (strlen(classname) != length) {
+		return NULL;
+	}
+	return classname;
 }
 
 /*
@@ -43,9 +91,9 @@ vtable_symbol(const char *class_name) {
  */
 static void
 adjust_vtable_from_symbol(kaddr_t *vtable, size_t *size) {
-	*vtable += 2 * sizeof(kword_t);
+	*vtable += VTABLE_ADJUSTMENT;
 	if (size != NULL) {
-		*size -= 2 * sizeof(kword_t);
+		*size -= VTABLE_ADJUSTMENT;
 	}
 }
 
@@ -386,13 +434,10 @@ static kext_result
 vtable_for_class_symbol(const char *class_name, const char *bundle_id, kaddr_t *vtable,
 		size_t *size) {
 	// Generate the vtable symbol.
-	char *symbol = vtable_symbol(class_name);
-	if (symbol == NULL) {
-		return KEXT_ERROR;
-	}
+	char symbol[VTABLE_SYMBOL_BUFFER_SIZE(class_name)];
+	vtable_symbol(class_name, symbol);
 	// Search all the kexts.
 	kext_result kr = resolve_symbol(bundle_id, symbol, vtable, size);
-	free(symbol);
 	if (kr == KEXT_SUCCESS) {
 		adjust_vtable_from_symbol(vtable, size);
 	}
@@ -407,5 +452,43 @@ vtable_for_class(const char *class_name, const char *bundle_id, kaddr_t *vtable,
 		kr = vtable_for_class_disassemble(class_name, bundle_id, vtable, size);
 	}
 #endif
+	return kr;
+}
+
+// TODO: Do disassembly lookup for AArch64.
+kext_result
+vtable_lookup(kaddr_t vtable, char **class_name) {
+	// Resolve the vtable address into a symbol.
+	struct kext kext;
+	kext_result kr = kext_init_containing_address(&kext, vtable);
+	if (kr != KEXT_SUCCESS) {
+		goto fail_0;
+	}
+	const char *symbol;
+	size_t offset;
+	kr = kext_resolve_address(&kext, vtable, &symbol, NULL, &offset);
+	if (kr != KEXT_SUCCESS) {
+		goto fail_1;
+	}
+	// Check that the offset is the expected vtable offset.
+	if (offset != VTABLE_ADJUSTMENT) {
+		kr = KEXT_NOT_FOUND;
+		goto fail_1;
+	}
+	// Get the class name from the vtable symbol.
+	const char *classname = class_name_from_vtable_symbol(symbol);
+	if (classname == NULL) {
+		kr = KEXT_NOT_FOUND;
+		goto fail_1;
+	}
+	*class_name = strdup(classname);
+	if (*class_name == NULL) {
+		error_out_of_memory();
+		kr = KEXT_ERROR;
+		goto fail_1;
+	}
+fail_1:
+	kext_deinit(&kext);
+fail_0:
 	return kr;
 }

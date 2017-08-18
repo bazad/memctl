@@ -361,11 +361,17 @@ macho_resolve_address(const struct macho *macho, const struct symtab_command *sy
 		macho_error("symbol index %d has no section", symidx);
 		return MACHO_ERROR;
 	}
-	uint64_t sym_strx = MACHO_STRUCT_FIELD(macho, struct nlist, sym, n_un.n_strx);
-	*name = (const char *)((uintptr_t)macho->mh + symtab->stroff + sym_strx);
-	uint64_t next_addr = macho_next_symbol(macho, symtab, sym_addr);
-	*size = guess_symbol_size(macho, sym_addr, next_addr);
-	*offset = addr - sym_addr;
+	if (name != NULL) {
+		uint64_t sym_strx = MACHO_STRUCT_FIELD(macho, struct nlist, sym, n_un.n_strx);
+		*name = (const char *)((uintptr_t)macho->mh + symtab->stroff + sym_strx);
+	}
+	if (size != NULL) {
+		uint64_t next_addr = macho_next_symbol(macho, symtab, sym_addr);
+		*size = guess_symbol_size(macho, sym_addr, next_addr);
+	}
+	if (offset != NULL) {
+		*offset = addr - sym_addr;
+	}
 	return MACHO_SUCCESS;
 }
 

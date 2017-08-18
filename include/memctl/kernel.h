@@ -173,6 +173,26 @@ kext_result kext_find_base(struct macho *macho, const char *bundle_id, kaddr_t *
 kext_result kext_init(struct kext *kext, const char *bundle_id);
 
 /*
+ * kext_init_containing_address
+ *
+ * Description:
+ * 	Find the kext that contains the given address and initialize the kext struct.
+ *
+ * Parameters:
+ * 	out	kext			The kext struct.
+ * 		address			The address to search for.
+ *
+ * Returns:
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_NO_KEXT			No kernel extension contains the given address.
+ * 	KEXT_ERROR			An error was encountered.
+ *
+ * Dependencies:
+ * 	kernel_slide
+ */
+kext_result kext_init_containing_address(struct kext *kext, kaddr_t address);
+
+/*
  * kext_deinit
  *
  * Description:
@@ -242,7 +262,9 @@ bool kext_add_symbol_finder(const char *bundle_id, kext_find_symbol_fn find_symb
  * 	out	size			A guess of the size of the symbol.
  *
  * Returns:
- * 	KEXT_SUCCESS, KEXT_ERROR, or KEXT_NOT_FOUND.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_NOT_FOUND			The symbol was not found.
+ * 	KEXT_ERROR			An error was encountered.
  */
 kext_result kext_find_symbol(const struct kext *kext, const char *symbol,
 		kaddr_t *addr, size_t *size);
@@ -261,7 +283,9 @@ kext_result kext_find_symbol(const struct kext *kext, const char *symbol,
  * 	out	size			A guess of the size of the symbol.
  *
  * Returns:
- * 	KEXT_SUCCESS, KEXT_ERROR, or KEXT_NOT_FOUND.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_NOT_FOUND			The symbol was not found.
+ * 	KEXT_ERROR			An error was encountered.
  */
 kext_result kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr,
 		size_t *size);
@@ -276,13 +300,15 @@ kext_result kext_resolve_symbol(const struct kext *kext, const char *symbol, kad
  * 		kext			The kernel extension to search.
  * 		addr			The address to resolve.
  * 	out	name			The name of the symbol. Not valid after the kext's macho
- * 					struct has been deinitialized.
- * 	out	size			A guess of the size of the symbol.
+ * 					struct has been deinitialized. May be NULL.
+ * 	out	size			A guess of the size of the symbol. May be NULL.
  * 	out	offset			The offset from the start of the symbol to the given
- * 					address.
+ * 					address. May be NULL.
  *
  * Returns:
- * 	A kext_result code.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_NOT_FOUND			The symbol for the address could not be found.
+ * 	KEXT_ERROR			An error was encountered.
  */
 kext_result kext_resolve_address(const struct kext *kext, kaddr_t addr, const char **name,
 		size_t *size, size_t *offset);
@@ -360,17 +386,19 @@ bool kext_for_each(kext_for_each_callback_fn callback, void *context);
  * 	Get the bundle ID of the kernel extension that contains the specified address.
  *
  * Parameters:
- * 		kaddr			The kernel address.
+ * 		address			The kernel address.
  * 	out	bundle_id		The bundle ID of the kext containing the address, or NULL.
  * 					The bundle ID should be freed when no longer needed.
  *
  * Returns:
- * 	A kext_result code.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_NO_KEXT			No kernel extension contains the given address.
+ * 	KEXT_ERROR			An error was encountered.
  *
  * Dependencies:
  * 	kernel_slide
  */
-kext_result kext_containing_address(kaddr_t kaddr, char **bundle_id);
+kext_result kext_containing_address(kaddr_t address, char **bundle_id);
 
 /*
  * kext_id_find_symbol

@@ -377,6 +377,11 @@ HANDLER(vt_handler) {
 	return vt_command(classname, bundle_id);
 }
 
+HANDLER(vtl_handler) {
+	kaddr_t address = ARG_GET_ADDRESS(0, "address");
+	return vtl_command(address);
+}
+
 HANDLER(vm_handler) {
 	unsigned depth  = OPT_GET_UINT_OR(0, "d", "depth", 2048);
 	kaddr_t address = ARG_GET_ADDRESS(1, "address");
@@ -610,6 +615,12 @@ static struct command commands[] = {
 			{ "b",      "kext",  ARG_STRING, "The bundle ID of the kext defining the class" },
 			{ "k",      NULL,    ARG_NONE,   "The class is defined in the kernel"           },
 			{ ARGUMENT, "class", ARG_STRING, "The C++ class name"                           },
+		},
+	}, {
+		"vtl", "vt", vtl_handler,
+		"Look up the class name for a vtable",
+		1, (struct argspec *) &(struct argspec[1]) {
+			{ ARGUMENT, "address", ARG_ADDRESS, "The vtable address" },
 		},
 	}, {
 		"vm", NULL, vm_handler,

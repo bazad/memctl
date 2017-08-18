@@ -267,10 +267,10 @@ size_t macho_guess_symbol_size(const struct macho *macho, const struct symtab_co
  * 		macho			The macho struct.
  * 		symtab			The Mach-O symtab command.
  * 		addr			The address to resolve.
- * 	out	name			The symbol name.
+ * 	out	name			The symbol name. May be NULL.
  * 	out	size			A guess of the size of the symbol. See
- * 					macho_resolve_symbol.
- * 	out	offset			The offset of addr into the symbol.
+ * 					macho_resolve_symbol. May be NULL.
+ * 	out	offset			The offset of addr into the symbol. May be NULL.
  *
  * Returns:
  * 	A macho_result status code.

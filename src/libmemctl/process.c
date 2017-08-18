@@ -70,7 +70,7 @@ proc_pids_find_path(const char *path, pid_t *pids, size_t *count) {
 	int capacity = proc_listallpids(NULL, 0);
 	if (capacity <= 0) {
 fail_0:
-		error_functionality_unavailable("proc_listallpids fails");
+		error_api_unavailable("proc_listallpids");
 		return false;
 	}
 	capacity += 10;
