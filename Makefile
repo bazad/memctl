@@ -41,7 +41,7 @@ MEMCTL_DIR        = memctl
 # Flags.
 
 ERRFLAGS   = -Wall -Wpedantic -Wno-gnu -Werror
-CFLAGS     = -g -O0 -I$(INC_DIR) $(ERRFLAGS)
+CFLAGS     = -g -O2 -I$(INC_DIR) $(ERRFLAGS)
 LDFLAGS    = -g -lcompression
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
