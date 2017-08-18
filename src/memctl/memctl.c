@@ -467,6 +467,14 @@ fc_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle
 }
 
 bool
+lc_command(kaddr_t address) {
+	kaddr_t vtable;
+	size_t size = sizeof(vtable);
+	return read_kernel(address, &size, &vtable, 0, 0)
+		&& vtl_command(vtable);
+}
+
+bool
 kp_command(kaddr_t address) {
 	if (!initialize(KERNEL_MEMORY)) {
 		return false;
@@ -569,7 +577,10 @@ vtl_command(kaddr_t address) {
 	}
 	char *class_name;
 	kext_result kr = vtable_lookup(address, &class_name);
-	if (kr == KEXT_NOT_FOUND) {
+	if (kr == KEXT_NO_KEXT) {
+		error_message("address "KADDR_XFMT" is not a vtable", address);
+		return false;
+	} else if (kr == KEXT_NOT_FOUND) {
 		error_message("cannot find class for vtable "KADDR_XFMT, address);
 		return false;
 	} else if (kext_error(kr, NULL, NULL, address)) {
