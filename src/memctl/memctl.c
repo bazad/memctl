@@ -503,7 +503,7 @@ kpm_command(kaddr_t start, kaddr_t end) {
 }
 
 bool
-kz_command(kaddr_t address) {
+zs_command(kaddr_t address) {
 	if (!initialize(KERNEL_MEMORY)) {
 		return false;
 	}

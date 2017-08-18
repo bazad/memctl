@@ -352,9 +352,9 @@ HANDLER(kpm_handler) {
 	return kpm_command(range.start, range.end);
 }
 
-HANDLER(kz_handler) {
+HANDLER(zs_handler) {
 	kaddr_t address = ARG_GET_ADDRESS(0, "address");
-	return kz_command(address);
+	return zs_command(address);
 }
 
 HANDLER(pca_handler) {
@@ -465,233 +465,233 @@ HANDLER(quit_handler) {
 static struct command commands[] = {
 	{
 		"i", NULL, i_handler,
-		"print system information",
+		"Print system information",
 		0, NULL,
 	}, {
 		"r", NULL, r_handler,
-		"read kernel memory",
+		"Read and print formatted memory",
 		7, (struct argspec *) &(struct argspec[7]) {
-			{ "",       "width",   ARG_WIDTH,   "display width"               },
-			{ "d",      NULL,      ARG_NONE,    "use dump format"             },
-			{ "f",      NULL,      ARG_NONE,    "force read (unsafe)"         },
-			{ "p",      NULL,      ARG_NONE,    "read physical memory"        },
-			{ "x",      "access",  ARG_WIDTH,   "memory access width"         },
-			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"         },
-			{ OPTIONAL, "length",  ARG_UINT,    "the number of bytes to read" },
+			{ "",       "width",   ARG_WIDTH,   "The width to display each value" },
+			{ "d",      NULL,      ARG_NONE,    "Use dump format with ASCII"      },
+			{ "f",      NULL,      ARG_NONE,    "Force read (unsafe)"             },
+			{ "p",      NULL,      ARG_NONE,    "Read physical memory"            },
+			{ "x",      "access",  ARG_WIDTH,   "The memory access width"         },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to read"             },
+			{ OPTIONAL, "length",  ARG_UINT,    "The number of bytes to read"     },
 		},
 	}, {
 		"rb", "r", rb_handler,
-		"read raw binary data",
+		"Print raw binary data from memory",
 		5, (struct argspec *) &(struct argspec[5]) {
-			{ "f",      NULL,      ARG_NONE,    "force read (unsafe)"         },
-			{ "p",      NULL,      ARG_NONE,    "read physical memory"        },
-			{ "x",      "access",  ARG_WIDTH,   "memory access width"         },
-			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"         },
-			{ ARGUMENT, "length",  ARG_UINT,    "the number of bytes to read" },
+			{ "f",      NULL,      ARG_NONE,    "Force read (unsafe)"         },
+			{ "p",      NULL,      ARG_NONE,    "Read physical memory"        },
+			{ "x",      "access",  ARG_WIDTH,   "The memory access width"     },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to read"         },
+			{ ARGUMENT, "length",  ARG_UINT,    "The number of bytes to read" },
 		},
 #if MEMCTL_DISASSEMBLY
 	}, {
 		"ri", "r", ri_handler,
-		"read instructions (disassemble)",
+		"Disassemble kernel memory",
 		5, (struct argspec *) &(struct argspec[5]) {
-			{ "f",      NULL,      ARG_NONE,    "force read (unsafe)"                },
-			{ "p",      NULL,      ARG_NONE,    "read physical memory"               },
-			{ "x",      "access",  ARG_WIDTH,   "memory access width"                },
-			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"                },
-			{ ARGUMENT, "length",  ARG_UINT,    "the number of bytes to disassemble" },
+			{ "f",      NULL,      ARG_NONE,    "Force read (unsafe)"                },
+			{ "p",      NULL,      ARG_NONE,    "Read physical memory"               },
+			{ "x",      "access",  ARG_WIDTH,   "The memory access width"            },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to read"                },
+			{ ARGUMENT, "length",  ARG_UINT,    "The number of bytes to disassemble" },
 		},
 	}, {
 		"rif", "ri", rif_handler,
-		"disassemble function",
+		"Disassemble a function",
 		3, (struct argspec *) &(struct argspec[3]) {
-			{ "f",      NULL,       ARG_NONE,   "force read (unsafe)"         },
-			{ "x",      "access",   ARG_WIDTH,  "memory access width"         },
-			{ ARGUMENT, "function", ARG_SYMBOL, "the function to disassemble" },
+			{ "f",      NULL,       ARG_NONE,   "Force read (unsafe)"         },
+			{ "x",      "access",   ARG_WIDTH,  "The memory access width"     },
+			{ ARGUMENT, "function", ARG_SYMBOL, "The function to disassemble" },
 		},
 #endif // MEMCTL_DISASSEMBLY
 	}, {
 		"rs", "r", rs_handler,
-		"read string",
+		"Read a string from memory",
 		5, (struct argspec *) &(struct argspec[5]) {
-			{ "f",      NULL,      ARG_NONE,    "force read (unsafe)"   },
-			{ "p",      NULL,      ARG_NONE,    "read physical memory"  },
-			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
-			{ ARGUMENT, "address", ARG_ADDRESS, "the address to read"   },
-			{ OPTIONAL, "length",  ARG_UINT,    "maximum string length" },
+			{ "f",      NULL,      ARG_NONE,    "Force read (unsafe)"       },
+			{ "p",      NULL,      ARG_NONE,    "Read physical memory"      },
+			{ "x",      "access",  ARG_WIDTH,   "The memory access width"   },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to read"       },
+			{ OPTIONAL, "length",  ARG_UINT,    "The maximum string length" },
 		},
 	}, {
 		"w", NULL, w_handler,
-		"write memory",
+		"Write an integer to memory",
 		6, (struct argspec *) &(struct argspec[6]) {
-			{ "",       "width",   ARG_WIDTH,   "value width"           },
-			{ "f",      NULL,      ARG_NONE,    "force write (unsafe)"  },
-			{ "p",      NULL,      ARG_NONE,    "write physical memory" },
-			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
-			{ ARGUMENT, "address", ARG_ADDRESS, "the address to write"  },
-			{ ARGUMENT, "value",   ARG_UINT,    "the value to write"    },
+			{ "",       "width",   ARG_WIDTH,   "The width of the value"  },
+			{ "f",      NULL,      ARG_NONE,    "Force write (unsafe)"    },
+			{ "p",      NULL,      ARG_NONE,    "Write physical memory"   },
+			{ "x",      "access",  ARG_WIDTH,   "The memory access width" },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to write"    },
+			{ ARGUMENT, "value",   ARG_UINT,    "The value to write"      },
 		},
 	}, {
 		"wd", "w", wd_handler,
-		"write data to memory",
+		"Write arbitrary data to memory",
 		5, (struct argspec *) &(struct argspec[5]) {
-			{ "f",      NULL,      ARG_NONE,    "force write (unsafe)"  },
-			{ "p",      NULL,      ARG_NONE,    "write physical memory" },
-			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
-			{ ARGUMENT, "address", ARG_ADDRESS, "the address to write"  },
-			{ ARGUMENT, "data",    ARG_DATA,    "the data to write"     },
+			{ "f",      NULL,      ARG_NONE,    "Force write (unsafe)"    },
+			{ "p",      NULL,      ARG_NONE,    "Write physical memory"   },
+			{ "x",      "access",  ARG_WIDTH,   "The memory access width" },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to write"    },
+			{ ARGUMENT, "data",    ARG_DATA,    "The data to write"       },
 		},
 	}, {
 		"ws", "w", ws_handler,
-		"write string to memory",
+		"Write a string to memory",
 		5, (struct argspec *) &(struct argspec[5]) {
-			{ "f",      NULL,      ARG_NONE,    "force write (unsafe)"  },
-			{ "p",      NULL,      ARG_NONE,    "write physical memory" },
-			{ "x",      "access",  ARG_WIDTH,   "memory access width"   },
-			{ ARGUMENT, "address", ARG_ADDRESS, "the address to write"  },
-			{ ARGUMENT, "string",  ARG_STRING,  "the string to write"   },
+			{ "f",      NULL,      ARG_NONE,    "Force write (unsafe)"    },
+			{ "p",      NULL,      ARG_NONE,    "Write physical memory"   },
+			{ "x",      "access",  ARG_WIDTH,   "The memory access width" },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to write"    },
+			{ ARGUMENT, "string",  ARG_STRING,  "The string to write"     },
 		},
 	}, {
 		"f", NULL, f_handler,
-		"find in memory",
+		"Find an integer in memory",
 		7, (struct argspec *) &(struct argspec[7]) {
-			{ "",       "width",  ARG_WIDTH, "value width"                 },
-			{ "p",      NULL,     ARG_NONE,  "search physical memory"      },
-			{ "h",      NULL,     ARG_NONE,  "search heap memory"          },
-			{ "a",      "align",  ARG_WIDTH, "search alignment"            },
-			{ "x",      "access", ARG_WIDTH, "memory access width"         },
-			{ ARGUMENT, "range",  ARG_RANGE, "the address range to search" },
-			{ ARGUMENT, "value",  ARG_UINT,  "the value to find"           },
+			{ "",       "width",  ARG_WIDTH, "The width of the value"      },
+			{ "p",      NULL,     ARG_NONE,  "Search physical memory"      },
+			{ "h",      NULL,     ARG_NONE,  "Search heap memory"          },
+			{ "a",      "align",  ARG_WIDTH, "The alignment of the value"  },
+			{ "x",      "access", ARG_WIDTH, "The memory access width"     },
+			{ ARGUMENT, "range",  ARG_RANGE, "The address range to search" },
+			{ ARGUMENT, "value",  ARG_UINT,  "The value to find"           },
 		},
 	}, {
 		"fpr", "f", fpr_handler,
-		"find proc struct",
+		"Find the proc struct for a process",
 		1, (struct argspec *) &(struct argspec[1]) {
-			{ ARGUMENT, "pid", ARG_INT, "pid of process" },
+			{ ARGUMENT, "pid", ARG_INT, "The pid of the process" },
 		},
 	}, {
 		"fc", "f", fc_handler,
-		"find instances of C++ class",
+		"Find instances of a C++ class",
 		5, (struct argspec *) &(struct argspec[5]) {
-			{ "b",      "kext",   ARG_STRING, "bundle ID of kext defining class" },
-			{ "k",      NULL,     ARG_NONE,   "class defined in kernel"          },
-			{ "x",      "access", ARG_WIDTH,  "memory access width"              },
-			{ ARGUMENT, "range",  ARG_RANGE,  "the address range to search"      },
-			{ ARGUMENT, "class",  ARG_STRING, "C++ class name"                   },
+			{ "b",      "kext",   ARG_STRING, "The bundle ID of the kext defining the class" },
+			{ "k",      NULL,     ARG_NONE,   "The class is defined in the kernel"           },
+			{ "x",      "access", ARG_WIDTH,  "The memory access width"                      },
+			{ ARGUMENT, "range",  ARG_RANGE,  "The address range to search"                  },
+			{ ARGUMENT, "class",  ARG_STRING, "The C++ class name"                           },
 		},
 	}, {
 		"kp", NULL, kp_handler,
-		"translate to physical address",
+		"Translate virtual to physical address",
 		1, (struct argspec *) &(struct argspec[1]) {
-			{ ARGUMENT, "address", ARG_ADDRESS, "kernel virtual address" },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The kernel virtual address" },
 		},
 	}, {
 		"kpm", "kp", kpm_handler,
-		"map to physical pages",
+		"Print virtual to physical address map",
 		1, (struct argspec *) &(struct argspec[1]) {
-			{ ARGUMENT, "range", ARG_RANGE, "range of virtual addresses" },
+			{ ARGUMENT, "range", ARG_RANGE, "The range of virtual addresses" },
 		},
 	}, {
-		"kz", NULL, kz_handler,
-		"get size of kalloc memory",
+		"zs", NULL, zs_handler,
+		"Get zalloc memory size",
 		1, (struct argspec *) &(struct argspec[1]) {
-			{ ARGUMENT, "address", ARG_ADDRESS, "kalloc address" },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The virtual address" },
 		},
 	}, {
 		"pca", NULL, pca_handler,
-		"show physical cache attributes",
+		"Show physical cache attributes",
 		2, (struct argspec *) &(struct argspec[2]) {
-			{ "v",      NULL,      ARG_NONE,    "use a virtual address"       },
-			{ ARGUMENT, "address", ARG_ADDRESS, "physical or virtual address" },
+			{ "v",      NULL,      ARG_NONE,    "Use a virtual address"           },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The physical or virtual address" },
 		},
 	}, {
 		"vt", NULL, vt_handler,
-		"vtable address of C++ class",
+		"Find the vtable of a C++ class",
 		3, (struct argspec *) &(struct argspec[3]) {
-			{ "b",      "kext",  ARG_STRING, "bundle ID of kext defining class" },
-			{ "k",      NULL,    ARG_NONE,   "class defined in kernel"          },
-			{ ARGUMENT, "class", ARG_STRING, "C++ class name"                   },
+			{ "b",      "kext",  ARG_STRING, "The bundle ID of the kext defining the class" },
+			{ "k",      NULL,    ARG_NONE,   "The class is defined in the kernel"           },
+			{ ARGUMENT, "class", ARG_STRING, "The C++ class name"                           },
 		},
 	}, {
 		"vm", NULL, vm_handler,
-		"show virtual memory info",
+		"Show virtual memory information",
 		2, (struct argspec *) &(struct argspec[2]) {
-			{ "d",      "depth",   ARG_UINT,    "submap depth"           },
-			{ ARGUMENT, "address", ARG_ADDRESS, "kernel virtual address" },
+			{ "d",      "depth",   ARG_UINT,    "The maximum submap depth" },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The virtual address"      },
 		},
 	}, {
 		"vmm", "vm", vmm_handler,
-		"show virtual memory info",
+		"Show virtual memory information for range",
 		2, (struct argspec *) &(struct argspec[2]) {
-			{ "d",      "depth", ARG_UINT,  "submap depth"             },
-			{ OPTIONAL, "range", ARG_RANGE, "kernel virtual addresses" },
+			{ "d",      "depth", ARG_UINT,  "The maximum submap depth"       },
+			{ OPTIONAL, "range", ARG_RANGE, "The range of virtual addresses" },
 		},
 	}, {
 		"vma", "vm", vma_handler,
-		"allocate virtual memory (mach_vm_allocate)",
+		"Allocate virtual memory (mach_vm_allocate)",
 		1, (struct argspec *) &(struct argspec[1]) {
-			{ ARGUMENT, "size", ARG_UINT, "number of bytes to allocate" },
+			{ ARGUMENT, "size", ARG_UINT, "The number of bytes to allocate" },
 		}
 	}, {
 		"vmd", "vm", vmd_handler,
-		"deallocate virtual memory",
+		"Deallocate virtual memory",
 		2, (struct argspec *) &(struct argspec[2]) {
-			{ ARGUMENT, "address", ARG_ADDRESS, "address to deallocate"         },
-			{ OPTIONAL, "size",    ARG_UINT,    "number of bytes to deallocate" },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to deallocate"         },
+			{ OPTIONAL, "size",    ARG_UINT,    "The number of bytes to deallocate" },
 		}
 	}, {
 		"vmp", "vm", vmp_handler,
-		"set virtual memory protection",
+		"Set virtual memory protection",
 		3, (struct argspec *) &(struct argspec[3]) {
-			{ ARGUMENT, "protection", ARG_STRING,  "protection"         },
-			{ ARGUMENT, "address",    ARG_ADDRESS, "address to protect" },
-			{ OPTIONAL, "length",     ARG_UINT,    "length of region"   },
+			{ ARGUMENT, "protection", ARG_STRING,  "The new virtual memory protection (e.g. 'r-x')" },
+			{ ARGUMENT, "address",    ARG_ADDRESS, "The address to protect"                         },
+			{ OPTIONAL, "length",     ARG_UINT,    "The length of the region"                       },
 		},
 	}, {
 		"ks", NULL, ks_handler,
-		"kernel slide",
+		"Kernel slide",
 		2, (struct argspec *) &(struct argspec[2]) {
-			{ "u",      NULL,      ARG_NONE,    "unslide" },
-			{ OPTIONAL, "address", ARG_ADDRESS, "address" },
+			{ "u",      NULL,      ARG_NONE,    "Unslide the address"  },
+			{ OPTIONAL, "address", ARG_ADDRESS, "The address to slide" },
 		},
 	}, {
 		"a", NULL, a_handler,
-		"address of symbol",
+		"Find the address of a symbol",
 		1, (struct argspec *) &(struct argspec[1]) {
-			{ ARGUMENT, "symbol", ARG_SYMBOL, "symbol to resolve" },
+			{ ARGUMENT, "symbol", ARG_SYMBOL, "The symbol to resolve" },
 		},
 	}, {
 		"ap", "a", ap_handler,
-		"address permutation",
+		"Address permutation",
 		2, (struct argspec *) &(struct argspec[2]) {
-			{ "u",      NULL,      ARG_NONE,    "unpermute" },
-			{ OPTIONAL, "address", ARG_ADDRESS, "address"   },
+			{ "u",      NULL,      ARG_NONE,    "Unpermute the address"  },
+			{ OPTIONAL, "address", ARG_ADDRESS, "The address to permute" },
 		},
 	}, {
 		"s", NULL, s_handler,
-		"symbol for address",
+		"Find the symbol for an address",
 		1, (struct argspec *) &(struct argspec[1]) {
-			{ ARGUMENT, "address", ARG_ADDRESS, "address to resolve" },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to resolve" },
 		},
 	}, {
 		"kcd", NULL, kcd_handler,
-		"kernelcache decompress",
+		"Decompress a kernelcache",
 		2, (struct argspec *) &(struct argspec[2]) {
-			{ "o",      "output", ARG_STRING, "output file"      },
+			{ "o",      "output", ARG_STRING, "The output file"      },
 #if KERNELCACHE
-			{ OPTIONAL, "file",   ARG_STRING, "kernelcache file" },
+			{ OPTIONAL, "file",   ARG_STRING, "The kernelcache file" },
 #else
-			{ ARGUMENT, "file",   ARG_STRING, "kernelcache file" },
+			{ ARGUMENT, "file",   ARG_STRING, "The kernelcache file" },
 #endif
 		},
 	}, {
 		"root", NULL, root_handler,
-		"exec a root shell",
+		"Exec a root shell",
 		0, NULL,
 	}
 #if MEMCTL_REPL
 	, {
 		"quit", NULL, quit_handler,
-		"exit the REPL",
+		"Exit the REPL",
 		0, NULL,
 	}
 #endif

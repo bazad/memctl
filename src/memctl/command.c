@@ -202,13 +202,14 @@ help_all() {
 		}
 	}
 	// Print the usage strings.
-	char *buf = malloc(usage_length + 1);
+	usage_length += 1;
+	char *buf = malloc(usage_length);
 	if (buf == NULL) {
 		error_out_of_memory();
 		return false;
 	}
 	for (c = cli.commands; c < end; c++) {
-		write_command_usage_oneline(c, buf, usage_length + 1);
+		write_command_usage_oneline(c, buf, usage_length);
 		fprintf(stderr, "%-*s %s\n", (int)usage_length, buf, c->description);
 	}
 	free(buf);
@@ -245,7 +246,8 @@ help_command(const struct command *command) {
 		}
 	}
 	// Print out the options and arguments.
-	buf = malloc(argspec_length + 1);
+	argspec_length += 1;
+	buf = malloc(argspec_length);
 	if (buf == NULL) {
 		error_out_of_memory();
 		goto fail;
@@ -262,7 +264,7 @@ help_command(const struct command *command) {
 			printed_arguments = true;
 		}
 		// Print out details for this option or argument.
-		write_argspec_usage_oneline(s, buf, argspec_length + 1);
+		write_argspec_usage_oneline(s, buf, argspec_length);
 		fprintf(stderr, "    %-*s %s\n", (int)argspec_length, buf, s->description);
 	}
 	fprintf(stderr, "\n");

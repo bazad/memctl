@@ -27,7 +27,7 @@ bool fc_command(kaddr_t start, kaddr_t end, const char *classname, const char *b
 		size_t access);
 bool kp_command(kaddr_t address);
 bool kpm_command(kaddr_t start, kaddr_t end);
-bool kz_command(kaddr_t address);
+bool zs_command(kaddr_t address);
 bool pca_command(kaddr_t address, bool is_virtual);
 bool vt_command(const char *classname, const char *bundle_id);
 bool vm_command(kaddr_t address, unsigned depth);
