@@ -299,13 +299,16 @@ HANDLER(f_handler) {
 	bool heap             = OPT_PRESENT(2, "h");
 	size_t alignment      = OPT_GET_WIDTH_OR(3, "a", "align", width);
 	size_t access         = OPT_GET_WIDTH_OR(4, "x", "access", 0);
-	struct argrange range = ARG_GET_RANGE(5, "range");
-	kword_t value         = ARG_GET_UINT(6, "value");
+	kword_t value         = ARG_GET_UINT(5, "value");
+	struct argrange range = ARG_GET_RANGE_OR(6, "range", 0, -1);
 	if (physical && heap) {
 		error_usage("f", NULL, "p and h options are mutually exclusive");
 		return false;
 	}
 	if (!heap && !physical) {
+		// memctl_find internally uses kernel_read_all, which does not skip regions just
+		// because they are not listed in the virtual memory map. If we don't truncate the
+		// range appropriately, the find will take a long time.
 		if (!default_virtual_range(&range)) {
 			return false;
 		}
@@ -327,8 +330,8 @@ HANDLER(fc_handler) {
 	const char *bundle_id = OPT_GET_STRING_OR(0, "b", "kext", NULL);
 	bool in_kernel        = OPT_PRESENT(1, "k");
 	size_t access         = OPT_GET_WIDTH_OR(2, "x", "access", 0);
-	struct argrange range = ARG_GET_RANGE(3, "range");
-	const char *classname = ARG_GET_STRING(4, "class");
+	const char *classname = ARG_GET_STRING(3, "class");
+	struct argrange range = ARG_GET_RANGE_OR(4, "range", 0, -1);
 	if (in_kernel) {
 		if (bundle_id != NULL) {
 			error_usage("fi", NULL, "b and k options are mutually exclusive");
@@ -571,8 +574,8 @@ static struct command commands[] = {
 			{ "h",      NULL,     ARG_NONE,  "Search heap memory"          },
 			{ "a",      "align",  ARG_WIDTH, "The alignment of the value"  },
 			{ "x",      "access", ARG_WIDTH, "The memory access width"     },
-			{ ARGUMENT, "range",  ARG_RANGE, "The address range to search" },
 			{ ARGUMENT, "value",  ARG_UINT,  "The value to find"           },
+			{ OPTIONAL, "range",  ARG_RANGE, "The address range to search" },
 		},
 	}, {
 		"fpr", "f", fpr_handler,
@@ -587,8 +590,8 @@ static struct command commands[] = {
 			{ "b",      "kext",   ARG_STRING, "The bundle ID of the kext defining the class" },
 			{ "k",      NULL,     ARG_NONE,   "The class is defined in the kernel"           },
 			{ "x",      "access", ARG_WIDTH,  "The memory access width"                      },
-			{ ARGUMENT, "range",  ARG_RANGE,  "The address range to search"                  },
 			{ ARGUMENT, "class",  ARG_STRING, "The C++ class name"                           },
+			{ OPTIONAL, "range",  ARG_RANGE,  "The address range to search"                  },
 		},
 	}, {
 		"lc", NULL, lc_handler,
