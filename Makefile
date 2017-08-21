@@ -41,14 +41,14 @@ MEMCTL_DIR        = memctl
 # Flags.
 
 ERRFLAGS   = -Wall -Wpedantic -Wno-gnu -Werror
-CFLAGS     = -g -O2 -I$(INC_DIR) $(ERRFLAGS)
+CFLAGS     = -g -O2 $(ERRFLAGS)
 LDFLAGS    = -g -lcompression
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
 
-LIBMEMCTL_CFLAGS = -I$(SRC_DIR)/$(LIBMEMCTL_DIR) -I$(EXTERNAL_HDR_DIR)
-MEMCTL_CFLAGS    = -I$(SRC_DIR)/$(MEMCTL_DIR) -I$(EXTERNAL_HDR_DIR)
-EXTERNAL_CFLAGS  = -O2 $(ERRFLAGS) -I$(EXTERNAL_HDR_DIR)
+LIBMEMCTL_CFLAGS = -I$(INC_DIR) -I$(EXTERNAL_HDR_DIR) -I$(SRC_DIR)/$(LIBMEMCTL_DIR)
+MEMCTL_CFLAGS    = -I$(INC_DIR) -I$(EXTERNAL_HDR_DIR) -I$(SRC_DIR)/$(MEMCTL_DIR)
+EXTERNAL_CFLAGS  = -I$(EXTERNAL_HDR_DIR)
 
 ifeq ($(REPL),YES)
 LDFLAGS        += -ledit -lcurses
@@ -211,7 +211,7 @@ aarch64_disasm_SRCS = $(SRC_DIR)/$(LIBMEMCTL_DIR)/aarch64/disasm.c \
 		      $(SRC_DIR)/$(MEMCTL_DIR)/aarch64/disassemble.c \
 		      $(TEST_DIR)/aarch64_disasm/aarch64_disasm.c
 
-aarch64_disasm_CFLAGS = -I$(INC_DIR)/$(LIBMEMCTL_INC_DIR) \
+aarch64_disasm_CFLAGS = -I$(INC_DIR) \
 			-I$(SRC_DIR)/$(MEMCTL_DIR) \
 			-DMEMCTL_DISASSEMBLY=1
 
@@ -260,7 +260,7 @@ $(OBJ_DIR)/$(LIBMEMCTL_DIR)/%.o: $(SRC_DIR)/$(LIBMEMCTL_DIR)/%.s $(LIBMEMCTL_INC
 
 $(OBJ_DIR)/$(EXTERNAL_SRC_DIR)/%.o: $(EXTERNAL_SRC_DIR)/%.c
 	@mkdir -p $(@D)
-	$(CC) $(EXTERNAL_CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(EXTERNAL_CFLAGS) -c $< -o $@
 
 $(MEMCTL_BIN): $(MEMCTL_LIB) $(CORE_LIB) $(MEMCTL_OBJS)
 	@mkdir -p $(@D)
