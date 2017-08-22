@@ -9,34 +9,12 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
+#include <IOKit/kext/OSKext.h>
 #include <mach-o/arch.h>
 
-/* ---- START OSKext API ---- */
-
-typedef struct __OSKext *OSKextRef;
-
-static const CFStringRef kCFBundleLoadAddressKey = CFSTR("OSBundleLoadAddress");
-static const CFStringRef kCFBundleLoadSizeKey    = CFSTR("OSBundleLoadSize");
-
-extern CFDictionaryRef
-OSKextCopyLoadedKextInfo(
-		CFArrayRef kextIdentifiers,
-		CFArrayRef infoKeys);
-
-extern OSKextRef
-OSKextCreateWithIdentifier(
-		CFAllocatorRef allocator,
-		CFStringRef    kextIdentifier);
-
-extern CFDataRef
-OSKextCopyExecutableForArchitecture(
-		OSKextRef         kext,
-		const NXArchInfo *arch);
-
-extern const NXArchInfo *
-OSKextGetRunningKernelArchitecture(void);
-
-/* ---- END OSKext API ---- */
+// CoreFoundation wrappers of OSKext strings.
+static const CFStringRef kCFBundleLoadAddressKey = CFSTR(kOSBundleLoadAddressKey);
+static const CFStringRef kCFBundleLoadSizeKey    = CFSTR(kOSBundleLoadSizeKey);
 
 /*
  * cfstring_nocopy
