@@ -322,4 +322,40 @@ unpack_uint(const void *src, unsigned width) {
 	}
 }
 
+/*
+ * host_is_little_endian
+ *
+ * Description:
+ * 	Returns true if the current host is little endian.
+ */
+static inline bool
+host_is_little_endian() {
+	const uint16_t one = 1;
+	return *(const uint8_t *)&one;
+}
+
+/*
+ * unpack_uint_e
+ *
+ * Description:
+ * 	Convert width bytes from src into an integer. width need not be a power of 2.
+ *
+ * Parameters:
+ * 		src			A pointer to the bytes of the integer.
+ * 		width			The width of the integer in bytes.
+ * 		little			True if the bytes are in little endian order (least
+ * 					significant to most significant).
+ */
+static inline uintmax_t
+unpack_uint_e(const void *src, unsigned width, bool little) {
+	assert(width <= sizeof(uintmax_t));
+	uintmax_t n = 0;
+	const uint8_t *p = src;
+	for (unsigned i = 0; i < width; i++) {
+		n |= ((uintmax_t) *p) << (8 * (little ? i : width - i - 1));
+		p++;
+	}
+	return n;
+}
+
 #endif

@@ -13,26 +13,37 @@
 
 bool
 memctl_read(kaddr_t address, size_t size, memflags flags, size_t width, size_t access) {
-	assert(ispow2(width) && 0 < width && width <= 8);
-	assert(ispow2(access) && access <= 8);
+	assert(ispow2(width) && 0 < width && width <= sizeof(kword_t));
+	assert(ispow2(access) && access <= sizeof(kword_t));
 	uint8_t data[page_size];
-	unsigned n = min(16 / width,  8);
+	unsigned n = min(16 / width, 8);
 	while (size > 0) {
+		// Read as many bytes as we can.
 		size_t readsize = min(size, sizeof(data));
 		bool read_success = read_kernel(address, &readsize, data, flags, access);
-		size_t end = readsize / width;
-		for (size_t i = 0; i < end; i++) {
+		// Print each word.
+		size_t left = readsize;
+		for (size_t i = 0; left > 0; i++) {
 			if (interrupted) {
 				error_interrupt();
 				return false;
 			}
-			kword_t value = unpack_uint(data + width * i, width);
+			// Truncate the width to however many bytes are left.
+			int w = min(width, left);
+			// Extract the integer.
+			uint8_t *p = data + width * i;
+			kword_t value = unpack_uint_e(p, w, host_is_little_endian());
 			if (i % n == 0) {
 				printf(KADDR_FMT":  ", address);
 			}
-			int newline = (((i + 1) % n == 0) || (size == readsize && i == end - 1));
-			printf("%0*llx%c", (int)(2 * width), value, (newline ? '\n' : ' '));
-			address += width;
+			left    -= w;
+			address += w;
+			// Print a new line if either we've saturated the line or if we're out of
+			// data to print.
+			int newline = (((i + 1) % n == 0) || left == 0);
+			// Add left padding if we're printing part of a little-endian value.
+			int leftpad = (host_is_little_endian() ? 2 * (width - w) : 0);
+			printf("%*s%0*llx%c", leftpad, "", 2 * w, value, (newline ? '\n' : ' '));
 		}
 		if (!read_success) {
 			return false;
@@ -44,8 +55,8 @@ memctl_read(kaddr_t address, size_t size, memflags flags, size_t width, size_t a
 
 bool
 memctl_dump(kaddr_t address, size_t size, memflags flags, size_t width, size_t access) {
-	assert(ispow2(width) && 0 < width && width <= 8);
-	assert(ispow2(access) && access <= 8);
+	assert(ispow2(width) && 0 < width && width <= sizeof(kword_t));
+	assert(ispow2(access) && access <= sizeof(kword_t));
 	uint8_t data[page_size];
 	uint8_t *p = data;
 	uint8_t *end = p;
@@ -115,7 +126,7 @@ memctl_dump(kaddr_t address, size_t size, memflags flags, size_t width, size_t a
 
 bool
 memctl_read_string(kaddr_t address, size_t size, memflags flags, size_t access) {
-	assert(ispow2(access) && access <= 8);
+	assert(ispow2(access) && access <= sizeof(kword_t));
 	uint8_t data[page_size + 1];
 	bool have_printed = false;
 	bool read_success = true;
@@ -140,7 +151,7 @@ memctl_read_string(kaddr_t address, size_t size, memflags flags, size_t access) 
 
 bool
 memctl_dump_binary(kaddr_t address, size_t size, memflags flags, size_t access) {
-	assert(ispow2(access) && access <= 8);
+	assert(ispow2(access) && access <= sizeof(kword_t));
 	uint8_t data[page_size];
 	while (size > 0) {
 		size_t readsize = min(size, sizeof(data));
