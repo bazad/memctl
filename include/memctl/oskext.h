@@ -6,18 +6,23 @@
 #include "memctl/memctl_types.h"
 
 /*
- * oskext_get_address
+ * oskext_load_info
  *
  * Description:
- * 	Find the runtime base address and size of the given kext in the kernel.
+ * 	Find load information for the kernel extension with the given bundle identifier.
  *
  * Parameters:
  * 		bundle_id		The bundle identifier of the kext.
  * 	out	base			On return, the base address of the kext.
  * 	out	size			On return, the size of the kext image in memory.
+ * 	out	uuid			On return, the UUID of the kext.
+ * 	out	version			On return, the version of the kext, encoded as per
+ * 					OSKextParseVersionString.
  *
  * Returns:
- * 	A kext_result code.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_ERROR			Out of memory or internal error.
+ * 	KEXT_NO_KEXT			No kext has the given bundle identifier.
  *
  * Dependencies:
  * 	kernel_slide
@@ -32,7 +37,8 @@
  * 	segment, not any of the other segments.
  *
  */
-kext_result oskext_get_address(const char *bundle_id, kaddr_t *base, size_t *size);
+kext_result oskext_load_info(const char *bundle_id, kaddr_t *base, size_t *size,
+		uuid_t uuid, uint64_t *version);
 
 /*
  * oskext_for_each
@@ -91,7 +97,9 @@ kext_result oskext_find_containing_address(kaddr_t kaddr, char **bundle_id,
  * 		bundle_id		The bundle ID of the kext.
  *
  * Returns:
- * 	A kext_result code.
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_ERROR			Out of memory or internal error.
+ * 	KEXT_NO_KEXT			No kext has the given bundle identifier.
  */
 kext_result oskext_init_macho(struct macho *macho, const char *bundle_id);
 

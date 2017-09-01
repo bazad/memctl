@@ -218,7 +218,7 @@ void macho_section_data(const struct macho *macho, const struct load_command *se
  * Returns:
  * 	A macho_result status code.
  */
-macho_result macho_find_base(struct macho *macho, uint64_t *base);
+macho_result macho_find_base(const struct macho *macho, uint64_t *base);
 
 /*
  * macho_resolve_symbol

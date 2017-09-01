@@ -12,10 +12,7 @@
 #include "memctl_common.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -25,6 +22,97 @@ struct kext kernel;
 #if KERNELCACHE
 struct kernelcache kernelcache;
 #endif
+
+/*
+ * is_kernel_id
+ *
+ * Description:
+ * 	Returns true if the given kext bundle identifier is for the kernel.
+ */
+static bool
+is_kernel_id(const char *bundle_id) {
+	return (strcmp(bundle_id, KERNEL_ID) == 0);
+}
+
+/*
+ * binary_search
+ *
+ * Description:
+ * 	Find a unique element in a sorted array, or find the index at which the element should be
+ * 	inserted if it is not present.
+ */
+static void *
+binary_search(void *array, size_t element_size, size_t count,
+		int (*compare)(const void *value, const void *element),
+		const void *value, size_t *index) {
+	ssize_t left  = 0;
+	ssize_t right = count - 1;
+	for (;;) {
+		if (right < left) {
+			if (index != NULL) {
+				*index = left;
+			}
+			return NULL;
+		}
+		ssize_t mid = (left + right) / 2;
+		void *element = (void *)((uintptr_t)array + mid * element_size);
+		int cmp = compare(value, element);
+		if (cmp < 0) {
+			right = mid - 1;
+		} else if (cmp > 0) {
+			left = mid + 1;
+		} else {
+			// We assume that there's only one value that's equal.
+			if (index != NULL) {
+				*index = mid;
+			}
+			return element;
+		}
+	}
+}
+
+/*
+ * array_insert
+ *
+ * Description:
+ * 	Make space for an element in an array at the specified index. A pointer to the element is
+ * 	returned.
+ */
+static void *
+array_insert(void **array, size_t element_size, size_t *count, size_t index) {
+	size_t newcount = *count + 1;
+	void *newarray = realloc(*array, newcount * element_size);
+	if (newarray == NULL) {
+		return NULL;
+	}
+	*array = newarray;
+	*count = newcount;
+	void *shift_src = (void *)((uintptr_t)newarray + index * element_size);
+	void *shift_dst = (void *)((uintptr_t)shift_src + element_size);
+	size_t shift_size = (newcount - 1 - index) * element_size;
+	memmove(shift_dst, shift_src, shift_size);
+	return shift_src;
+}
+
+#if !KERNELCACHE
+/*
+ * array_remove
+ *
+ * Description:
+ * 	Remove an element from an array and move the rest of the elements forward.
+ */
+static void
+array_remove(void *array, size_t element_size, size_t *count, size_t index) {
+	size_t newcount = *count - 1;
+	*count = newcount;
+	void *shift_dst = (void *)((uintptr_t)array + index * element_size);
+	void *shift_src = (void *)((uintptr_t)shift_dst + element_size);
+	size_t shift_size = (newcount - index) * element_size;
+	memmove(shift_dst, shift_src, shift_size);
+}
+#endif
+
+// ---- Kext analyzers / symbol finders -----------------------------------------------------------
 
 /*
  * struct kext_analyzers
@@ -41,9 +129,6 @@ struct kext_analyzers {
 	size_t find_symbol_count;
 };
 
-// The path of the currently initialized kernel.
-static const char *initialized_kernel = NULL;
-
 // The array of kext analyzers.
 struct kext_analyzers *all_analyzers;
 
@@ -51,14 +136,60 @@ struct kext_analyzers *all_analyzers;
 size_t all_analyzers_count;
 
 /*
- * is_kernel_id
+ * compare_kext_analyzers
  *
  * Description:
- * 	Returns true if the given kext bundle identifier is for the kernel.
+ * 	Compare the bundle ID of a kext_analyzers struct.
  */
-static bool
-is_kernel_id(const char *bundle_id) {
-	return (strcmp(bundle_id, KERNEL_ID) == 0);
+static int
+compare_kext_analyzers(const void *value, const void *element) {
+	const char *bundle_id = value;
+	const struct kext_analyzers *ka = element;
+	return strcmp(bundle_id, ka->bundle_id);
+}
+
+/*
+ * find_kext_analyzers
+ *
+ * Description:
+ * 	Find the existing kext_analyzers struct for the given bundle ID.
+ */
+static struct kext_analyzers *
+find_kext_analyzers(const char *bundle_id, size_t *insert_index) {
+	return (struct kext_analyzers *) binary_search(all_analyzers, sizeof(*all_analyzers),
+			all_analyzers_count, compare_kext_analyzers, bundle_id, insert_index);
+}
+
+/*
+ * create_kext_analyzers
+ *
+ * Description:
+ * 	Find the kext_analyzers struct for the given bundle ID, or create one if it doesn't already
+ * 	exist.
+ */
+static struct kext_analyzers *
+create_kext_analyzers(const char *bundle_id) {
+	if (bundle_id == NULL) {
+		bundle_id = "";
+	}
+	// Try to find the kext_analyzers struct if it already exists.
+	size_t insert_index;
+	struct kext_analyzers *ka = find_kext_analyzers(bundle_id, &insert_index);
+	if (ka != NULL) {
+		return ka;
+	}
+	// Insert space for a new kext_analyzers in the all_analyzers array.
+	ka = array_insert((void **) &all_analyzers, sizeof(*all_analyzers), &all_analyzers_count,
+			insert_index);
+	if (ka == NULL) {
+		error_out_of_memory();
+		return NULL;
+	}
+	// Fill in the new kext_analyzers.
+	ka->bundle_id         = bundle_id;
+	ka->find_symbol_fn    = NULL;
+	ka->find_symbol_count = 0;
+	return ka;
 }
 
 /*
@@ -89,6 +220,264 @@ clear_all_analyzers() {
 	all_analyzers       = NULL;
 	all_analyzers_count = 0;
 }
+
+/*
+ * kext_analyzers_insert_symbol_finder
+ *
+ * Description:
+ * 	Add a symbol finder to the kext_analyzers struct.
+ */
+static bool
+kext_analyzers_insert_symbol_finder(struct kext_analyzers *ka, kext_find_symbol_fn find_symbol) {
+	// Allocate space for the new symbol finder.
+	size_t count = ka->find_symbol_count + 1;
+	kext_find_symbol_fn *fn = realloc(ka->find_symbol_fn, count * sizeof(*fn));
+	if (fn == NULL) {
+		error_out_of_memory();
+		return false;
+	}
+	// Insert the symbol finder.
+	ka->find_symbol_fn    = fn;
+	ka->find_symbol_count = count;
+	fn[count - 1] = find_symbol;
+	return true;
+}
+
+// ---- Mapping of bundle IDs to kext structs -----------------------------------------------------
+
+/*
+ * struct kext_info
+ *
+ * Description:
+ * 	Used to keep track of additional information about a kext.
+ */
+struct kext_info {
+	// The kext.
+	struct kext kext;
+	// The reference count.
+	unsigned refcount;
+	// The following state is used to keep track of whether the kext is out-of-date.
+#if !KERNELCACHE
+	// Whether the current kext is outdated, and thus should be freed when its reference count
+	// drops to 0.
+	bool outdated;
+	// The kext's UUID.
+	uuid_t uuid;
+	// The kext's parsed version number.
+	uint64_t version;
+#endif
+	// The bundle identifier.
+	char bundle_id[1];
+};
+
+// Load information for a kext, as per oskext_load_info.
+struct load_info {
+#if !KERNELCACHE
+	kaddr_t  base;
+	uuid_t   uuid;
+	uint64_t version;
+#endif
+};
+
+// An array of pointers to kext_info structs. These structs must live at the same address for their
+// entire lifetime, so they are stored indirectly.
+struct kext_info **kexts;
+
+// The number of elements in the kexts array.
+size_t kexts_count;
+
+/*
+ * init_kext_macho
+ *
+ * Description:
+ * 	Initialize the Mach-O file for a kernel extension by bundle ID.
+ */
+static kext_result
+init_kext_macho(struct macho *macho, const char *bundle_id) {
+	assert(bundle_id != NULL);
+	if (is_kernel_id(bundle_id)) {
+		*macho = kernel.macho;
+		return KEXT_SUCCESS;
+	}
+#if KERNELCACHE
+	return kernelcache_kext_init_macho(&kernelcache, macho, bundle_id);
+#else
+	return oskext_init_macho(macho, bundle_id);
+#endif
+}
+
+/*
+ * deinit_kext_macho
+ *
+ * Description:
+ * 	Clean up a macho struct initialized with init_kext_macho.
+ */
+static void
+deinit_kext_macho(struct macho *macho) {
+#if !KERNELCACHE
+	if (macho->mh != kernel.macho.mh) {
+		oskext_deinit_macho(macho);
+	}
+#endif
+}
+
+/*
+ * fill_kext_info
+ *
+ * Description:
+ * 	Fill in the kext_info struct.
+ */
+static kext_result
+fill_kext_info(struct kext_info *kext_info, const struct macho *macho,
+		const struct load_info *li) {
+	assert(macho->mh != kernel.macho.mh);
+	uint64_t static_base;
+	macho_result mr = macho_find_base(macho, &static_base);
+	if (mr != MACHO_SUCCESS) {
+		error_internal("could not find Mach-O base address for kext %s",
+		               kext_info->bundle_id);
+		return KEXT_ERROR;
+	}
+	kext_info->kext.macho  = *macho;
+	kext_info->kext.symtab = (const struct symtab_command *)macho_find_load_command(macho,
+			NULL, LC_SYMTAB);
+#if KERNELCACHE
+	kext_info->kext.base   = static_base + kernel_slide;
+	kext_info->kext.slide  = kernel_slide;
+#else
+	kext_info->kext.base   = li->base;
+	kext_info->kext.slide  = li->base - static_base;
+	kext_info->outdated    = false;
+	memcpy(kext_info->uuid, li->uuid, sizeof(kext_info->uuid));
+	kext_info->version     = li->version;
+#endif
+	return KEXT_SUCCESS;
+}
+
+/*
+ * create_kext_info
+ *
+ * Description:
+ * 	Create a new kext_info structure to store a kext. The refcount is initialized to 1.
+ *
+ * Returns:
+ * 	KEXT_SUCCESS, KEXT_ERROR, KEXT_NO_KEXT
+ */
+static kext_result
+create_kext_info(struct kext_info **kext_info, const char *bundle_id, const struct load_info *li) {
+	// Get the Mach-O struct for this kext.
+	struct macho macho;
+	kext_result kr = init_kext_macho(&macho, bundle_id);
+	if (kr != KEXT_SUCCESS) {
+		goto fail_0;
+	}
+	// Create an over-allocated structure with room for the bundle_id at the end.
+	size_t len = strlen(bundle_id);
+	struct kext_info *ki = malloc(sizeof(*ki) + len);
+	if (ki == NULL) {
+		error_out_of_memory();
+		goto fail_1;
+	}
+	// Copy in the bundle ID string.
+	strcpy((char *)ki->bundle_id, bundle_id);
+	ki->kext.bundle_id = ki->bundle_id;
+	// Fill in the kext_info struct.
+	kr = fill_kext_info(ki, &macho, li);
+	if (kr != KEXT_SUCCESS) {
+		goto fail_2;
+	}
+	// Success.
+	ki->refcount = 1;
+	*kext_info = ki;
+	return KEXT_SUCCESS;
+fail_2:
+	free(ki);
+fail_1:
+	deinit_kext_macho(&macho);
+fail_0:
+	return kr;
+}
+
+/*
+ * destroy_kext_info
+ *
+ * Description:
+ * 	Free the resources used by create_kext_info.
+ */
+static void
+destroy_kext_info(struct kext_info *kext_info) {
+	deinit_kext_macho(&kext_info->kext.macho);
+	free(kext_info);
+}
+
+#if !KERNELCACHE
+/*
+ * is_outdated
+ *
+ * Description:
+ * 	Returns true if the load_info for the kext indicates that the kext is outdated.
+ */
+static kext_result
+is_outdated(const struct kext_info *ki, const struct load_info *li) {
+	return (ki->kext.base != li->base
+	        || ki->version != li->version
+	        || memcmp(ki->uuid, li->uuid, sizeof(li->uuid)) != 0);
+}
+#endif
+
+/*
+ * handle_kext_release
+ *
+ * Description:
+ * 	Destroy the kext_info struct if it is outdated and its reference count is zero.
+ */
+static void
+handle_kext_release(struct kext_info *kext_info) {
+#if !KERNELCACHE
+	if (kext_info->refcount == 0 && kext_info->outdated) {
+		destroy_kext_info(kext_info);
+	}
+#endif
+}
+
+/*
+ * compare_kext_info
+ *
+ * Description:
+ * 	Compare the bundle ID of a kext_info struct.
+ */
+static int
+compare_kext_info(const void *value, const void *element) {
+	const char *bundle_id = value;
+	const struct kext_info *const *ki = element;
+	return strcmp(bundle_id, (*ki)->bundle_id);
+}
+
+/*
+ * clear_kexts
+ *
+ * Description:
+ * 	Free all the kexts in the kexts array.
+ */
+static void
+clear_kexts() {
+	for (size_t i = 0; i < kexts_count; i++) {
+		struct kext_info *ki = kexts[i];
+		if (ki->refcount > 0) {
+			memctl_warning("kext %s has outstanding reference during deinitialization",
+			               ki->bundle_id);
+		}
+		destroy_kext_info(ki);
+	}
+	free(kexts);
+	kexts = NULL;
+	kexts_count = 0;
+}
+
+// ---- Public API --------------------------------------------------------------------------------
+
+// The path of the currently initialized kernel.
+static const char *initialized_kernel = NULL;
 
 #if KERNELCACHE
 
@@ -195,197 +584,95 @@ kernel_deinit() {
 	}
 #endif
 	clear_all_analyzers();
+	clear_kexts();
 }
 
-
 kext_result
-kext_init_macho(struct macho *macho, const char *bundle_id) {
+kernel_kext(const struct kext **kext, const char *bundle_id) {
+	// Handle the kernel specially.
 	assert(bundle_id != NULL);
 	if (is_kernel_id(bundle_id)) {
-		*macho = kernel.macho;
+		*kext = &kernel;
 		return KEXT_SUCCESS;
 	}
-#if KERNELCACHE
-	return kernelcache_kext_init_macho(&kernelcache, macho, bundle_id);
-#else
-	return oskext_init_macho(macho, bundle_id);
+	kext_result kr;
+	// Get load information for this kext.
+	struct load_info li;
+#if !KERNELCACHE
+	kr = oskext_load_info(bundle_id, &li.base, NULL, li.uuid, &li.version);
+	if (kr != KEXT_SUCCESS) {
+		return kr;
+	}
 #endif
+	// Find the slot for the given bundle ID. If we fail later on, we'll need to remove this
+	// slot.
+	size_t index;
+	struct kext_info **slot = binary_search(kexts, sizeof(*kexts), kexts_count,
+			compare_kext_info, bundle_id, &index);
+	if (slot != NULL) {
+		struct kext_info *ki = *slot;
+		assert(ki != NULL);
+#if !KERNELCACHE
+		if (is_outdated(ki, &li)) {
+			// ki is now outdated. Remove it from the array and free the kext if it has
+			// no references.
+			memctl_warning("removing outdated kext %s", bundle_id);
+			ki->outdated = true;
+			array_remove(kexts, sizeof(*kexts), &kexts_count, index);
+			handle_kext_release(ki);
+			goto new_kext_info;
+		}
+#endif
+		ki->refcount += 1;
+		*kext = &ki->kext;
+		return KEXT_SUCCESS;
+	}
+#if !KERNELCACHE
+new_kext_info:;
+#endif
+	// We don't have a kext_info for this kext, or the old one was just removed.
+	// Create a new kext_info struct.
+	struct kext_info *ki;
+	kr = create_kext_info(&ki, bundle_id, &li);
+	if (kr != KEXT_SUCCESS) {
+		return kr;
+	}
+	// Allocate space in the array for the kext_info.
+	slot = array_insert((void **)&kexts, sizeof(*kexts), &kexts_count, index);
+	if (slot == NULL) {
+		kext_release(&ki->kext);
+		error_out_of_memory();
+		return KEXT_ERROR;
+	}
+	// Insert the new kext_info struct.
+	*slot = ki;
+	*kext = &ki->kext;
+	return KEXT_SUCCESS;
 }
 
 void
-kext_deinit_macho(struct macho *macho) {
-#if !KERNELCACHE
-	if (macho->mh != kernel.macho.mh) {
-		oskext_deinit_macho(macho);
+kext_release(const struct kext *kext) {
+	assert(kext != NULL);
+	if (kext->macho.mh == kernel.macho.mh) {
+		return;
 	}
-#endif
+	struct kext_info *ki = (struct kext_info *)(kext);
+	assert(kext->bundle_id == ki->bundle_id);
+	assert(ki->refcount >= 1);
+	ki->refcount -= 1;
+	handle_kext_release(ki);
 }
 
 kext_result
-kext_find_base(struct macho *macho, const char *bundle_id, kaddr_t *base, kword_t *slide) {
-	assert(macho->mh != kernel.macho.mh);
-	uint64_t static_base;
-	macho_result mr = macho_find_base(macho, &static_base);
-	if (mr != MACHO_SUCCESS) {
-		error_internal("could not find Mach-O base address for kext %s", bundle_id);
-		return KEXT_ERROR;
-	}
-#if KERNELCACHE
-	*base = static_base + kernel_slide;
-	*slide = kernel_slide;
-#else
-	// oskext_get_address depends on kernel_slide.
-	kaddr_t runtime_base;
-	kext_result kr = oskext_get_address(bundle_id, &runtime_base, NULL);
-	if (kr != KEXT_SUCCESS) {
-		return kr;
-	}
-	*base = runtime_base;
-	*slide = runtime_base - static_base;
-#endif
-	return KEXT_SUCCESS;
-}
-
-kext_result
-kext_init(struct kext *kext, const char *bundle_id) {
-	assert(bundle_id != NULL);
-	if (is_kernel_id(bundle_id)) {
-		*kext = kernel;
-		return KEXT_SUCCESS;
-	}
-	kext_result kr = kext_init_macho(&kext->macho, bundle_id);
-	if (kr != KEXT_SUCCESS) {
-		return kr;
-	}
-	kr = kext_find_base(&kext->macho, bundle_id, &kext->base, &kext->slide);
-	if (kr != KEXT_SUCCESS) {
-		goto fail;
-	}
-	kext->bundle_id = strdup(bundle_id);
-	if (kext->bundle_id == NULL) {
-		error_out_of_memory();
-		kr = KEXT_ERROR;
-		goto fail;
-	}
-	kext->symtab = (const struct symtab_command *)macho_find_load_command(&kext->macho, NULL,
-			LC_SYMTAB);
-	return KEXT_SUCCESS;
-fail:
-	kext_deinit_macho(&kext->macho);
-	return KEXT_ERROR;
-}
-
-kext_result
-kext_init_containing_address(struct kext *kext, kaddr_t address) {
+kernel_kext_containing_address(const struct kext **kext, kaddr_t address) {
 	char *bundle_id;
 	kext_result kr = kext_containing_address(address, &bundle_id);
 	if (kr != KEXT_SUCCESS) {
 		return kr;
 	}
-	kr = kext_init(kext, bundle_id);
+	kr = kernel_kext(kext, bundle_id);
 	free(bundle_id);
 	return kr;
-}
-
-void
-kext_deinit(struct kext *kext) {
-	if (kext->macho.mh == kernel.macho.mh) {
-		return;
-	}
-	kext_deinit_macho(&kext->macho);
-	free((char *)kext->bundle_id);
-}
-
-/*
- * find_kext_analyzers
- *
- * Description:
- * 	Find the existing kext_analyzers struct for the given bundle ID.
- */
-static struct kext_analyzers *
-find_kext_analyzers(const char *bundle_id, size_t *insert_index) {
-	struct kext_analyzers *ka = all_analyzers;
-	size_t count = all_analyzers_count;
-	ssize_t left  = 0;
-	ssize_t right = count - 1;
-	for (;;) {
-		if (right < left) {
-			if (insert_index != NULL) {
-				*insert_index = left;
-			}
-			return NULL;
-		}
-		ssize_t mid = (left + right) / 2;
-		int cmp = strcmp(bundle_id, ka[mid].bundle_id);
-		if (cmp < 0) {
-			right = mid - 1;
-		} else if (cmp > 0) {
-			left = mid + 1;
-		} else {
-			// There's only one value that's equal.
-			return &ka[mid];
-		}
-	}
-}
-
-/*
- * create_kext_analyzers
- *
- * Description:
- * 	Find the kext_analyzers struct for the given bundle ID, or create one if it doesn't already
- * 	exist.
- */
-static struct kext_analyzers *
-create_kext_analyzers(const char *bundle_id) {
-	if (bundle_id == NULL) {
-		bundle_id = "";
-	}
-	// Try to find the kext_analyzers struct if it already exists.
-	size_t insert_index;
-	struct kext_analyzers *ka = find_kext_analyzers(bundle_id, &insert_index);
-	if (ka != NULL) {
-		return ka;
-	}
-	// Grow the all_analyzers array by one.
-	size_t count = all_analyzers_count + 1;
-	struct kext_analyzers *analyzers = realloc(all_analyzers, count * sizeof(*analyzers));
-	if (analyzers == NULL) {
-		error_out_of_memory();
-		return NULL;
-	}
-	all_analyzers = analyzers;
-	all_analyzers_count = count;
-	// Make room for the new kext_analyzers in the array.
-	ka = &analyzers[insert_index];
-	size_t shift_count = (count - 1) - insert_index;
-	memmove(ka + 1, ka, shift_count * sizeof(*analyzers));
-	// Fill in the new kext_analyzers.
-	ka->bundle_id         = bundle_id;
-	ka->find_symbol_fn    = NULL;
-	ka->find_symbol_count = 0;
-	return ka;
-}
-
-/*
- * kext_analyzers_insert_symbol_finder
- *
- * Description:
- * 	Add a symbol finder to the kext_analyzers struct.
- */
-static bool
-kext_analyzers_insert_symbol_finder(struct kext_analyzers *ka, kext_find_symbol_fn find_symbol) {
-	// Allocate space for the new symbol finder.
-	size_t count = ka->find_symbol_count + 1;
-	kext_find_symbol_fn *fn = realloc(ka->find_symbol_fn, count * sizeof(*fn));
-	if (fn == NULL) {
-		error_out_of_memory();
-		return false;
-	}
-	// Insert the symbol finder.
-	ka->find_symbol_fn    = fn;
-	ka->find_symbol_count = count;
-	fn[count - 1] = find_symbol;
-	return true;
 }
 
 bool
@@ -447,16 +734,13 @@ run_matching_symbol_finders(const struct kext *kext, const char *symbol,
 	return kr;
 }
 
-kext_result
-kext_find_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
-	kext_result kr = kext_resolve_symbol(kext, symbol, addr, size);
-	if (kr == KEXT_NOT_FOUND) {
-		kr = run_matching_symbol_finders(kext, symbol, addr, size);
-	}
-	return kr;
-}
-
-kext_result
+/*
+ * kext_resolve_symbol
+ *
+ * Description:
+ * 	Find a symbol using the symbol table.
+ */
+static kext_result
 kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
 	if (kext->symtab == NULL) {
 		return KEXT_NOT_FOUND;
@@ -473,6 +757,15 @@ kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, 
 	}
 	*addr = static_addr + kext->slide;
 	return KEXT_SUCCESS;
+}
+
+kext_result
+kext_find_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
+	kext_result kr = kext_resolve_symbol(kext, symbol, addr, size);
+	if (kr == KEXT_NOT_FOUND) {
+		kr = run_matching_symbol_finders(kext, symbol, addr, size);
+	}
+	return kr;
 }
 
 kext_result
@@ -576,11 +869,11 @@ kext_containing_address(kaddr_t address, char **bundle_id) {
 
 kext_result
 kext_id_find_symbol(const char *bundle_id, const char *symbol, kaddr_t *addr, size_t *size) {
-	struct kext kext;
-	kext_result kr = kext_init(&kext, bundle_id);
+	const struct kext *kext;
+	kext_result kr = kernel_kext(&kext, bundle_id);
 	if (kr == KEXT_SUCCESS) {
-		kr = kext_find_symbol(&kext, symbol, addr, size);
-		kext_deinit(&kext);
+		kr = kext_find_symbol(kext, symbol, addr, size);
+		kext_release(kext);
 	}
 	return kr;
 }
@@ -661,22 +954,19 @@ kernel_and_kexts_search_data_callback(void *context, CFDictionaryRef info, const
 		return false;
 	}
 	struct kernel_and_kexts_search_data_context *c = context;
-	struct kext kext;
+	const struct kext *kext;
+	bool found = false;
 	error_stop();
-	kext_result kr = kext_init(&kext, bundle_id);
+	kext_result kr = kernel_kext(&kext, bundle_id);
 	if (kr != KEXT_SUCCESS) {
 		goto fail;
 	}
-	kr = kext_search_data(&kext, c->data, c->size, c->minprot, &c->addr);
-	kext_deinit(&kext);
-	if (kr != KEXT_SUCCESS) {
-		goto fail;
-	}
-	error_start();
-	return true;
+	kr = kext_search_data(kext, c->data, c->size, c->minprot, &c->addr);
+	kext_release(kext);
+	found = (kr == KEXT_SUCCESS);
 fail:
 	error_start();
-	return false;
+	return found;
 
 }
 

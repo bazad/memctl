@@ -459,14 +459,14 @@ vtable_for_class(const char *class_name, const char *bundle_id, kaddr_t *vtable,
 kext_result
 vtable_lookup(kaddr_t vtable, char **class_name) {
 	// Resolve the vtable address into a symbol.
-	struct kext kext;
-	kext_result kr = kext_init_containing_address(&kext, vtable);
+	const struct kext *kext;
+	kext_result kr = kernel_kext_containing_address(&kext, vtable);
 	if (kr != KEXT_SUCCESS) {
 		goto fail_0;
 	}
 	const char *symbol;
 	size_t offset;
-	kr = kext_resolve_address(&kext, vtable, &symbol, NULL, &offset);
+	kr = kext_resolve_address(kext, vtable, &symbol, NULL, &offset);
 	if (kr != KEXT_SUCCESS) {
 		goto fail_1;
 	}
@@ -488,7 +488,7 @@ vtable_lookup(kaddr_t vtable, char **class_name) {
 		goto fail_1;
 	}
 fail_1:
-	kext_deinit(&kext);
+	kext_release(kext);
 fail_0:
 	return kr;
 }

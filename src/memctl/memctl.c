@@ -709,43 +709,43 @@ s_command(kaddr_t address) {
 	if (!initialize(KERNEL_SYMBOLS)) {
 		return false;
 	}
-	struct kext kext;
-	kext_result kr = kext_init_containing_address(&kext, address);
+	const struct kext *kext;
+	kext_result kr = kernel_kext_containing_address(&kext, address);
 	if (kext_error(kr, NULL, NULL, address)) {
 		return false;
 	}
 	const char *segname = NULL;
 	size_t segoffset;
-	get_segment_offset(&kext.macho, address - kext.slide, &segname, &segoffset);
+	get_segment_offset(&kext->macho, address - kext->slide, &segname, &segoffset);
 	const char *name = NULL;
 	size_t size = 0;
 	size_t offset = 0;
-	kr = kext_resolve_address(&kext, address, &name, &size, &offset);
+	kr = kext_resolve_address(kext, address, &name, &size, &offset);
 	bool is_error = false;
 	if (kr == KEXT_SUCCESS && strlen(name) > 0 && offset < size) {
 		assert(segname != NULL);
 		if (offset == 0) {
-			printf("%s.%s: %s  (%zu)\n", kext.bundle_id, segname, name, size);
+			printf("%s.%s: %s  (%zu)\n", kext->bundle_id, segname, name, size);
 		} else {
-			printf("%s.%s: %s+%zu  (%zu)\n", kext.bundle_id, segname, name, offset, size);
+			printf("%s.%s: %s+%zu  (%zu)\n", kext->bundle_id, segname, name, offset, size);
 		}
 	} else if (segname == NULL) {
-		offset = address - kext.base;
+		offset = address - kext->base;
 		if (offset == 0) {
-			printf("%s\n", kext.bundle_id);
+			printf("%s\n", kext->bundle_id);
 		} else {
-			printf("%s+%zu\n", kext.bundle_id, offset);
+			printf("%s+%zu\n", kext->bundle_id, offset);
 		}
 	} else if (kr == KEXT_SUCCESS || kr == KEXT_NOT_FOUND) {
 		if (offset == 0) {
-			printf("%s.%s\n", kext.bundle_id, segname);
+			printf("%s.%s\n", kext->bundle_id, segname);
 		} else {
-			printf("%s.%s+%zu\n", kext.bundle_id, segname, segoffset);
+			printf("%s.%s+%zu\n", kext->bundle_id, segname, segoffset);
 		}
 	} else {
-		is_error = kext_error(kr, kext.bundle_id, NULL, 0);
+		is_error = kext_error(kr, kext->bundle_id, NULL, 0);
 	}
-	kext_deinit(&kext);
+	kext_release(kext);
 	return !is_error;
 }
 

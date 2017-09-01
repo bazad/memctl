@@ -345,6 +345,9 @@ host_is_little_endian() {
  * 		width			The width of the integer in bytes.
  * 		little			True if the bytes are in little endian order (least
  * 					significant to most significant).
+ *
+ * Returns:
+ * 	The width-byte integer in src.
  */
 static inline uintmax_t
 unpack_uint_e(const void *src, unsigned width, bool little) {

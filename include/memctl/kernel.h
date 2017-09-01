@@ -1,5 +1,15 @@
 #ifndef MEMCTL__KERNEL_H_
 #define MEMCTL__KERNEL_H_
+/*
+ * Kernel and kernel extension routines.
+ *
+ * The kernel subsystem maintains a mapping of bundle identifiers to kext structs. Each kext struct
+ * stores basic information about the kernel extension (or pseudoextension): the runtime address,
+ * the runtime slide, the kext's Mach-O file, the symbol table, etc. This mapping is initialized in
+ * kernel_init(). When kernel_kext() is called for a kext that has not yet been initialized, it is
+ * added to the mapping. Subsequent calls to kernel_kext will return this previously-created
+ * object. kernel_deinit() will free this mapping, and all kext objects will be invalidated.
+ */
 
 #include "memctl/macho.h"
 #include "memctl/memctl_types.h"
@@ -17,17 +27,19 @@ extern const char KERNEL_ID[];
 /*
  * struct kext
  *
+ * Description:
+ * 	Basic information about the kernel or a kernel extension.
  */
 struct kext {
-	// The kext's Mach-O file.
-	struct macho macho;
+	// The kext's bundle ID.
+	const char *bundle_id;
 	// The runtime base address.
 	kaddr_t base;
 	// The runtime offset between the static addresses in the Mach-O and the addresses in
 	// kernel memory.
 	kword_t slide;
-	// The kext's bundle ID.
-	const char *bundle_id;
+	// The kext's Mach-O file.
+	struct macho macho;
 	// The symtab command, used for resolving symbols.
 	const struct symtab_command *symtab;
 };
@@ -59,7 +71,7 @@ extern struct kext kernel;
  * kernelcache
  *
  * Description:
- * 	The kernelcache.
+ * 	The kernelcache. Only available on platforms with a kernelcache.
  */
 extern struct kernelcache kernelcache;
 #endif
@@ -73,11 +85,11 @@ extern struct kernelcache kernelcache;
  * Parameters:
  * 		kernel_path		The path to the kernel to initialize, or NULL to use the
  * 					default value of KERNEL_PATH. If not NULL, this must point
- * 					to a string which will be live until the subsequent call to
- * 					kernel_deinit.
+ * 					to a string which will remain live until the subsequent
+ * 					call to kernel_deinit.
  *
  * Returns:
- * 	True if the kernel was initialized successfully.
+ * 	True if no errors were encountered and the kernel was initialized successfully.
  *
  * Notes:
  * 	This function can be called multiple times. The typical use case is to call this function
@@ -90,7 +102,8 @@ bool kernel_init(const char *kernel_path);
 
 /*
  * kernel_deinit
- * 	Clean up resources used by the kernel image subsystem.
+ * 	Clean up resources used by the kernel image subsystem. All kext objects are invalidated by
+ * 	this call and must not be used afterwards.
  */
 void kernel_deinit(void);
 
@@ -101,107 +114,49 @@ void kernel_deinit(void);
  * 	Result code for kext operations.
  */
 typedef enum kext_result {
+	// Success.
 	KEXT_SUCCESS,
+	// An error was encountered, and an error was pushed onto the error stack.
 	KEXT_ERROR,
+	// The kext was not found.
 	KEXT_NO_KEXT,
+	// The item was not found in the kext.
 	KEXT_NOT_FOUND,
 } kext_result;
 
 /*
- * kext_init_macho
+ * kernel_kext
  *
  * Description:
- * 	Initialize the Mach-O file for a kernel extension by bundle ID.
+ * 	Load the kext struct for the kernel or kernel extension with the given bundle ID. If the
+ * 	bundle ID has previously been loaded (and has not been invalidated because the kext has
+ * 	been unloaded on the system), then this function will always succeed. Once the kext is no
+ * 	longer needed, release it with kext_release.
  *
  * Parameters:
- * 	out	macho			The macho struct to initialize.
- * 		bundle_id		The bundle ID of the kernel extension.
- *
- * Returns:
- * 	A kext_result code.
- */
-kext_result kext_init_macho(struct macho *macho, const char *bundle_id);
-
-/*
- * kext_deinit_macho
- *
- * Description:
- * 	Clean up a macho struct initialized with kext_init_macho.
- *
- * Parameters:
- * 		macho			The macho struct to clean up.
- */
-void kext_deinit_macho(struct macho *macho);
-
-/*
- * kext_find_base
- *
- * Description:
- * 	Find the runtime base address and slide of the given kernel extension.
- *
- * Parameters:
- * 		macho			The macho struct for the kernel extension.
- * 		bundle_id		The bundle ID of the kernel extension.
- * 	out	base			The runtime base address of the kernel extension.
- * 	out	slide			The slide between the static addresses in the Mach-O file
- * 					and the runtime addresses.
- * Returns:
- * 	A kext_result code.
- *
- * Dependencies:
- * 	kernel_slide
- */
-kext_result kext_find_base(struct macho *macho, const char *bundle_id, kaddr_t *base,
-		kword_t *slide);
-
-/*
- * kext_init
- *
- * Description:
- * 	Initialize a kext struct for the given kernel extension.
- *
- * Parameters:
- * 	out	kext			The kext struct to initialize.
- * 		bundle_id		The bundle ID of the kernel extension.
- *
- * Returns:
- * 	A kext_result code.
- *
- * Dependencies:
- * 	kernel_slide
- */
-kext_result kext_init(struct kext *kext, const char *bundle_id);
-
-/*
- * kext_init_containing_address
- *
- * Description:
- * 	Find the kext that contains the given address and initialize the kext struct.
- *
- * Parameters:
- * 	out	kext			The kext struct.
- * 		address			The address to search for.
+ * 	out	kext			On return, a pointer to the kext struct.
+ * 		bundle_id		The bundle ID of the kernel or kernel extension to load.
  *
  * Returns:
  * 	KEXT_SUCCESS			Success.
- * 	KEXT_NO_KEXT			No kernel extension contains the given address.
  * 	KEXT_ERROR			An error was encountered.
+ * 	KEXT_NO_KEXT			No kernel extension with the given bundle ID was found.
  *
- * Dependencies:
- * 	kernel_slide
+ * Notes:
+ * 	This call is not thread safe.
  */
-kext_result kext_init_containing_address(struct kext *kext, kaddr_t address);
+kext_result kernel_kext(const struct kext **kext, const char *bundle_id);
 
 /*
- * kext_deinit
+ * kext_release
  *
  * Description:
- * 	Clean up the resources from kext_init.
+ * 	Release a reference to a kext obtained with kernel_kext.
  *
  * Parameters:
- * 		kext			The kext struct to clean up.
+ * 		kext			The kext struct.
  */
-void kext_deinit(struct kext *kext);
+void kext_release(const struct kext *kext);
 
 /*
  * kext_find_symbol_fn
@@ -268,27 +223,6 @@ bool kext_add_symbol_finder(const char *bundle_id, kext_find_symbol_fn find_symb
  */
 kext_result kext_find_symbol(const struct kext *kext, const char *symbol,
 		kaddr_t *addr, size_t *size);
-
-/*
- * kext_resolve_symbol
- *
- * Description:
- * 	Resolve the given symbol in the kext, returning the runtime address and size. No special
- * 	symbol finders are checked.
- *
- * Parameters:
- * 		kext			The kext struct for the kernel extension to search.
- * 		symbol			The (mangled) symbol name.
- * 	out	addr			The runtime address of the symbol.
- * 	out	size			A guess of the size of the symbol.
- *
- * Returns:
- * 	KEXT_SUCCESS			Success.
- * 	KEXT_NOT_FOUND			The symbol was not found.
- * 	KEXT_ERROR			An error was encountered.
- */
-kext_result kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr,
-		size_t *size);
 
 /*
  * kext_resolve_address
@@ -399,6 +333,29 @@ bool kext_for_each(kext_for_each_callback_fn callback, void *context);
  * 	kernel_slide
  */
 kext_result kext_containing_address(kaddr_t address, char **bundle_id);
+
+// ---- Convenience functions ---------------------------------------------------------------------
+
+/*
+ * kernel_kext_containing_address
+ *
+ * Description:
+ * 	Load the kext struct for the kernel or kernel extension containing the specified kernel
+ * 	virtual address. The kext must be released with kext_release when no longer needed.
+ *
+ * Parameters:
+ * 	out	kext			On return, a pointer to the kext struct.
+ * 		address			The address to search for.
+ *
+ * Returns:
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_NO_KEXT			No kernel extension contains the given address.
+ * 	KEXT_ERROR			An error was encountered.
+ *
+ * Dependencies:
+ * 	kernel_slide
+ */
+kext_result kernel_kext_containing_address(const struct kext **kext, kaddr_t address);
 
 /*
  * kext_id_find_symbol

@@ -246,7 +246,7 @@ macho_section_data(const struct macho *macho, const struct load_command *segment
 }
 
 macho_result
-macho_find_base(struct macho *macho, uint64_t *base) {
+macho_find_base(const struct macho *macho, uint64_t *base) {
 	const struct load_command *lc = NULL;
 	for (;;) {
 		lc = macho_next_segment(macho, lc);

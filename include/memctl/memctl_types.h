@@ -26,23 +26,6 @@
 #endif // KERNEL_BITS
 
 /*
- * DYNAMIC_KEXTS
- *
- * Description:
- * 	 1 if the platform uses dynamically loaded kernel extensions rather than a prelinked
- * 	 kernelcache.
- */
-#ifndef DYNAMIC_KEXTS
-# if __x86_64__ || __i386__
-#  define DYNAMIC_KEXTS 1
-# elif __arm64__ || __arm__
-#  define DYNAMIC_KEXTS 0
-# else
-#  error It is unknown whether dynamic kexts are supported on this platform or not.
-# endif
-#endif // DYNAMIC_KEXTS
-
-/*
  * KERNELCACHE
  *
  * Description:

@@ -15,6 +15,7 @@
 // CoreFoundation wrappers of OSKext strings.
 static const CFStringRef kCFBundleLoadAddressKey = CFSTR(kOSBundleLoadAddressKey);
 static const CFStringRef kCFBundleLoadSizeKey    = CFSTR(kOSBundleLoadSizeKey);
+static const CFStringRef kCFBundleUUIDKey        = CFSTR(kOSBundleUUIDKey);
 
 /*
  * cfstring_nocopy
@@ -57,14 +58,45 @@ oskext_info_get_load_address_and_size(CFDictionaryRef info, kaddr_t *load_addres
 }
 
 /*
- * oskext_get_load_address_and_size_info
+ * oskext_info_get_uuid_and_version
+ *
+ * Description:
+ * 	Retrieve the UUID and parsed version number from the kext info dictionary.
+ */
+static void
+oskext_info_get_uuid_and_version(CFDictionaryRef info, uuid_t uuid, uint64_t *version) {
+	// Copy the UUID, which may or may not be present.
+	if (uuid != NULL) {
+		CFDataRef uuidinfo = (CFDataRef)CFDictionaryGetValue(info, kCFBundleUUIDKey);
+		if (uuidinfo == NULL) {
+			memset(uuid, 0, sizeof(uuid_t));
+		} else {
+			assert(CFGetTypeID(uuidinfo) == CFDataGetTypeID());
+			assert(CFDataGetLength(uuidinfo) == sizeof(uuid_t));
+			memcpy(uuid, CFDataGetBytePtr(uuidinfo), sizeof(uuid_t));
+		}
+	}
+	// Copy the version.
+	if (version != NULL) {
+		CFStringRef versioninfo = (CFStringRef)CFDictionaryGetValue(info, kCFBundleVersionKey);
+		if (versioninfo == NULL) {
+			*version = 0;
+		} else {
+			assert(CFGetTypeID(versioninfo) == CFStringGetTypeID());
+			*version = OSKextParseVersionCFString(versioninfo);
+		}
+	}
+}
+
+/*
+ * oskext_get_load_info
  *
  * Description:
  * 	Retrieve the kext info dictionary for the specified kext. The dictionary must be released
  * 	by the caller.
  */
 static kext_result
-oskext_get_load_address_and_size_info(const char *kext, CFDictionaryRef *kext_info) {
+oskext_get_load_info(const char *kext, CFDictionaryRef *kext_info) {
 	CFStringRef cfkext = cfstring_nocopy(kext);
 	if (cfkext == NULL) {
 		goto oom;
@@ -75,11 +107,12 @@ oskext_get_load_address_and_size_info(const char *kext, CFDictionaryRef *kext_in
 	if (kexts == NULL) {
 		goto oom;
 	}
-	CFStringRef key_strings[2] = {
-		kCFBundleLoadAddressKey, kCFBundleLoadSizeKey
+	CFStringRef key_strings[4] = {
+		kCFBundleLoadAddressKey, kCFBundleLoadSizeKey,
+		kCFBundleUUIDKey,        kCFBundleVersionKey,
 	};
 	CFArrayRef keys = CFArrayCreate(kCFAllocatorDefault,
-			(const void **)key_strings, 2, &kCFTypeArrayCallBacks);
+			(const void **)key_strings, 4, &kCFTypeArrayCallBacks);
 	if (keys == NULL) {
 		CFRelease(kexts);
 		goto oom;
@@ -107,13 +140,15 @@ oom:
 }
 
 kext_result
-oskext_get_address(const char *bundle_id, kaddr_t *base, size_t *size) {
+oskext_load_info(const char *bundle_id, kaddr_t *base, size_t *size,
+		uuid_t uuid, uint64_t *version) {
 	CFDictionaryRef kext_info;
-	kext_result kr = oskext_get_load_address_and_size_info(bundle_id, &kext_info);
+	kext_result kr = oskext_get_load_info(bundle_id, &kext_info);
 	if (kr != KEXT_SUCCESS) {
 		return kr;
 	}
 	oskext_info_get_load_address_and_size(kext_info, base, size);
+	oskext_info_get_uuid_and_version(kext_info, uuid, version);
 	CFRelease(kext_info);
 	return KEXT_SUCCESS;
 }
