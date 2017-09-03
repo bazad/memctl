@@ -9,6 +9,7 @@
 #include "memctl/oskext.h"
 #endif
 
+#include "algorithm.h"
 #include "memctl_common.h"
 
 #include <assert.h>
@@ -35,43 +36,6 @@ is_kernel_id(const char *bundle_id) {
 }
 
 /*
- * binary_search
- *
- * Description:
- * 	Find a unique element in a sorted array, or find the index at which the element should be
- * 	inserted if it is not present.
- */
-static void *
-binary_search(void *array, size_t element_size, size_t count,
-		int (*compare)(const void *value, const void *element),
-		const void *value, size_t *index) {
-	ssize_t left  = 0;
-	ssize_t right = count - 1;
-	for (;;) {
-		if (right < left) {
-			if (index != NULL) {
-				*index = left;
-			}
-			return NULL;
-		}
-		ssize_t mid = (left + right) / 2;
-		void *element = (void *)((uintptr_t)array + mid * element_size);
-		int cmp = compare(value, element);
-		if (cmp < 0) {
-			right = mid - 1;
-		} else if (cmp > 0) {
-			left = mid + 1;
-		} else {
-			// We assume that there's only one value that's equal.
-			if (index != NULL) {
-				*index = mid;
-			}
-			return element;
-		}
-	}
-}
-
-/*
  * array_insert
  *
  * Description:
@@ -79,17 +43,17 @@ binary_search(void *array, size_t element_size, size_t count,
  * 	returned.
  */
 static void *
-array_insert(void **array, size_t element_size, size_t *count, size_t index) {
+array_insert(void **array, size_t width, size_t *count, size_t index) {
 	size_t newcount = *count + 1;
-	void *newarray = realloc(*array, newcount * element_size);
+	void *newarray = realloc(*array, newcount * width);
 	if (newarray == NULL) {
 		return NULL;
 	}
 	*array = newarray;
 	*count = newcount;
-	void *shift_src = (void *)((uintptr_t)newarray + index * element_size);
-	void *shift_dst = (void *)((uintptr_t)shift_src + element_size);
-	size_t shift_size = (newcount - 1 - index) * element_size;
+	void *shift_src = (void *)((uintptr_t)newarray + index * width);
+	void *shift_dst = (void *)((uintptr_t)shift_src + width);
+	size_t shift_size = (newcount - 1 - index) * width;
 	memmove(shift_dst, shift_src, shift_size);
 	return shift_src;
 }
@@ -102,12 +66,12 @@ array_insert(void **array, size_t element_size, size_t *count, size_t index) {
  * 	Remove an element from an array and move the rest of the elements forward.
  */
 static void
-array_remove(void *array, size_t element_size, size_t *count, size_t index) {
+array_remove(void *array, size_t width, size_t *count, size_t index) {
 	size_t newcount = *count - 1;
 	*count = newcount;
-	void *shift_dst = (void *)((uintptr_t)array + index * element_size);
-	void *shift_src = (void *)((uintptr_t)shift_dst + element_size);
-	size_t shift_size = (newcount - index) * element_size;
+	void *shift_dst = (void *)((uintptr_t)array + index * width);
+	void *shift_src = (void *)((uintptr_t)shift_dst + width);
+	size_t shift_size = (newcount - index) * width;
 	memmove(shift_dst, shift_src, shift_size);
 }
 #endif
@@ -124,9 +88,9 @@ struct kext_analyzers {
 	// The bundle ID. This string is managed by the caller who created this analyzer.
 	const char *bundle_id;
 	// An array of symbol finders.
-	kext_find_symbol_fn *find_symbol_fn;
-	// The number of elements in the find_symbol_fn array.
-	size_t find_symbol_count;
+	kext_symbol_finder_fn *symbol_finders;
+	// The number of elements in the symbol_finders array.
+	size_t symbol_finders_count;
 };
 
 // The array of kext analyzers.
@@ -142,20 +106,20 @@ size_t all_analyzers_count;
  * 	Compare the bundle ID of a kext_analyzers struct.
  */
 static int
-compare_kext_analyzers(const void *value, const void *element) {
-	const char *bundle_id = value;
+compare_kext_analyzers(const void *key, const void *element) {
+	const char *bundle_id = key;
 	const struct kext_analyzers *ka = element;
 	return strcmp(bundle_id, ka->bundle_id);
 }
 
 /*
- * find_kext_analyzers
+ * find_kext_analyzers_for_id
  *
  * Description:
  * 	Find the existing kext_analyzers struct for the given bundle ID.
  */
 static struct kext_analyzers *
-find_kext_analyzers(const char *bundle_id, size_t *insert_index) {
+find_kext_analyzers_for_id(const char *bundle_id, size_t *insert_index) {
 	return (struct kext_analyzers *) binary_search(all_analyzers, sizeof(*all_analyzers),
 			all_analyzers_count, compare_kext_analyzers, bundle_id, insert_index);
 }
@@ -174,7 +138,7 @@ create_kext_analyzers(const char *bundle_id) {
 	}
 	// Try to find the kext_analyzers struct if it already exists.
 	size_t insert_index;
-	struct kext_analyzers *ka = find_kext_analyzers(bundle_id, &insert_index);
+	struct kext_analyzers *ka = find_kext_analyzers_for_id(bundle_id, &insert_index);
 	if (ka != NULL) {
 		return ka;
 	}
@@ -186,9 +150,9 @@ create_kext_analyzers(const char *bundle_id) {
 		return NULL;
 	}
 	// Fill in the new kext_analyzers.
-	ka->bundle_id         = bundle_id;
-	ka->find_symbol_fn    = NULL;
-	ka->find_symbol_count = 0;
+	ka->bundle_id            = bundle_id;
+	ka->symbol_finders       = NULL;
+	ka->symbol_finders_count = 0;
 	return ka;
 }
 
@@ -200,9 +164,9 @@ create_kext_analyzers(const char *bundle_id) {
  */
 static void
 clear_kext_analyzers(struct kext_analyzers *ka) {
-	free(ka->find_symbol_fn);
-	ka->find_symbol_fn    = NULL;
-	ka->find_symbol_count = 0;
+	free(ka->symbol_finders);
+	ka->symbol_finders       = NULL;
+	ka->symbol_finders_count = 0;
 }
 
 /*
@@ -228,19 +192,72 @@ clear_all_analyzers() {
  * 	Add a symbol finder to the kext_analyzers struct.
  */
 static bool
-kext_analyzers_insert_symbol_finder(struct kext_analyzers *ka, kext_find_symbol_fn find_symbol) {
+kext_analyzers_insert_symbol_finder(struct kext_analyzers *ka,
+		kext_symbol_finder_fn symbol_finder) {
 	// Allocate space for the new symbol finder.
-	size_t count = ka->find_symbol_count + 1;
-	kext_find_symbol_fn *fn = realloc(ka->find_symbol_fn, count * sizeof(*fn));
+	size_t count = ka->symbol_finders_count + 1;
+	kext_symbol_finder_fn *fn = realloc(ka->symbol_finders, count * sizeof(*fn));
 	if (fn == NULL) {
 		error_out_of_memory();
 		return false;
 	}
 	// Insert the symbol finder.
-	ka->find_symbol_fn    = fn;
-	ka->find_symbol_count = count;
-	fn[count - 1] = find_symbol;
+	ka->symbol_finders       = fn;
+	ka->symbol_finders_count = count;
+	fn[count - 1] = symbol_finder;
 	return true;
+}
+
+/*
+ * run_symbol_finders
+ *
+ * Description:
+ * 	Run the symbol finders from the given kext_analyzers struct.
+ */
+static void
+run_symbol_finders(const struct kext_analyzers *ka, struct kext *kext) {
+	kext_symbol_finder_fn *symbol_finder = ka->symbol_finders;
+	kext_symbol_finder_fn *end = symbol_finder + ka->symbol_finders_count;
+	error_stop();
+	for (; symbol_finder < end; symbol_finder++) {
+		(*symbol_finder)(kext);
+	}
+	error_start();
+}
+
+/*
+ * init_kext_symbols
+ *
+ * Description:
+ * 	Initialize the symbols in a kext. This includes initializing the symtab and running any
+ * 	matching symbol finders on the kext.
+ */
+static bool
+init_kext_symbols(struct kext *kext) {
+	bool success = symbol_table_init_with_macho(&kext->symtab, &kext->macho);
+	if (!success) {
+		return false;
+	}
+	assert(kext->bundle_id != NULL);
+	const char *bundle_ids[2] = { kext->bundle_id, "" };
+	for (size_t i = 0; i < 2; i++) {
+		struct kext_analyzers *ka = find_kext_analyzers_for_id(bundle_ids[i], NULL);
+		if (ka != NULL) {
+			run_symbol_finders(ka, kext);
+		}
+	}
+	return true;
+}
+
+/*
+ * deinit_kext_symbols
+ *
+ * Description:
+ * 	Free resources allocated by init_kext_symbols.
+ */
+static void
+deinit_kext_symbols(struct kext *kext) {
+	symbol_table_deinit(&kext->symtab);
 }
 
 // ---- Mapping of bundle IDs to kext structs -----------------------------------------------------
@@ -339,8 +356,6 @@ fill_kext_info(struct kext_info *kext_info, const struct macho *macho,
 		return KEXT_ERROR;
 	}
 	kext_info->kext.macho  = *macho;
-	kext_info->kext.symtab = (const struct symtab_command *)macho_find_load_command(macho,
-			NULL, LC_SYMTAB);
 #if KERNELCACHE
 	kext_info->kext.base   = static_base + kernel_slide;
 	kext_info->kext.slide  = kernel_slide;
@@ -351,6 +366,11 @@ fill_kext_info(struct kext_info *kext_info, const struct macho *macho,
 	memcpy(kext_info->uuid, li->uuid, sizeof(kext_info->uuid));
 	kext_info->version     = li->version;
 #endif
+	// Now that the kext and kext_info have been initialized, fill in the symbol table.
+	bool success = init_kext_symbols(&kext_info->kext);
+	if (!success) {
+		return KEXT_ERROR;
+	}
 	return KEXT_SUCCESS;
 }
 
@@ -406,6 +426,7 @@ fail_0:
  */
 static void
 destroy_kext_info(struct kext_info *kext_info) {
+	deinit_kext_symbols(&kext_info->kext);
 	deinit_kext_macho(&kext_info->kext.macho);
 	free(kext_info);
 }
@@ -560,8 +581,9 @@ kernel_init(const char *kernel_path) {
 	kernel.slide = kernel_slide;
 	kernel.bundle_id = KERNEL_ID;
 	// Initialize the symtab.
-	kernel.symtab = (const struct symtab_command *)macho_find_load_command(&kernel.macho, NULL,
-			LC_SYMTAB);
+	if (!init_kext_symbols(&kernel)) {
+		goto fail;
+	}
 	initialized_kernel = kernel_path;
 	return true;
 fail:
@@ -583,6 +605,7 @@ kernel_deinit() {
 		kernel.macho.mh = NULL;
 	}
 #endif
+	deinit_kext_symbols(&kernel);
 	clear_all_analyzers();
 	clear_kexts();
 }
@@ -607,8 +630,8 @@ kernel_kext(const struct kext **kext, const char *bundle_id) {
 	// Find the slot for the given bundle ID. If we fail later on, we'll need to remove this
 	// slot.
 	size_t index;
-	struct kext_info **slot = binary_search(kexts, sizeof(*kexts), kexts_count,
-			compare_kext_info, bundle_id, &index);
+	struct kext_info **slot = (struct kext_info **) binary_search(kexts, sizeof(*kexts),
+			kexts_count, compare_kext_info, bundle_id, &index);
 	if (slot != NULL) {
 		struct kext_info *ki = *slot;
 		assert(ki != NULL);
@@ -676,130 +699,51 @@ kernel_kext_containing_address(const struct kext **kext, kaddr_t address) {
 }
 
 bool
-kext_add_symbol_finder(const char *bundle_id, kext_find_symbol_fn find_symbol) {
+kext_add_symbol_finder(const char *bundle_id, kext_symbol_finder_fn symbol_finder) {
 	struct kext_analyzers *ka = create_kext_analyzers(bundle_id);
 	if (ka == NULL) {
 		return false;
 	}
-	return kext_analyzers_insert_symbol_finder(ka, find_symbol);
+	return kext_analyzers_insert_symbol_finder(ka, symbol_finder);
 }
 
-/*
- * run_symbol_finders
- *
- * Description:
- * 	Run the symbol finders from the given kext_analyzers struct.
- */
-static kext_result
-run_symbol_finders(const struct kext_analyzers *ka, const struct kext *kext,
-		const char *symbol, kaddr_t *addr, size_t *size) {
-	kext_find_symbol_fn *find_symbol = ka->find_symbol_fn;
-	kext_find_symbol_fn *end = find_symbol + ka->find_symbol_count;
-	kext_result kr = KEXT_NOT_FOUND;
-	size_t size0 = 0;
-	size_t *psize = (size == NULL ? NULL : &size0);
-	// Run the symbol finders until one returns something other than KEXT_NOT_FOUND.
-	for (; kr == KEXT_NOT_FOUND && find_symbol < end; find_symbol++) {
-		kr = (*find_symbol)(kext, symbol, addr, psize);
-	}
-	// Clean up the result on success.
-	if (kr == KEXT_SUCCESS && size != NULL) {
-		if (size0 == 0) {
-			size0 = macho_guess_symbol_size(&kext->macho, kext->symtab,
-					*addr - kext->slide);
-		}
-		*size = size0;
-	}
-	return kr;
-}
-
-/*
- * run_matching_symbol_finders
- *
- * Description:
- * 	Run the symbol finders matching the given kext.
- */
-static kext_result
-run_matching_symbol_finders(const struct kext *kext, const char *symbol,
-		kaddr_t *addr, size_t *size) {
-	assert(kext->bundle_id != NULL);
-	const char *bundle_ids[2] = { kext->bundle_id, "" };
-	kext_result kr = KEXT_NOT_FOUND;
-	for (size_t i = 0; kr == KEXT_NOT_FOUND && i < 2; i++) {
-		struct kext_analyzers *ka = find_kext_analyzers(bundle_ids[i], NULL);
-		if (ka != NULL) {
-			kr = run_symbol_finders(ka, kext, symbol, addr, size);
-		}
-	}
-	return kr;
-}
-
-/*
- * kext_resolve_symbol
- *
- * Description:
- * 	Find a symbol using the symbol table.
- */
-static kext_result
-kext_resolve_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
-	if (kext->symtab == NULL) {
+kext_result
+kext_find_symbol(const struct kext *kext, const char *symbol, kaddr_t *address, size_t *size) {
+	uint64_t static_address;
+	bool found = symbol_table_resolve_symbol(&kext->symtab, symbol, &static_address, size);
+	if (!found) {
 		return KEXT_NOT_FOUND;
 	}
-	uint64_t static_addr;
-	macho_result mr = macho_resolve_symbol(&kext->macho, kext->symtab, symbol, &static_addr,
-			size);
-	if (mr != MACHO_SUCCESS) {
-		if (mr == MACHO_NOT_FOUND) {
-			return KEXT_NOT_FOUND;
-		}
-		assert(mr == MACHO_ERROR);
-		return KEXT_ERROR;
-	}
-	*addr = static_addr + kext->slide;
+	*address = static_address + kext->slide;
 	return KEXT_SUCCESS;
 }
 
 kext_result
-kext_find_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
-	kext_result kr = kext_resolve_symbol(kext, symbol, addr, size);
-	if (kr == KEXT_NOT_FOUND) {
-		kr = run_matching_symbol_finders(kext, symbol, addr, size);
-	}
-	return kr;
-}
-
-kext_result
-kext_resolve_address(const struct kext *kext, kaddr_t addr, const char **name, size_t *size,
+kext_resolve_address(const struct kext *kext, kaddr_t address, const char **name, size_t *size,
 		size_t *offset) {
-	if (kext->symtab == NULL) {
-		return KEXT_NOT_FOUND;
-	}
-	uint64_t static_addr = addr - kext->slide;
-	macho_result mr = macho_resolve_address(&kext->macho, kext->symtab, static_addr, name,
-			size, offset);
-	if (mr != MACHO_SUCCESS) {
-		if (mr == MACHO_NOT_FOUND) {
-			if (name != NULL) {
-				*name = NULL;
-			}
-			if (size != NULL) {
-				*size = 0;
-			}
-			if (offset != NULL) {
-				*offset = addr - kext->base;
-			}
-			return KEXT_NOT_FOUND;
+	uint64_t static_address = address - kext->slide;
+	bool found = symbol_table_resolve_address(&kext->symtab, static_address, name, size,
+			offset);
+	if (!found) {
+		if (name != NULL) {
+			*name = NULL;
 		}
-		assert(mr == MACHO_ERROR);
-		return KEXT_ERROR;
+		if (size != NULL) {
+			*size = 0;
+		}
+		if (offset != NULL) {
+			*offset = address - kext->base;
+		}
+		return KEXT_NOT_FOUND;
 	}
 	return KEXT_SUCCESS;
 }
 
 kext_result
-kext_search_data(const struct kext *kext, const void *data, size_t size, int minprot, kaddr_t *addr) {
-	uint64_t static_addr;
-	macho_result mr = macho_search_data(&kext->macho, data, size, minprot, &static_addr);
+kext_search_data(const struct kext *kext, const void *data, size_t size, int minprot,
+		kaddr_t *address) {
+	uint64_t static_address;
+	macho_result mr = macho_search_data(&kext->macho, data, size, minprot, &static_address);
 	if (mr != MACHO_SUCCESS) {
 		if (mr == MACHO_NOT_FOUND) {
 			return KEXT_NOT_FOUND;
@@ -807,7 +751,7 @@ kext_search_data(const struct kext *kext, const void *data, size_t size, int min
 		assert(mr == MACHO_ERROR);
 		return KEXT_ERROR;
 	}
-	*addr = static_addr + kext->slide;
+	*address = static_address + kext->slide;
 	return KEXT_SUCCESS;
 }
 

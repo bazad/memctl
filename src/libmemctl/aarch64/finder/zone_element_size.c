@@ -9,59 +9,35 @@
  *  jump to _kfree_addr, then disassembling _kfree_addr to find a call to _zone_element_size.
  */
 
-#include "memctl/kernel.h"
 #include "memctl/memctl_error.h"
-
 #include "memctl/aarch64/ksim.h"
 
-static kaddr_t _kfree_addr;
-static kaddr_t _zone_element_size;
-
-/*
- * find_symbol
- *
- * Description:
- * 	A symbol finder for kfree_addr and zone_element_size in the kernel.
- */
-static kext_result
-find_symbol(const struct kext *kext, const char *symbol, kaddr_t *addr, size_t *size) {
-	assert(strcmp(kext->bundle_id, KERNEL_ID) == 0);
-	kaddr_t static_addr;
-	if (strcmp(symbol, "_kfree_addr") == 0) {
-		static_addr = _kfree_addr;
-	} else if (strcmp(symbol, "_zone_element_size") == 0) {
-		static_addr = _zone_element_size;
-	} else {
-		return KEXT_NOT_FOUND;
-	}
-	*addr = static_addr + kext->slide;
-	// We have no idea what the real size is, so don't set anything.
-	return KEXT_SUCCESS;
-}
-
 void
-kernel_symbol_finder_init_zone_element_size() {
-#define WARN(sym)	memctl_warning("could not find %s", #sym)
-	error_stop();
-	struct ksim sim;
+kernel_find_zone_element_size(struct kext *kernel) {
+#define NOSYM(sym)	memctl_warning("could not find %s", #sym)
+	// Find __FREE.
 	kaddr_t __FREE = ksim_symbol(NULL, "__FREE");
 	if (__FREE == 0) {
-		WARN(__FREE);
-		goto abort;
+		NOSYM(__FREE);
+		return;
 	}
+	// Find _kfree_addr.
+	struct ksim sim;
 	ksim_set_pc(&sim, __FREE);
+	kaddr_t _kfree_addr = 0;
 	ksim_scan_for_jump(&sim, KSIM_FW, 0, NULL, &_kfree_addr, 8);
 	if (_kfree_addr == 0) {
-		WARN(_kfree_addr);
-		goto abort;
+		NOSYM(_kfree_addr);
+		return;
 	}
+	symbol_table_add_symbol(&kernel->symtab, "_kfree_addr", _kfree_addr);
+	// Find _zone_element_size.
+	kaddr_t _zone_element_size = 0;
 	ksim_set_pc(&sim, _kfree_addr);
 	ksim_scan_for_call(&sim, KSIM_FW, 0, NULL, &_zone_element_size, 12);
 	if (_zone_element_size == 0) {
-		WARN(_zone_element_size);
-		goto abort;
+		NOSYM(_zone_element_size);
+		return;
 	}
-	kext_add_symbol_finder(KERNEL_ID, find_symbol);
-abort:
-	error_start();
+	symbol_table_add_symbol(&kernel->symtab, "_zone_element_size", _zone_element_size);
 }

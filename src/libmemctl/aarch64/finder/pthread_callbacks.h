@@ -1,13 +1,15 @@
 #ifndef MEMCTL__AARCH64__FINDER__PTHREAD_CALLBACKS_H_
 #define MEMCTL__AARCH64__FINDER__PTHREAD_CALLBACKS_H_
 
+#include "memctl/kernel.h"
+
 /*
- * kernel_symbol_finder_init_pthread_callbacks
+ * kernel_find_pthread_callbacks
  *
  * Description:
- * 	Add a kernel symbol finder for the pthread callbacks supplied by pthread_kext_register in
- * 	pthread_shims.c.
+ * 	A special symbol finder for the _pthread_callbacks structure and some of its function
+ * 	pointers. _pthread_callbacks is defined in pthread_shims.c in XNU.
  */
-void kernel_symbol_finder_init_pthread_callbacks(void);
+void kernel_find_pthread_callbacks(struct kext *kernel);
 
 #endif

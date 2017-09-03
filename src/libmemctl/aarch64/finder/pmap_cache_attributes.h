@@ -1,12 +1,14 @@
 #ifndef MEMCTL__AARCH64__FINDER__PMAP_CACHE_ATTRIBUTES_H_
 #define MEMCTL__AARCH64__FINDER__PMAP_CACHE_ATTRIBUTES_H_
 
+#include "memctl/kernel.h"
+
 /*
- * kernel_symbol_finder_init_pmap_cache_attributes
+ * kernel_find_pmap_cache_attributes
  *
  * Description:
- * 	Add a kernel symbol finder for pmap_cache_attributes.
+ * 	A special symbol finder for _pmap_cache_attributes.
  */
-void kernel_symbol_finder_init_pmap_cache_attributes(void);
+void kernel_find_pmap_cache_attributes(struct kext *kernel);
 
 #endif

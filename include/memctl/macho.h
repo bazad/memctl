@@ -180,7 +180,8 @@ const void *macho_find_section(const struct macho *macho,
  * Parameters:
  * 		macho			The macho struct.
  * 		segment			The segment command.
- * 	out	data			On return, a pointer to the contents of the segment.
+ * 	out	data			On return, a pointer to the contents of the segment. May be
+ * 					NULL.
  * 	out	addr			On return, the runtime address of the segment contents.
  * 	out	size			On return, the size of the segment contents.
  */
@@ -198,7 +199,8 @@ void macho_segment_data(const struct macho *macho, const struct load_command *se
  * 		macho			The macho struct.
  * 		segment			The segment command.
  * 		section			The section.
- * 	out	data			On return, a pointer to the contents of the section.
+ * 	out	data			On return, a pointer to the contents of the section. May be
+ * 					NULL.
  * 	out	addr			On return, the runtime address of the section contents.
  * 	out	size			On return, the size of the section contents.
  */
@@ -219,6 +221,42 @@ void macho_section_data(const struct macho *macho, const struct load_command *se
  * 	A macho_result status code.
  */
 macho_result macho_find_base(const struct macho *macho, uint64_t *base);
+
+/*
+ * macho_for_each_symbol_fn
+ *
+ * Description:
+ * 	A callback function type for macho_for_each_symbol
+ *
+ * Parameters:
+ * 		context			Client context.
+ * 		symbol			The symbol name.
+ * 		address			The address of the symbol.
+ *
+ * Returns:
+ * 	True if iteration should stop.
+ */
+typedef bool (*macho_for_each_symbol_fn)(void *context, const char *symbol, uint64_t address);
+
+/*
+ * macho_for_each_symbol
+ *
+ * Description:
+ * 	Call the client-supplied callback function for each symbol in the Mach-O symbol table. The
+ * 	symtab->nsyms field indicates the maximum number of symbols.
+ *
+ * Parameters:
+ * 		macho			The macho struct.
+ * 		symtab			The Mach-O symtab command.
+ * 		callback		The client callback.
+ * 		context			Client context for the callback.
+ *
+ * Notes:
+ * 	The callback may be invoked for fewer than symtab->nsyms symbols if some of the symbols are
+ * 	not of the proper type or if a recoverable parse error is encountered.
+ */
+void macho_for_each_symbol(const struct macho *macho, const struct symtab_command *symtab,
+		macho_for_each_symbol_fn callback, void *context);
 
 /*
  * macho_resolve_symbol

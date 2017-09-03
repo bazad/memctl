@@ -67,18 +67,35 @@ guess_symbol_size(const struct macho *macho, uint64_t addr, uint64_t next) {
 
 // TODO: Make this resilient to malformed images.
 /*
- * macho_string_index
+ * macho_symtab_string
+ *
+ * Description:
+ * 	Find the string at the given index in the symtab.
+ */
+static const char *
+macho_symtab_string(const struct macho *macho, const struct symtab_command *symtab,
+		uint32_t strx) {
+	uintptr_t base = (uintptr_t)macho->mh + symtab->stroff;
+	if (strx < 4 || strx >= symtab->strsize) {
+		return NULL;
+	}
+	return (const char *)(base + strx);
+}
+
+// TODO: Make this resilient to malformed images.
+/*
+ * macho_symtab_string_index
  *
  * Description:
  * 	Find the index of the string in the string table.
  */
-static uint64_t
-macho_string_index(const struct macho *macho, const struct symtab_command *symtab,
+static uint32_t
+macho_symtab_string_index(const struct macho *macho, const struct symtab_command *symtab,
 		const char *name) {
 	uintptr_t base = (uintptr_t)macho->mh + symtab->stroff;
 	const char *str = (const char *)(base + 4);
 	const char *end = (const char *)(base + symtab->strsize);
-	uint64_t strx;
+	uint32_t strx;
 	for (;; str++) {
 		strx = (uintptr_t)str - base;
 		const char *p = name;
@@ -162,7 +179,6 @@ macho_next_load_command(const struct macho *macho, const struct load_command *lc
 		lc = (const struct load_command *)((uintptr_t)lc + lc->cmdsize);
 	}
 	size_t sizeofcmds = MACHO_STRUCT_FIELD(macho, struct mach_header, macho->mh, sizeofcmds);
-	// TODO size_t sizeofcmds = (macho_is_32(macho) ? macho->mh32->sizeofcmds : macho->mh64->sizeofcmds);
 	if ((uintptr_t)lc >= (uintptr_t)macho->mh + sizeofcmds) {
 		lc = NULL;
 	}
@@ -227,7 +243,9 @@ macho_segment_data(const struct macho *macho, const struct load_command *segment
 	size_t   fileoff = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, fileoff);
 	uint64_t vmaddr  = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmaddr);
 	size_t   vmsize  = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmsize);
-	*data = (const void *)((uintptr_t)macho->mh + fileoff);
+	if (data != NULL) {
+		*data = (const void *)((uintptr_t)macho->mh + fileoff);
+	}
 	*addr = vmaddr;
 	*size = vmsize;
 }
@@ -237,10 +255,12 @@ macho_section_data(const struct macho *macho, const struct load_command *segment
 		const void *section, const void **data, uint64_t *addr, size_t *size) {
 	uint64_t section_addr = MACHO_STRUCT_FIELD(macho, struct section, section, addr);
 	size_t   section_size = MACHO_STRUCT_FIELD(macho, struct section, section, size);
-	uint64_t segment_addr = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmaddr);
-	size_t   fileoff = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, fileoff);
-	uint64_t vmoff = section_addr - segment_addr;
-	*data = (const void *)((uintptr_t)macho->mh + fileoff + vmoff);
+	if (data != NULL) {
+		uint64_t segment_addr = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, vmaddr);
+		size_t fileoff = MACHO_STRUCT_FIELD(macho, struct segment_command, segment, fileoff);
+		uint64_t vmoff = section_addr - segment_addr;
+		*data = (const void *)((uintptr_t)macho->mh + fileoff + vmoff);
+	}
 	*addr = section_addr;
 	*size = section_size;
 }
@@ -261,6 +281,27 @@ macho_find_base(const struct macho *macho, uint64_t *base) {
 		}
 		*base = vmaddr;
 		return MACHO_SUCCESS;
+	}
+}
+
+void
+macho_for_each_symbol(const struct macho *macho, const struct symtab_command *symtab,
+		macho_for_each_symbol_fn callback, void *context) {
+	bool stop = false;
+	for (uint32_t i = 0; !stop && i < symtab->nsyms; i++) {
+		const void *nl_i = macho_get_nlist(macho, symtab, i);
+		uint32_t n_strx = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_un.n_strx);
+		uint8_t n_type = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_type);
+		// We can't currently handle STAB entries or non-section symbol types.
+		if ((n_type & N_STAB) != 0 || (n_type & N_TYPE) != N_SECT) {
+			continue;
+		}
+		const char *symbol = macho_symtab_string(macho, symtab, n_strx);
+		if (symbol == NULL) {
+			continue;
+		}
+		uint64_t address = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_value);
+		stop = callback(context, symbol, address);
 	}
 }
 
@@ -287,7 +328,7 @@ macho_next_symbol(const struct macho *macho, const struct symtab_command *symtab
 macho_result
 macho_resolve_symbol(const struct macho *macho, const struct symtab_command *symtab,
 		const char *symbol, uint64_t *addr, size_t *size) {
-	uint64_t strx = macho_string_index(macho, symtab, symbol);
+	uint32_t strx = macho_symtab_string_index(macho, symtab, symbol);
 	if (strx == 0) {
 		return MACHO_NOT_FOUND;
 	}
@@ -295,7 +336,7 @@ macho_resolve_symbol(const struct macho *macho, const struct symtab_command *sym
 	uint32_t symidx = -1;
 	for (uint32_t i = 0; i < symtab->nsyms; i++) {
 		const void *nl_i = macho_get_nlist(macho, symtab, i);
-		uint64_t n_strx = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_un.n_strx);
+		uint32_t n_strx = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_un.n_strx);
 		if (n_strx == strx) {
 			uint8_t n_type = MACHO_STRUCT_FIELD(macho, struct nlist, nl_i, n_type);
 			if ((n_type & N_TYPE) == N_UNDF) {
@@ -362,8 +403,8 @@ macho_resolve_address(const struct macho *macho, const struct symtab_command *sy
 		return MACHO_ERROR;
 	}
 	if (name != NULL) {
-		uint64_t sym_strx = MACHO_STRUCT_FIELD(macho, struct nlist, sym, n_un.n_strx);
-		*name = (const char *)((uintptr_t)macho->mh + symtab->stroff + sym_strx);
+		uint32_t sym_strx = MACHO_STRUCT_FIELD(macho, struct nlist, sym, n_un.n_strx);
+		*name = macho_symtab_string(macho, symtab, sym_strx);
 	}
 	if (size != NULL) {
 		uint64_t next_addr = macho_next_symbol(macho, symtab, sym_addr);

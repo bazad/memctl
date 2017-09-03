@@ -115,11 +115,11 @@ initialize(feature_t features) {
 		LOADED(KERNEL_MEMORY_BASIC);
 	}
 	if (NEED(KERNEL_IMAGE)) {
+		kernel_symbol_finders_init();
 		if (!kernel_init(NULL)) {
 			error_message("could not initialize kernel image");
 			return false;
 		}
-		kernel_symbol_finders_init();
 		LOADED(KERNEL_IMAGE);
 	}
 	if (NEED(KERNEL_SLIDE)) {
