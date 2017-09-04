@@ -14,7 +14,7 @@ struct symbol_table {
 	// The number of symbols.
 	size_t        count;
 	// The symbol names. These are in no particular order.
-	const char ** symbol;
+	char **       symbol;
 	// The address of each symbol, in the same order as the symbol array.
 	kaddr_t *     address;
 	// The symbols above in lexicographical sorted order.
@@ -34,7 +34,9 @@ struct symbol_table {
  *
  * Parameters:
  * 	out	st			The symbol table to initialize.
- * 		macho			The Mach-O containing the symbols.
+ * 		macho			The Mach-O containing the symbols. All data is copied from
+ * 					the Mach-O, so the Mach-O may be freed after this function
+ * 					returns.
  *
  * Returns:
  * 	True if no errors were encountered.
@@ -63,7 +65,8 @@ void symbol_table_deinit(struct symbol_table *st);
  *
  * Parameters:
  * 		st			The symbol table to which a new symbol will be added.
- * 		symbol			The symbol name to add.
+ * 		symbol			The symbol name to add. This string is copied internally,
+ * 					so it may be freed after this function returns.
  * 		address			The address of the symbol.
  *
  * Returns:

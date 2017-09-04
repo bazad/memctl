@@ -1,8 +1,6 @@
 #include "aarch64/finder/pthread_callbacks.h"
 
-#include "memctl/kernel.h"
 #include "memctl/memctl_error.h"
-
 #include "memctl/aarch64/ksim.h"
 
 // A struct to hold symbol information.

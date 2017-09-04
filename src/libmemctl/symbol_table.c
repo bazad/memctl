@@ -51,21 +51,39 @@ count_symbols(const struct macho *macho, const struct symtab_command *symtab) {
 }
 
 /*
+ * struct collect_symbol_context
+ *
+ * Description:
+ * 	Context for collect_symbol and symbol_table_init_with_macho.
+ */
+struct collect_symbol_context {
+	struct symbol_table *st;
+	size_t capacity;
+	bool out_of_memory;
+};
+
+/*
  * collect_symbol
  *
  * Description:
- * 	A macho_for_each_symbol_fn for symbol_table_init_with_macho. We use st->count to track the
- * 	number of available slots in the symbol table.
+ * 	A macho_for_each_symbol_fn for symbol_table_init_with_macho.
  */
 static bool
-collect_symbol(void *context, const char *symbol, uint64_t address) {
-	struct symbol_table *st = context;
-	assert(st->count > 0);
-	// Insert this new symbol to the arrays. We'll worry about sorting later.
-	st->count--;
-	st->symbol[st->count]  = symbol;
+collect_symbol(void *context0, const char *symbol, uint64_t address) {
+	struct collect_symbol_context *context = context0;
+	struct symbol_table *st = context->st;
+	assert(st->count < context->capacity);
+	// Duplicate the symbol string.
+	char *new_symbol = strdup(symbol);
+	if (new_symbol == NULL) {
+		context->out_of_memory = true;
+		return true;
+	}
+	// Insert this new symbol into the arrays.
+	st->symbol[st->count]  = new_symbol;
 	st->address[st->count] = address;
-	return (st->count == 0);
+	st->count++;
+	return (st->count == context->capacity);
 }
 
 /*
@@ -151,16 +169,18 @@ symbol_table_init_with_macho(struct symbol_table *st, const struct macho *macho)
 	}
 	// Create arrays of the requisite capacity.
 	size_t count = count_symbols(macho, symtab);
-	st->count   = count;
 	st->symbol  = malloc(count * sizeof(*st->symbol));
 	st->address = malloc(count * sizeof(*st->address));
 	if (st->symbol == NULL || st->address == NULL) {
 		goto out_of_memory;
 	}
 	// Collect the symbols and addresses.
-	macho_for_each_symbol(macho, symtab, collect_symbol, st);
-	assert(st->count == 0);
-	st->count = count;
+	struct collect_symbol_context context = { st, count, false };
+	macho_for_each_symbol(macho, symtab, collect_symbol, &context);
+	if (context.out_of_memory) {
+		goto out_of_memory;
+	}
+	assert(st->count == count);
 	// Get the lexicographical sort order of the symbols and the numerical sort order of the
 	// addresses.
 	st->sort_symbol  = sort_order(st->symbol,  sizeof(*st->symbol),  count, compare_symbols);
@@ -180,11 +200,14 @@ out_of_memory:
 
 void
 symbol_table_deinit(struct symbol_table *st) {
-	st->count = 0;
 	if (st->symbol != NULL) {
+		for (size_t i = 0; i < st->count; i++) {
+			free(st->symbol[i]);
+		}
 		free(st->symbol);
 		st->symbol = NULL;
 	}
+	st->count = 0;
 	if (st->address != NULL) {
 		free(st->address);
 		st->address = NULL;
@@ -210,7 +233,7 @@ symbol_table_deinit(struct symbol_table *st) {
  */
 struct compare_sort_symbol_key {
 	const char *symbol;
-	const char **symbols;
+	char **symbols;
 };
 
 /*
@@ -291,30 +314,27 @@ find_index_of_address(const struct symbol_table *st, kaddr_t address, size_t *so
  */
 static bool
 grow_arrays(struct symbol_table *st, size_t count) {
-	const char **symbol = realloc(st->symbol, count * sizeof(*st->symbol));
+	char **symbol = realloc(st->symbol, count * sizeof(*st->symbol));
 	if (symbol == NULL) {
-		goto out_of_memory;
+		return false;
 	}
 	st->symbol = symbol;
 	kaddr_t *address = realloc(st->address, count * sizeof(*st->address));
 	if (address == NULL) {
-		goto out_of_memory;
+		return false;
 	}
 	st->address = address;
 	size_t *sort_symbol = realloc(st->sort_symbol, count * sizeof(*st->sort_symbol));
 	if (sort_symbol == NULL) {
-		goto out_of_memory;
+		return false;
 	}
 	st->sort_symbol = sort_symbol;
 	size_t *sort_address = realloc(st->sort_address, count * sizeof(*st->sort_address));
 	if (sort_address == NULL) {
-		goto out_of_memory;
+		return false;
 	}
 	st->sort_address = sort_address;
 	return true;
-out_of_memory:
-	error_out_of_memory();
-	return false;
 }
 
 bool
@@ -329,10 +349,15 @@ symbol_table_add_symbol(struct symbol_table *st, const char *symbol, kaddr_t add
 	// Grow all the arrays.
 	size_t count = st->count;
 	if (!grow_arrays(st, count + 1)) {
-		return false;
+		goto out_of_memory;
+	}
+	// Duplicate the symbol string.
+	char *new_symbol = strdup(symbol);
+	if (new_symbol == NULL) {
+		goto out_of_memory;
 	}
 	// Append the symbol to the end of the symbol and address arrays.
-	st->symbol[count] = symbol;
+	st->symbol[count]  = new_symbol;
 	st->address[count] = address;
 	// Insert the new index in the proper sorted position in the sort_symbol array.
 	memmove(&st->sort_symbol[sort_symbol_index + 1], &st->sort_symbol[sort_symbol_index],
@@ -346,6 +371,9 @@ symbol_table_add_symbol(struct symbol_table *st, const char *symbol, kaddr_t add
 	// All done. Increment count (after all of the find_index_of_* calls, which use count).
 	st->count = count + 1;
 	return true;
+out_of_memory:
+	error_out_of_memory();
+	return false;
 }
 
 /*
