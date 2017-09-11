@@ -1,6 +1,7 @@
 #include "memctl/symbol_table.h"
 
 #include "memctl/memctl_error.h"
+#include "memctl/utility.h"
 
 #include "algorithm.h"
 
@@ -22,7 +23,6 @@ sort_order(const void *array, size_t width, size_t count,
 	}
 	return order;
 }
-
 
 /*
  * count_symbol
@@ -118,49 +118,60 @@ compare_addresses(const void *a0, const void *b0) {
 }
 
 /*
- * find_end_address
+ * collect_segments
  *
  * Description:
- * 	Find the end address of the symbol table.
+ * 	Collect segment information into the symbol table.
  */
-static void
-find_end_address(struct symbol_table *st, const struct macho *macho,
-		const struct symtab_command *symtab) {
-	// Find the ending address of the Mach-O.
-	st->end_address = 0;
+static bool
+collect_segments(struct symbol_table *st, const struct macho *macho) {
+	// Count the number of segments.
 	const struct load_command *sc = NULL;
-	for (;;) {
+	size_t count = 0;
+	for (;; count++) {
 		sc = macho_next_segment(macho, sc);
 		if (sc == NULL) {
 			break;
 		}
+	}
+	// Allocate the arrays.
+	st->segment = malloc(2 * count * sizeof(*st->segment));
+	if (st->segment == NULL) {
+		return false;
+	}
+	// Collect the segment information.
+	sc = NULL;
+	for (size_t i = 0;; i++) {
+		sc = macho_next_segment(macho, sc);
+		if (sc == NULL) {
+			assert(i == count);
+			st->segment_count = i;
+			break;
+		}
+		assert(i < count);
 		uint64_t address;
 		size_t size;
 		macho_segment_data(macho, sc, NULL, &address, &size);
-		if (address + size > st->end_address) {
-			st->end_address = address + size;
-		}
+		st->segment[2 * i]     = address;
+		st->segment[2 * i + 1] = address + size;
 	}
-	// Truncate the ending address by the end of the last symbol.
-	if (st->count > 0) {
-		kaddr_t address = st->address[st->sort_address[st->count - 1]];
-		size_t size = macho_guess_symbol_size(macho, symtab, address);
-		assert(address + size >= address);
-		if (address + size < st->end_address) {
-			st->end_address = address + size;
-		}
-	}
+	return true;
 }
 
 bool
 symbol_table_init_with_macho(struct symbol_table *st, const struct macho *macho) {
 	// Default-initialize.
-	st->count        = 0;
-	st->symbol       = NULL;
-	st->address      = NULL;
-	st->sort_symbol  = NULL;
-	st->sort_address = NULL;
-	st->end_address  = (kaddr_t) (-1);
+	st->count         = 0;
+	st->symbol        = NULL;
+	st->address       = NULL;
+	st->sort_symbol   = NULL;
+	st->sort_address  = NULL;
+	st->segment       = NULL;
+	st->segment_count = 0;
+	// Get the segments.
+	if (!collect_segments(st, macho)) {
+		goto out_of_memory;
+	}
 	// Get the symbol table.
 	const struct symtab_command *symtab = (const struct symtab_command *)
 		macho_find_load_command(macho, NULL, LC_SYMTAB);
@@ -188,8 +199,6 @@ symbol_table_init_with_macho(struct symbol_table *st, const struct macho *macho)
 	if (st->sort_symbol == NULL || st->sort_address == NULL) {
 		goto out_of_memory;
 	}
-	// Find the end_address.
-	find_end_address(st, macho, symtab);
 	// All done.
 	return true;
 out_of_memory:
@@ -220,6 +229,11 @@ symbol_table_deinit(struct symbol_table *st) {
 		free(st->sort_address);
 		st->sort_address = NULL;
 	}
+	if (st->segment != NULL) {
+		free(st->segment);
+		st->segment = NULL;
+	}
+	st->segment_count = 0;
 }
 
 // A sentinel value indicating that the index was not found.
@@ -368,6 +382,7 @@ symbol_table_add_symbol(struct symbol_table *st, const char *symbol, kaddr_t add
 	find_index_of_address(st, address, &sort_address_index);
 	memmove(&st->sort_address[sort_address_index + 1], &st->sort_address[sort_address_index],
 			(count - sort_address_index) * sizeof(*st->sort_address));
+	st->sort_address[sort_address_index] = count;
 	// All done. Increment count (after all of the find_index_of_* calls, which use count).
 	st->count = count + 1;
 	return true;
@@ -377,28 +392,46 @@ out_of_memory:
 }
 
 /*
- * find_next_symbol_address
+ * find_segment_containing_address
  *
  * Description:
- * 	Find the address of the next symbol following the given address. Any symbols that share
- * 	this address are skipped.
+ * 	Find the bounds of the section containing the given address.
+ */
+static bool
+find_segment_containing_address(const struct symbol_table *st, kaddr_t address, kaddr_t *end) {
+	for (size_t i = 0; i < st->segment_count; i++) {
+		if (st->segment[2 * i] <= address && address < st->segment[2 * i + 1]) {
+			*end = st->segment[2 * i + 1];
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+ * find_symbol_end_address
+ *
+ * Description:
+ * 	Find the address of the end of the symbol. This is usually the address of the next symbol,
+ * 	skipping any symbols that share this address.
  */
 static kaddr_t
-find_next_symbol_address(const struct symbol_table *st, kaddr_t address) {
+find_symbol_end_address(const struct symbol_table *st, kaddr_t address, kaddr_t segment_end) {
 	// Find the insertion index in the sort_address array of `address + 1`. This will skip over
-	// any symbols that share the same address, and either put us right on a next symbol, or
-	// put us off the end of the array.
+	// any symbols that share the same address, and either put sort_address_index right on a
+	// next symbol, or put us off the end of the array.
 	size_t sort_address_index;
 	find_index_of_address(st, address + 1, &sort_address_index);
 	assert(sort_address_index <= st->count);
 	if (sort_address_index == st->count) {
-		// This is the last address. The next address is the ending address.
-		return st->end_address;
+		// This is the last address. The end of the symbol is the end of the containing
+		// segment.
+		return segment_end;
 	}
 	assert(st->sort_address[sort_address_index] < st->count);
 	kaddr_t next = st->address[st->sort_address[sort_address_index]];
 	assert(next > address);
-	return next;
+	return min(next, segment_end);
 }
 
 bool
@@ -408,13 +441,16 @@ symbol_table_resolve_symbol(const struct symbol_table *st, const char *symbol,
 	if (index == NOT_FOUND) {
 		return false;
 	}
-	kaddr_t addr = st->address[index];
+	kaddr_t start = st->address[index];
 	if (address != NULL) {
-		*address = addr;
+		*address = start;
 	}
 	if (size != NULL) {
-		kaddr_t next = find_next_symbol_address(st, addr);
-		*size = next - addr;
+		kaddr_t segment_end;
+		bool found = find_segment_containing_address(st, start, &segment_end);
+		assert(found);
+		kaddr_t end = find_symbol_end_address(st, start, segment_end);
+		*size = end - start;
 	}
 	return true;
 }
@@ -422,8 +458,10 @@ symbol_table_resolve_symbol(const struct symbol_table *st, const char *symbol,
 bool
 symbol_table_resolve_address(const struct symbol_table *st, kaddr_t address,
 		const char **symbol, size_t *size, size_t *offset) {
-	if (address >= st->end_address) {
-		// The address falls after the last symbol.
+	kaddr_t segment_end;
+	bool found = find_segment_containing_address(st, address, &segment_end);
+	if (!found) {
+		// The address is not contained in any segment.
 		return false;
 	}
 	// Get the index of the symbol containing the address.
@@ -446,9 +484,9 @@ symbol_table_resolve_address(const struct symbol_table *st, kaddr_t address,
 	}
 	kaddr_t start = st->address[index];
 	if (size != NULL) {
-		kaddr_t next = find_next_symbol_address(st, address);
-		assert(start <= address && address < next);
-		*size = next - start;
+		kaddr_t end = find_symbol_end_address(st, address, segment_end);
+		assert(start <= address && address < end && end <= segment_end);
+		*size = end - start;
 	}
 	if (offset != NULL) {
 		*offset = address - start;

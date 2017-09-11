@@ -59,25 +59,27 @@ endif
 
 ARCH_arm64_DIR = aarch64
 
-LIBMEMCTL_arm64_SRCS = sim.c \
+LIBMEMCTL_arm64_SRCS = finder/kauth_cred_setsvuidgid.c \
+		       finder/pmap_cache_attributes.c \
+		       finder/pthread_callbacks.c \
+		       finder/vtables.c \
+		       finder/zone_element_size.c \
 		       disasm.c \
 		       kernel_call_aarch64.c \
 		       ksim.c \
 		       memory_region.c \
-		       finder/kauth_cred_setsvuidgid.c \
-		       finder/pmap_cache_attributes.c \
-		       finder/pthread_callbacks.c \
-		       finder/zone_element_size.c
+		       sim.c
 
-LIBMEMCTL_arm64_HDRS = kernel_call_aarch64.h \
-		       finder/kauth_cred_setsvuidgid.h \
+LIBMEMCTL_arm64_HDRS = finder/kauth_cred_setsvuidgid.h \
 		       finder/pmap_cache_attributes.h \
 		       finder/pthread_callbacks.h \
-		       finder/zone_element_size.h
+		       finder/vtables.h \
+		       finder/zone_element_size.h \
+		       kernel_call_aarch64.h
 
-LIBMEMCTL_arm64_INCS = sim.h \
-		       disasm.h \
-		       ksim.h
+LIBMEMCTL_arm64_INCS = disasm.h \
+		       ksim.h \
+		       sim.h
 
 # libmemctl x86_64 sources.
 
@@ -107,6 +109,7 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 kernel_slide.c \
 		 kernelcache.c \
 		 macho.c \
+		 mangle.c \
 		 mapped_region.c \
 		 memctl_common.c \
 		 memctl_error.c \
@@ -122,6 +125,7 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 
 LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
 		 algorithm.h \
+		 mangle.h \
 		 memctl_common.h
 
 LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \

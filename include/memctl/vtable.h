@@ -4,6 +4,22 @@
 #include "memctl/kernel.h"
 
 /*
+ * macro VTABLE_OFFSET
+ *
+ * Description:
+ * 	The offset between the vtable symbol and the actual vtable contents, in words.
+ */
+#define VTABLE_OFFSET	2
+
+/*
+ * macro VTABLE_OFFSET_SIZE
+ *
+ * Description:
+ * 	 The offset between the vtable symbol and the actual vtable contents, in bytes.
+ */
+#define VTABLE_OFFSET_SIZE	(VTABLE_OFFSET * sizeof(kword_t))
+
+/*
  * vtable_for_class
  *
  * Description:
@@ -38,6 +54,9 @@ kext_result vtable_for_class(const char *class_name, const char *bundle_id, kadd
  * 		vtable			The vtable address.
  * 	out	classname		On return, the name of the class. Deallocate with free()
  * 					when no longer needed.
+ * 	out	offset			On return, the offset of the address from the start of the
+ * 					vtable symbol. Note that the vtable symbol begins
+ * 					VTABLE_OFFSET_SIZE bytes before the actual vtable contents.
  *
  * Returns:
  * 	KEXT_SUCCESS			Success.
@@ -49,6 +68,6 @@ kext_result vtable_for_class(const char *class_name, const char *bundle_id, kadd
  * Dependencies:
  * 	kernel subsystem
  */
-kext_result vtable_lookup(kaddr_t vtable, char **class_name);
+kext_result vtable_lookup(kaddr_t vtable, char **class_name, size_t *offset);
 
 #endif

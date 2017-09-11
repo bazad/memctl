@@ -298,6 +298,47 @@ find_vtable(const char *classname, const char *bundle_id, kaddr_t *address, size
 	return true;
 }
 
+/*
+ * lookup_vtable
+ *
+ * Print the class name and possibly offset if allow_internal is true for the given vtable address.
+ */
+static bool
+lookup_vtable(kaddr_t address, bool allow_internal) {
+	if (!initialize(KERNEL_SYMBOLS)) {
+		return false;
+	}
+	char *class_name;
+	size_t offset;
+	kext_result kr = vtable_lookup(address, &class_name, &offset);
+	if (kr == KEXT_NO_KEXT) {
+		error_message("address "KADDR_XFMT" is not a vtable", address);
+		return false;
+	} else if (kr == KEXT_NOT_FOUND) {
+		error_message("cannot find class for vtable "KADDR_XFMT, address);
+		return false;
+	} else if (kext_error(kr, NULL, NULL, address)) {
+		return false;
+	}
+	bool success = false;
+	if (!allow_internal && offset != VTABLE_OFFSET_SIZE) {
+		const char *where = (offset < VTABLE_OFFSET_SIZE ? "before" : "inside");
+		error_message("address "KADDR_XFMT" is %s the vtable for class %s",
+		              address, where, class_name);
+		goto end;
+	}
+	success = true;
+	ssize_t soffset = offset - VTABLE_OFFSET_SIZE;
+	if (soffset == 0) {
+		printf("%s\n", class_name);
+	} else {
+		printf("%s  (%+zd)\n", class_name, soffset);
+	}
+end:
+	free(class_name);
+	return success;
+}
+
 bool
 default_action(void) {
 #if MEMCTL_REPL
@@ -471,7 +512,7 @@ lc_command(kaddr_t address) {
 	kaddr_t vtable;
 	size_t size = sizeof(vtable);
 	return read_kernel(address, &size, &vtable, 0, 0)
-		&& vtl_command(vtable);
+		&& lookup_vtable(vtable, false);
 }
 
 bool
@@ -572,23 +613,7 @@ vt_command(const char *classname, const char *bundle_id) {
 
 bool
 vtl_command(kaddr_t address) {
-	if (!initialize(KERNEL_SYMBOLS)) {
-		return false;
-	}
-	char *class_name;
-	kext_result kr = vtable_lookup(address, &class_name);
-	if (kr == KEXT_NO_KEXT) {
-		error_message("address "KADDR_XFMT" is not a vtable", address);
-		return false;
-	} else if (kr == KEXT_NOT_FOUND) {
-		error_message("cannot find class for vtable "KADDR_XFMT, address);
-		return false;
-	} else if (kext_error(kr, NULL, NULL, address)) {
-		return false;
-	}
-	printf("%s\n", class_name);
-	free(class_name);
-	return true;
+	return lookup_vtable(address, true);
 }
 
 bool
@@ -737,7 +762,7 @@ s_command(kaddr_t address) {
 			printf("%s+%zu\n", kext->bundle_id, offset);
 		}
 	} else if (kr == KEXT_SUCCESS || kr == KEXT_NOT_FOUND) {
-		if (offset == 0) {
+		if (segoffset == 0) {
 			printf("%s.%s\n", kext->bundle_id, segname);
 		} else {
 			printf("%s.%s+%zu\n", kext->bundle_id, segname, segoffset);

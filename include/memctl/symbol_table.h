@@ -21,9 +21,11 @@ struct symbol_table {
 	size_t *      sort_symbol;
 	// The addresses above in sorted order.
 	size_t *      sort_address;
-	// The end address of the symbol table. This is the address of the first byte that is not
-	// part of the last symbol.
-	kaddr_t       end_address;
+	// The memory segments underlying the symbol table. The segment information is used to
+	// truncate symbols. Information about each segment is stored as a pair of addresses: the
+	// start address followed by the end address.
+	kaddr_t *     segment;
+	size_t        segment_count;
 };
 
 /*
