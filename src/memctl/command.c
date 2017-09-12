@@ -164,11 +164,17 @@ fail:
  * 	characters needed to store the full string is returned.
  */
 static size_t
-write_command_usage_oneline(const struct command *command, char *buf, size_t size) {
+write_command_usage_oneline(const struct command *command, char *buf, size_t size,
+		bool abbreviated) {
 	size_t written = 0;
 	WRITE("%s", command->command);
 	for (size_t i = 0; i < command->argspecc; i++) {
 		const struct argspec *s = &command->argspecv[i];
+		// If we're doing an abbreviated usage, skip options.
+		if (abbreviated && spec_is_option(s)) {
+			continue;
+		}
+		// Insert a space unless it's an unnamed option.
 		if (!(spec_is_option(s) && s->option[0] == 0)) {
 			WRITE(" ");
 		}
@@ -196,7 +202,7 @@ help_all() {
 	// Get the length of the usage string.
 	size_t usage_length = 4;
 	for (; c < end; c++) {
-		size_t length = write_command_usage_oneline(c, NULL, 0);
+		size_t length = write_command_usage_oneline(c, NULL, 0, true);
 		if (length > usage_length) {
 			usage_length = length;
 		}
@@ -209,7 +215,7 @@ help_all() {
 		return false;
 	}
 	for (c = cli.commands; c < end; c++) {
-		write_command_usage_oneline(c, buf, usage_length);
+		write_command_usage_oneline(c, buf, usage_length, true);
 		fprintf(stderr, "%-*s %s\n", (int)usage_length, buf, c->description);
 	}
 	free(buf);
@@ -226,13 +232,13 @@ static bool
 help_command(const struct command *command) {
 	bool success = false;
 	// Print out the oneline usage and description.
-	size_t length = write_command_usage_oneline(command, NULL, 0);
+	size_t length = write_command_usage_oneline(command, NULL, 0, false);
 	char *buf = malloc(length + 1);
 	if (buf == NULL) {
 		error_out_of_memory();
 		goto fail;
 	}
-	write_command_usage_oneline(command, buf, length + 1);
+	write_command_usage_oneline(command, buf, length + 1, false);
 	fprintf(stderr, "\n%s\n\n    %s\n", buf, command->description);
 	free(buf);
 	// Get the argspec length.
