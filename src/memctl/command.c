@@ -140,7 +140,7 @@ write_argspec_usage_oneline(const struct argspec *argspec, char *buf, size_t siz
 	if (argspec->option == ARGUMENT) {
 		WRITE("<%s>", argspec->argument);
 	} else if (argspec->option == OPTIONAL) {
-		WRITE("[<%s>]", argspec->argument);
+		WRITE("[%s]", argspec->argument);
 	} else {
 		if (argspec->type == ARG_NONE) {
 			WRITE("[-%s]", argspec->option);
