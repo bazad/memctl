@@ -216,10 +216,70 @@ help_all() {
 	}
 	for (c = cli.commands; c < end; c++) {
 		write_command_usage_oneline(c, buf, usage_length, true);
-		fprintf(stderr, "%-*s %s\n", (int)usage_length, buf, c->description);
+		fprintf(stderr, "%-*s %s\n", (int)usage_length, buf, c->short_description);
 	}
 	free(buf);
 	return true;
+}
+
+/*
+ * break_and_print_indented_string
+ *
+ * Description:
+ * 	Print a string with indentation, breaking it with newlines every so often.
+ */
+static void
+break_and_print_indented_string(FILE *file, size_t indent, const char *string) {
+	const size_t columns = 80;
+	const size_t max_chars = columns - indent;
+	size_t next_pos = 0;
+	for (;;) {
+		// Loop until:
+		// 1. We reach the maximum line length, in which case we will print print_len
+		//    characters and then start the next line at position next_pos;
+		// 2. We encounter a NULL terminator, in which case we print the full line and
+		//    abort;
+		// 3. We encounter a newline, which means we are starting a new paragraph.
+		bool new_paragraph = false;
+		size_t begin     = next_pos;
+		size_t pos       = begin;
+		size_t print_len = 0;
+		for (size_t n = 0;; n++, pos++) {
+			if (n >= max_chars) {
+				// If we haven't yet found a place to divide, just print the whole
+				// block.
+				if (print_len == 0) {
+					print_len = n;
+					next_pos = pos;
+				}
+				break;
+			}
+			if (string[pos] == 0) {
+				print_len = n;
+				next_pos  = 0;
+				break;
+			}
+			if (string[pos] == ' ' || string[pos] == '\n') {
+				print_len = n;
+				next_pos = pos + 1;
+			}
+			if (string[pos] == '\n') {
+				// Do a new paragraph.
+				new_paragraph = true;
+				break;
+			}
+		}
+		// Now, print the print_len characters from the line starting at position begin.
+		fprintf(file, "%*s%.*s\n", (int)indent, "", (int)print_len, string + begin);
+		// Handle a new paragraph.
+		if (new_paragraph) {
+			fprintf(file, "\n");
+		}
+		// End the loop once we finish the string.
+		if (next_pos == 0) {
+			break;
+		}
+	}
 }
 
 /*
@@ -239,8 +299,9 @@ help_command(const struct command *command) {
 		goto fail;
 	}
 	write_command_usage_oneline(command, buf, length + 1, false);
-	fprintf(stderr, "\n%s\n\n    %s\n", buf, command->description);
+	fprintf(stderr, "\n%s\n\n", buf);
 	free(buf);
+	break_and_print_indented_string(stderr, 4, command->long_description);
 	// Get the argspec length.
 	const struct argspec *s = command->argspecv;
 	const struct argspec *const send = s + command->argspecc;

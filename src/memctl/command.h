@@ -127,7 +127,9 @@ struct command {
 	// A handler for this command.
 	handler_fn handler;
 	// A description of this command.
-	const char *description;
+	const char *short_description;
+	// A longer description of this command.
+	const char *long_description;
 	// The number of elements in the argspecv array.
 	size_t argspecc;
 	// An array of argspec structures describing the options and arguments.

@@ -481,10 +481,13 @@ static struct command commands[] = {
 	{
 		"i", NULL, i_handler,
 		"Print system information",
+		"Print general information about the system.",
 		0, NULL,
 	}, {
 		"r", NULL, r_handler,
 		"Read and print formatted memory",
+		"Read data from kernel virtual or physical memory and print it with the specified "
+		"formatting.",
 		ARGSPEC(7) {
 			{ "",       "width",   ARG_WIDTH,   "The width to display each value" },
 			{ "d",      NULL,      ARG_NONE,    "Use dump format with ASCII"      },
@@ -497,6 +500,8 @@ static struct command commands[] = {
 	}, {
 		"rb", "r", rb_handler,
 		"Print raw binary data from memory",
+		"Read data from kernel virtual or physical memory and write the binary data "
+		"directly to stdout.",
 		ARGSPEC(5) {
 			{ "f",      NULL,      ARG_NONE,    "Force read (unsafe)"         },
 			{ "p",      NULL,      ARG_NONE,    "Read physical memory"        },
@@ -508,6 +513,7 @@ static struct command commands[] = {
 	}, {
 		"ri", "r", ri_handler,
 		"Disassemble kernel memory",
+		"Print the disassembly of kernel memory.",
 		ARGSPEC(5) {
 			{ "f",      NULL,      ARG_NONE,    "Force read (unsafe)"                },
 			{ "p",      NULL,      ARG_NONE,    "Read physical memory"               },
@@ -518,6 +524,7 @@ static struct command commands[] = {
 	}, {
 		"rif", "ri", rif_handler,
 		"Disassemble a function",
+		"Disassemble the named kernel function.",
 		ARGSPEC(3) {
 			{ "f",      NULL,       ARG_NONE,   "Force read (unsafe)"         },
 			{ "x",      "access",   ARG_WIDTH,  "The memory access width"     },
@@ -527,6 +534,7 @@ static struct command commands[] = {
 	}, {
 		"rs", "r", rs_handler,
 		"Read a string from memory",
+		"Read and print an ASCII string from kernel memory.",
 		ARGSPEC(5) {
 			{ "f",      NULL,      ARG_NONE,    "Force read (unsafe)"       },
 			{ "p",      NULL,      ARG_NONE,    "Read physical memory"      },
@@ -537,6 +545,7 @@ static struct command commands[] = {
 	}, {
 		"w", NULL, w_handler,
 		"Write an integer to memory",
+		"Write an integer to kernel virtual or physical memory.",
 		ARGSPEC(6) {
 			{ "",       "width",   ARG_WIDTH,   "The width of the value"  },
 			{ "f",      NULL,      ARG_NONE,    "Force write (unsafe)"    },
@@ -548,6 +557,7 @@ static struct command commands[] = {
 	}, {
 		"wd", "w", wd_handler,
 		"Write arbitrary data to memory",
+		"Write data (specified as a hexadecimal string) to kernel memory.",
 		ARGSPEC(5) {
 			{ "f",      NULL,      ARG_NONE,    "Force write (unsafe)"    },
 			{ "p",      NULL,      ARG_NONE,    "Write physical memory"   },
@@ -558,6 +568,7 @@ static struct command commands[] = {
 	}, {
 		"ws", "w", ws_handler,
 		"Write a string to memory",
+		"Write a NULL-terminated ASCII string to kernel memory.",
 		ARGSPEC(5) {
 			{ "f",      NULL,      ARG_NONE,    "Force write (unsafe)"    },
 			{ "p",      NULL,      ARG_NONE,    "Write physical memory"   },
@@ -568,6 +579,8 @@ static struct command commands[] = {
 	}, {
 		"f", NULL, f_handler,
 		"Find an integer in memory",
+		"Scan through kernel memory for an integer and print all addresses at which it "
+		"is found.",
 		ARGSPEC(7) {
 			{ "",       "width",  ARG_WIDTH, "The width of the value"      },
 			{ "p",      NULL,     ARG_NONE,  "Search physical memory"      },
@@ -580,12 +593,15 @@ static struct command commands[] = {
 	}, {
 		"fpr", "f", fpr_handler,
 		"Find the proc struct for a process",
+		"Find the in-kernel process structure (struct proc) for a process by its PID.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "pid", ARG_INT, "The pid of the process" },
 		},
 	}, {
 		"fc", "f", fc_handler,
 		"Find instances of a C++ class",
+		"Scan through kernel memory for instances of a C++ class and print the address of "
+		"each instance.",
 		ARGSPEC(5) {
 			{ "b",      "kext",   ARG_STRING, "The bundle ID of the kext defining the class" },
 			{ "k",      NULL,     ARG_NONE,   "The class is defined in the kernel"           },
@@ -596,30 +612,37 @@ static struct command commands[] = {
 	}, {
 		"lc", NULL, lc_handler,
 		"Look up the class of a C++ object",
+		"Try to determine the C++ class from a C++ object pointer.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "The address of the C++ object" },
 		}
 	}, {
 		"kp", NULL, kp_handler,
 		"Translate virtual to physical address",
+		"Translate a kernel virtual address to a physical address.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "The kernel virtual address" },
 		},
 	}, {
 		"kpm", "kp", kpm_handler,
 		"Print virtual to physical address map",
+		"Print a mapping from kernel virtual addresses to physical addresses.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "range", ARG_RANGE, "The range of virtual addresses" },
 		},
 	}, {
 		"zs", NULL, zs_handler,
 		"Get zalloc memory size",
+		"Call the kernel function zone_element_size to determine the allocation size of "
+		"the specified address.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "The virtual address" },
 		},
 	}, {
 		"pca", NULL, pca_handler,
 		"Show physical cache attributes",
+		"Call the kernel function pmap_cache_attributes to retrieve physical cache "
+		"attributes (WIMG bits) for the specified physical (or virtual) address.",
 		ARGSPEC(2) {
 			{ "v",      NULL,      ARG_NONE,    "Use a virtual address"           },
 			{ ARGUMENT, "address", ARG_ADDRESS, "The physical or virtual address" },
@@ -627,6 +650,7 @@ static struct command commands[] = {
 	}, {
 		"vt", NULL, vt_handler,
 		"Find the vtable of a C++ class",
+		"Print the address of the virtual method table for a C++ class.",
 		ARGSPEC(3) {
 			{ "b",      "kext",  ARG_STRING, "The bundle ID of the kext defining the class" },
 			{ "k",      NULL,    ARG_NONE,   "The class is defined in the kernel"           },
@@ -635,12 +659,15 @@ static struct command commands[] = {
 	}, {
 		"vtl", "vt", vtl_handler,
 		"Look up the class name for a vtable",
+		"Print the name of the C++ class for a given C++ virtual method table.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "The vtable address" },
 		},
 	}, {
 		"vm", NULL, vm_handler,
 		"Show virtual memory information",
+		"Show virtual memory information for the memory region containing the given "
+		"address.",
 		ARGSPEC(2) {
 			{ "d",      "depth",   ARG_UINT,    "The maximum submap depth" },
 			{ ARGUMENT, "address", ARG_ADDRESS, "The virtual address"      },
@@ -648,19 +675,25 @@ static struct command commands[] = {
 	}, {
 		"vmm", "vm", vmm_handler,
 		"Show virtual memory information for range",
+		"Show virtual memory information for all memory regions intersecting the given "
+		"memory range.",
 		ARGSPEC(2) {
 			{ "d",      "depth", ARG_UINT,  "The maximum submap depth"       },
 			{ OPTIONAL, "range", ARG_RANGE, "The range of virtual addresses" },
 		},
 	}, {
 		"vma", "vm", vma_handler,
-		"Allocate virtual memory (mach_vm_allocate)",
+		"Allocate virtual memory",
+		"Allocate virtual memory using mach_vm_allocate.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "size", ARG_UINT, "The number of bytes to allocate" },
 		}
 	}, {
 		"vmd", "vm", vmd_handler,
 		"Deallocate virtual memory",
+		"Deallocate virtual memory using mach_vm_deallocate."
+		"\nIf size is not specified, then it defaults to the number of bytes from address "
+		"to the end of the region.",
 		ARGSPEC(2) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "The address to deallocate"         },
 			{ OPTIONAL, "size",    ARG_UINT,    "The number of bytes to deallocate" },
@@ -668,6 +701,9 @@ static struct command commands[] = {
 	}, {
 		"vmp", "vm", vmp_handler,
 		"Set virtual memory protection",
+		"Set the virtual memory protection bits for a virtual memory region."
+		"\nIf length is not specified, then it defaults to 1, meaning the new protection "
+		"will be set on only the one page containing the given address.",
 		ARGSPEC(3) {
 			{ ARGUMENT, "protection", ARG_STRING,  "The new virtual memory protection (e.g. 'r-x')" },
 			{ ARGUMENT, "address",    ARG_ADDRESS, "The address to protect"                         },
@@ -676,6 +712,8 @@ static struct command commands[] = {
 	}, {
 		"ks", NULL, ks_handler,
 		"Kernel slide",
+		"Print the kernel slide, or if address is specified, add the kernel slide to the "
+		"address.",
 		ARGSPEC(2) {
 			{ "u",      NULL,      ARG_NONE,    "Unslide the address"  },
 			{ OPTIONAL, "address", ARG_ADDRESS, "The address to slide" },
@@ -683,12 +721,16 @@ static struct command commands[] = {
 	}, {
 		"a", NULL, a_handler,
 		"Find the address of a symbol",
+		"Print the address of a kernel symbol.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "symbol", ARG_SYMBOL, "The symbol to resolve" },
 		},
 	}, {
 		"ap", "a", ap_handler,
 		"Address permutation",
+		"Print the address permutation value, or if address is specified, permute the "
+		"address."
+		"\nThis functionality may not be available on iOS.",
 		ARGSPEC(2) {
 			{ "u",      NULL,      ARG_NONE,    "Unpermute the address"  },
 			{ OPTIONAL, "address", ARG_ADDRESS, "The address to permute" },
@@ -696,12 +738,14 @@ static struct command commands[] = {
 	}, {
 		"s", NULL, s_handler,
 		"Find the symbol for an address",
+		"Print information about the kernel symbol containing an address.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "The address to resolve" },
 		},
 	}, {
 		"kcd", NULL, kcd_handler,
 		"Decompress a kernelcache",
+		"Decompress a kernelcache and write it to stdout or a file.",
 		ARGSPEC(2) {
 			{ "o",      "output", ARG_STRING, "The output file"      },
 #if KERNELCACHE
@@ -713,12 +757,14 @@ static struct command commands[] = {
 	}, {
 		"root", NULL, root_handler,
 		"Exec a root shell",
+		"Execute a shell with UID and GID 0. The shell replaces the current process.",
 		0, NULL,
 	}
 #if MEMCTL_REPL
 	, {
 		"quit", NULL, quit_handler,
 		"Exit the REPL",
+		"If running in a REPL, exit the REPL.",
 		0, NULL,
 	}
 #endif
