@@ -101,6 +101,7 @@ LIBMEMCTL_ARCH_INCS = $(LIBMEMCTL_$(ARCH)_INCS:%=$(ARCH_$(ARCH)_DIR)/%)
 
 LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 algorithm.c \
+		 class.c \
 		 core.c \
 		 error.c \
 		 kernel.c \
@@ -120,8 +121,7 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 process.c \
 		 symbol_finders.c \
 		 symbol_table.c \
-		 task_memory.c \
-		 vtable.c
+		 task_memory.c
 
 LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
 		 algorithm.h \
@@ -129,6 +129,7 @@ LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
 		 memctl_common.h
 
 LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
+		 class.h \
 		 core.h \
 		 error.h \
 		 kernel.h \
@@ -150,8 +151,7 @@ LIBMEMCTL_INCS = $(LIBMEMCTL_ARCH_INCS) \
 		 symbol_finders.h \
 		 symbol_table.h \
 		 task_memory.h \
-		 utility.h \
-		 vtable.h
+		 utility.h
 
 LIBMEMCTL_SRCS := $(LIBMEMCTL_SRCS:%=$(SRC_DIR)/$(LIBMEMCTL_DIR)/%)
 LIBMEMCTL_HDRS := $(LIBMEMCTL_HDRS:%=$(SRC_DIR)/$(LIBMEMCTL_DIR)/%)

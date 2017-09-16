@@ -118,6 +118,24 @@ fail:
 }
 
 /*
+ * validate_options_b_k
+ *
+ * Description:
+ * 	Handle the (mutually exclusive) [-b kext] and [-k] options.
+ */
+static bool
+validate_options_b_k(const char *command, const char **bundle_id, bool in_kernel) {
+	if (in_kernel) {
+		if (*bundle_id != NULL) {
+			error_usage(command, NULL, "b and k options are mutually exclusive");
+			return false;
+		}
+		*bundle_id = KERNEL_ID;
+	}
+	return true;
+}
+
+/*
  * default_virtual_range
  *
  * Description:
@@ -332,12 +350,8 @@ HANDLER(fc_handler) {
 	size_t access         = OPT_GET_WIDTH_OR(2, "x", "access", 0);
 	const char *classname = ARG_GET_STRING(3, "class");
 	struct argrange range = ARG_GET_RANGE_OR(4, "range", 0, -1);
-	if (in_kernel) {
-		if (bundle_id != NULL) {
-			error_usage("fi", NULL, "b and k options are mutually exclusive");
-			return false;
-		}
-		bundle_id = KERNEL_ID;
+	if (!validate_options_b_k("fc", &bundle_id, in_kernel)) {
+		return false;
 	}
 	return fc_command(range.start, range.end, classname, bundle_id, access);
 }
@@ -345,6 +359,26 @@ HANDLER(fc_handler) {
 HANDLER(lc_handler) {
 	kaddr_t address = ARG_GET_ADDRESS(0, "address");
 	return lc_command(address);
+}
+
+HANDLER(cm_handler) {
+	const char *bundle_id = OPT_GET_STRING_OR(0, "b", "kext", NULL);
+	bool in_kernel        = OPT_PRESENT(1, "k");
+	const char *classname = ARG_GET_STRING(2, "class");
+	if (!validate_options_b_k("cm", &bundle_id, in_kernel)) {
+		return false;
+	}
+	return cm_command(classname, NULL);
+}
+
+HANDLER(cz_handler) {
+	const char *bundle_id = OPT_GET_STRING_OR(0, "b", "kext", NULL);
+	bool in_kernel        = OPT_PRESENT(1, "k");
+	const char *classname = ARG_GET_STRING(2, "class");
+	if (!validate_options_b_k("cz", &bundle_id, in_kernel)) {
+		return false;
+	}
+	return cz_command(classname, bundle_id);
 }
 
 HANDLER(kp_handler) {
@@ -375,12 +409,8 @@ HANDLER(vt_handler) {
 	const char *bundle_id = OPT_GET_STRING_OR(0, "b", "kext", NULL);
 	bool in_kernel        = OPT_PRESENT(1, "k");
 	const char *classname = ARG_GET_STRING(2, "class");
-	if (in_kernel) {
-		if (bundle_id != NULL) {
-			error_usage("vt", NULL, "b and k options are mutually exclusive");
-			return false;
-		}
-		bundle_id = KERNEL_ID;
+	if (!validate_options_b_k("vt", &bundle_id, in_kernel)) {
+		return false;
 	}
 	return vt_command(classname, bundle_id);
 }
@@ -615,7 +645,25 @@ static struct command commands[] = {
 		"Try to determine the C++ class from a C++ object pointer.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "The address of the C++ object" },
-		}
+		},
+	}, {
+		"cm", NULL, cm_handler,
+		"Get the C++ metaclass pointer",
+		"Find the C++ metaclass instance for a class.",
+		ARGSPEC(3) {
+			{ "b",      "kext",  ARG_STRING, "The bundle ID of the kext defining the class" },
+			{ "k",      NULL,    ARG_NONE,   "The class is defined in the kernel"           },
+			{ ARGUMENT, "class", ARG_STRING, "The C++ class name"                           },
+		},
+	}, {
+		"cz", NULL, cz_handler,
+		"Get the size of a C++ class",
+		"Find the size of a C++ class.",
+		ARGSPEC(3) {
+			{ "b",      "kext",  ARG_STRING, "The bundle ID of the kext defining the class" },
+			{ "k",      NULL,    ARG_NONE,   "The class is defined in the kernel"           },
+			{ ARGUMENT, "class", ARG_STRING, "The C++ class name"                           },
+		},
 	}, {
 		"kp", NULL, kp_handler,
 		"Translate virtual to physical address",

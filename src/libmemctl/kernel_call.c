@@ -70,12 +70,12 @@
  *  perform the actual function call.
  */
 
+#include "memctl/class.h"
 #include "memctl/core.h"
 #include "memctl/kernel.h"
 #include "memctl/kernel_memory.h"
 #include "memctl/memctl_signal.h"
 #include "memctl/utility.h"
-#include "memctl/vtable.h"
 
 #include "memctl_common.h"
 
@@ -383,8 +383,8 @@ find_registry_entry_with_id(kaddr_t vtable, uint64_t id, kaddr_t *object, kaddr_
  */
 static bool
 get_user_client_vtable() {
-	kext_result kr = vtable_for_class(user_client_name, kext_name, &hook.vtable,
-	                                  &hook.vtable_size);
+	kext_result kr = class_vtable(user_client_name, kext_name, &hook.vtable,
+	                              &hook.vtable_size);
 	if (kr != KEXT_SUCCESS) {
 		error_internal("could not locate vtable for class %s", user_client_name);
 		return false;

@@ -42,7 +42,7 @@
  */
 
 #include "memctl/aarch64/ksim.h"
-#include "memctl/vtable.h"
+#include "memctl/class.h"
 
 #include "mangle.h"
 
@@ -289,7 +289,7 @@ add_symbols(struct symbol_table *symtab, const char *class_name, kaddr_t metacla
 		return;
 	}
 	// Add the metaclass symbol.
-	const char *metaclass_name[2] = { class_name, "gMetaClass" };
+	const char *metaclass_name[2] = { class_name, METACLASS_INSTANCE_NAME };
 	size_t metaclass_symbol_size = mangle_class_name(NULL, 0, metaclass_name, 2) + 1;
 	char metaclass_symbol[metaclass_symbol_size];
 	mangle_class_name(metaclass_symbol, metaclass_symbol_size, metaclass_name, 2);

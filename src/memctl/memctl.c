@@ -8,6 +8,7 @@
 #include "read.h"
 #include "vmmap.h"
 
+#include "memctl/class.h"
 #include "memctl/kernel.h"
 #include "memctl/kernel_slide.h"
 #include "memctl/kernelcache.h"
@@ -15,7 +16,6 @@
 #include "memctl/platform.h"
 #include "memctl/privilege_escalation.h"
 #include "memctl/process.h"
-#include "memctl/vtable.h"
 
 #include <stdio.h>
 
@@ -281,16 +281,17 @@ find_vtable(const char *classname, const char *bundle_id, kaddr_t *address, size
 	if (!initialize(KERNEL_SYMBOLS)) {
 		return false;
 	}
-	kext_result kr = vtable_for_class(classname, bundle_id, address, size);
+	kext_result kr = class_vtable(classname, bundle_id, address, size);
 	if (kr == KEXT_NOT_FOUND) {
-		if (bundle_id == NULL) {
-			error_message("class %s not found", classname);
-		} else if (strcmp(bundle_id, KERNEL_ID) == 0) {
-			error_message("class %s not found in kernel", classname);
-		} else {
-			error_message("class %s not found in kernel extension %s", classname,
-			              bundle_id);
+		const char *location = "";
+		const char *extra = "";
+		if (strcmp(bundle_id, KERNEL_ID) == 0) {
+			location = "in the kernel";
+		} else if (bundle_id != NULL) {
+			location = "in kernel extension ";
+			extra = bundle_id;
 		}
+		error_message("class %s not found%s%s", classname, location, extra);
 		return false;
 	} else if (kext_error(kr, bundle_id, NULL, 0)) {
 		return false;
@@ -310,7 +311,7 @@ lookup_vtable(kaddr_t address, bool allow_internal) {
 	}
 	char *class_name;
 	size_t offset;
-	kext_result kr = vtable_lookup(address, &class_name, &offset);
+	kext_result kr = class_vtable_lookup(address, &class_name, &offset);
 	if (kr == KEXT_NO_KEXT) {
 		error_message("address "KADDR_XFMT" is not a vtable", address);
 		return false;
@@ -338,6 +339,36 @@ end:
 	free(class_name);
 	return success;
 }
+
+/*
+ * find_metaclass
+ *
+ * Description:
+ * 	Find the metaclass instance for the given class name.
+ */
+static bool
+find_metaclass(const char *classname, const char *bundle_id, kaddr_t *address) {
+	if (!initialize(KERNEL_SYMBOLS)) {
+		return false;
+	}
+	kext_result kr = class_metaclass(classname, bundle_id, address);
+	if (kr == KEXT_NOT_FOUND) {
+		const char *location = "";
+		const char *extra = "";
+		if (strcmp(bundle_id, KERNEL_ID) == 0) {
+			location = "in the kernel";
+		} else if (bundle_id != NULL) {
+			location = "in kernel extension ";
+			extra = bundle_id;
+		}
+		error_message("metaclass for class %s not found%s%s", classname, location, extra);
+		return false;
+	} else if (kext_error(kr, bundle_id, NULL, 0)) {
+		return false;
+	}
+	return true;
+}
+
 
 bool
 default_action(void) {
@@ -513,6 +544,37 @@ lc_command(kaddr_t address) {
 	size_t size = sizeof(vtable);
 	return read_kernel(address, &size, &vtable, 0, 0)
 		&& lookup_vtable(vtable, false);
+}
+
+bool
+cm_command(const char *classname, const char *bundle_id) {
+	kaddr_t metaclass;
+	if (!find_metaclass(classname, bundle_id, &metaclass)) {
+		return false;
+	}
+	printf(KADDR_XFMT"\n", metaclass);
+	return true;
+}
+
+bool
+cz_command(const char *classname, const char *bundle_id) {
+	kaddr_t metaclass;
+	if (!find_metaclass(classname, bundle_id, &metaclass)) {
+		return false;
+	}
+	if (!initialize(CLASS)) {
+		return false;
+	}
+	size_t size;
+	if (class_size == NULL) {
+		error_api_unavailable("OSMetaClass::getClassSize");
+		return false;
+	}
+	if (!class_size(&size, metaclass)) {
+		return false;
+	}
+	printf("%zu\n", size);
+	return true;
 }
 
 bool

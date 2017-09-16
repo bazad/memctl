@@ -3,6 +3,7 @@
 #include "error.h"
 #include "memory.h"
 
+#include "memctl/class.h"
 #include "memctl/core.h"
 #include "memctl/kernel.h"
 #include "memctl/kernel_call.h"
@@ -154,6 +155,10 @@ initialize(feature_t features) {
 	if (NEED(PROCESS)) {
 		process_init();
 		LOADED(PROCESS);
+	}
+	if (NEED(CLASS)) {
+		class_init();
+		LOADED(CLASS);
 	}
 	assert(ALL_SET(features, loaded_features));
 	return true;

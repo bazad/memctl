@@ -19,6 +19,7 @@ typedef enum {
 	KERNEL_MEMORY       = 0x20 | KERNEL_CALL,
 	PROCESS             = 0x40 | KERNEL_CALL | KERNEL_SYMBOLS,
 	PRIVESC             = PROCESS | KERNEL_MEMORY_BASIC,
+	CLASS               = 0x80 | KERNEL_CALL | KERNEL_SYMBOLS,
 } feature_t;
 
 /*

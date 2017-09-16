@@ -26,6 +26,8 @@ bool fpr_command(pid_t pid);
 bool fc_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle_id,
 		size_t access);
 bool lc_command(kaddr_t address);
+bool cm_command(const char *classname, const char *bundle_id);
+bool cz_command(const char *classname, const char *bundle_id);
 bool kp_command(kaddr_t address);
 bool kpm_command(kaddr_t start, kaddr_t end);
 bool zs_command(kaddr_t address);
