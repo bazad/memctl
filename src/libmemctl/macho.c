@@ -173,13 +173,14 @@ macho_validate(const void *mh, size_t size) {
 
 const struct load_command *
 macho_next_load_command(const struct macho *macho, const struct load_command *lc) {
+	uintptr_t lc_start = (uintptr_t)macho->mh + macho_header_size(macho);
 	if (lc == NULL) {
-		lc = (const struct load_command *)((uintptr_t)macho->mh + macho_header_size(macho));
+		lc = (const struct load_command *) lc_start;
 	} else {
 		lc = (const struct load_command *)((uintptr_t)lc + lc->cmdsize);
 	}
 	size_t sizeofcmds = MACHO_STRUCT_FIELD(macho, struct mach_header, macho->mh, sizeofcmds);
-	if ((uintptr_t)lc >= (uintptr_t)macho->mh + sizeofcmds) {
+	if ((uintptr_t)lc >= lc_start + sizeofcmds) {
 		lc = NULL;
 	}
 	return lc;
