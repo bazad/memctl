@@ -4,7 +4,7 @@
  * kernel_call routines for AArch64. These functions should not be called directly.
  */
 
-#include "memctl/memctl_types.h"
+#include "memctl/kernel_call.h"
 
 /*
  * kernel_call_init_aarch64
@@ -37,6 +37,6 @@ void kernel_call_deinit_aarch64(void);
  * 	kernel_call_7
  */
 bool kernel_call_aarch64(void *result, unsigned result_size,
-		kaddr_t func, unsigned arg_count, const kword_t args[]);
+		kaddr_t func, unsigned arg_count, const struct kernel_call_argument args[]);
 
 #endif

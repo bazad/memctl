@@ -101,7 +101,7 @@ fail_0:
 static bool
 class_size_(size_t *size, kaddr_t metaclass) {
 	assert(metaclass != 0);
-	bool success = kernel_call(size, sizeof(*size), __ZNK11OSMetaClass12getClassSizeEv,
+	bool success = kernel_call_x(size, sizeof(*size), __ZNK11OSMetaClass12getClassSizeEv,
 			1, &metaclass);
 	if (!success) {
 		ERROR_CALL(__ZNK11OSMetaClass12getClassSizeEv);

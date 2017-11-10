@@ -110,7 +110,7 @@ physical_word_read_unsafe(paddr_t paddr, void *data, size_t logsize) {
 	const kaddr_t fn[4] = {
 		_IOMappedRead8, _IOMappedRead16, _IOMappedRead32, _IOMappedRead64
 	};
-	bool success = kernel_call(data, 1 << logsize, fn[logsize], 1, &paddr);
+	bool success = kernel_call_x(data, 1 << logsize, fn[logsize], 1, &paddr);
 	if (!success) {
 		error_internal("could not read physical address 0x%llx", (long long)paddr);
 	}
@@ -130,7 +130,7 @@ physical_word_write_unsafe(paddr_t paddr, uint64_t data, size_t logsize) {
 		_IOMappedWrite8, _IOMappedWrite16, _IOMappedWrite32, _IOMappedWrite64
 	};
 	kword_t args[2] = { paddr, data };
-	bool success = kernel_call(NULL, 0, fn[logsize], 2, args);
+	bool success = kernel_call_x(NULL, 0, fn[logsize], 2, args);
 	if (!success) {
 		error_internal("could not write physical address 0x%llx", (long long)paddr);
 	}
@@ -157,7 +157,7 @@ transfer_physical_words_unsafe(vm_map_t task, mach_vm_address_t paddr, size_t *s
 	size_t left = *size;
 	uint8_t *p = (uint8_t *)data;
 	kword_t dummy_args[] = { 1 };
-	bool trunc_32 = !is_write && !kernel_call(NULL, sizeof(uint64_t), 0, 1, dummy_args);
+	bool trunc_32 = !is_write && !kernel_call_x(NULL, sizeof(uint64_t), 0, 1, dummy_args);
 	task_io_result result = TASK_IO_SUCCESS;
 	while (left > 0) {
 		size_t align    = lobit(paddr | sizeof(kword_t));
@@ -607,7 +607,7 @@ kernel_virtual_to_physical_(kaddr_t kaddr, paddr_t *paddr) {
 	assert(_pmap_find_phys != 0 && kernel_pmap != 0);
 	ppnum_t ppnum;
 	kword_t args[] = { kernel_pmap, kaddr };
-	bool success = kernel_call(&ppnum, sizeof(ppnum), _pmap_find_phys, 2, args);
+	bool success = kernel_call_x(&ppnum, sizeof(ppnum), _pmap_find_phys, 2, args);
 	if (!success) {
 		ERROR_CALL(_pmap_find_phys);
 		return false;
@@ -624,7 +624,7 @@ bool
 zone_element_size_(kaddr_t address, size_t *size) {
 	vm_size_t vmsize;
 	kword_t args[] = { address, 0 };
-	bool success = kernel_call(&vmsize, sizeof(vmsize), _zone_element_size, 2, args);
+	bool success = kernel_call_x(&vmsize, sizeof(vmsize), _zone_element_size, 2, args);
 	if (!success) {
 		ERROR_CALL(_zone_element_size);
 		return false;
@@ -636,7 +636,8 @@ zone_element_size_(kaddr_t address, size_t *size) {
 bool
 pmap_cache_attributes_(unsigned int *cacheattr, ppnum_t page) {
 	kword_t args[] = { page };
-	bool success = kernel_call(cacheattr, sizeof(*cacheattr), _pmap_cache_attributes, 1, args);
+	bool success = kernel_call_x(cacheattr, sizeof(*cacheattr), _pmap_cache_attributes,
+			1, args);
 	if (!success) {
 		ERROR_CALL(_pmap_cache_attributes);
 	}
@@ -677,7 +678,7 @@ kernel_memory_init() {
 		RESOLVE_KERNEL(_pmap_find_phys);
 		if (_pmap_find_phys != 0) {
 			kword_t dummy_args[2] = { kernel_pmap, kernel.base };
-			if (kernel_call(NULL, sizeof(ppnum_t), 0, 2, dummy_args)) {
+			if (kernel_call_x(NULL, sizeof(ppnum_t), 0, 2, dummy_args)) {
 				SET(kernel_virtual_to_physical);
 			}
 		}
@@ -702,14 +703,14 @@ kernel_memory_init() {
 	if (physical_read_unsafe == NULL && _IOMappedRead8 != 0 && _IOMappedRead16 != 0
 			&& _IOMappedRead32 != 0 && _IOMappedRead64 != 0) {
 		kword_t dummy_args[2] = { 1, 1 };
-		if (kernel_call(NULL, sizeof(uint32_t), 0, 1, dummy_args)) {
+		if (kernel_call_x(NULL, sizeof(uint32_t), 0, 1, dummy_args)) {
 			SET(physical_read_unsafe);
 		}
 	}
 	if (physical_write_unsafe == NULL && _IOMappedWrite8 != 0 && _IOMappedWrite16 != 0
 			&& _IOMappedWrite32 != 0 && _IOMappedWrite64 != 0) {
 		kword_t dummy_args[2] = { 1, 1 };
-		if (kernel_call(NULL, 0, 0, 2, dummy_args)) {
+		if (kernel_call_x(NULL, 0, 0, 2, dummy_args)) {
 			SET(physical_write_unsafe);
 		}
 	}
@@ -718,7 +719,7 @@ kernel_memory_init() {
 		RESOLVE_KERNEL(_zone_element_size);
 		if (_zone_element_size != 0) {
 			kword_t dummy_args[2] = { kernel.base, 0 };
-			if (kernel_call(NULL, sizeof(vm_size_t), 0, 2, dummy_args)) {
+			if (kernel_call_x(NULL, sizeof(vm_size_t), 0, 2, dummy_args)) {
 				SET(zone_element_size);
 			}
 		}
@@ -728,7 +729,7 @@ kernel_memory_init() {
 		RESOLVE_KERNEL(_pmap_cache_attributes);
 		if (_pmap_cache_attributes != 0) {
 			kword_t dummy_args[1] = { 0 };
-			if (kernel_call(NULL, sizeof(unsigned int), 0, 1, dummy_args)) {
+			if (kernel_call_x(NULL, sizeof(unsigned int), 0, 1, dummy_args)) {
 				SET(pmap_cache_attributes);
 			}
 		}

@@ -303,7 +303,7 @@ kernel_call_deinit_syscall_x86_64(void) {
 
 bool
 kernel_call_syscall_x86_64(void *result, unsigned result_size,
-		kaddr_t func, unsigned arg_count, const kword_t args[]) {
+		kaddr_t func, unsigned arg_count, const struct kernel_call_argument args[]) {
 	// There's unfortunately a dependency chain here: We use physical_write_unsafe to write
 	// the kernel, which calls kernel_call, which calls kernel_call_syscall_x86_64. Thus, we
 	// need to fail unless the syscall hook has been installed.
@@ -318,7 +318,7 @@ kernel_call_syscall_x86_64(void *result, unsigned result_size,
 	// Get exactly 5 arguments.
 	uint64_t args64[5] = { 0 };
 	for (unsigned i = 0; i < arg_count; i++) {
-		args64[i] = args[i];
+		args64[i] = args[i].value;
 	}
 	// Do the syscall.
 	uint64_t result64 = syscall_kernel_call_x86_64(func, args64[0], args64[1], args64[2],

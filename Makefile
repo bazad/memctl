@@ -41,7 +41,7 @@ MEMCTL_DIR        = memctl
 # Flags.
 
 ERRFLAGS   = -Wall -Wpedantic -Wno-gnu -Werror
-CFLAGS     = -g -O2 $(ERRFLAGS)
+CFLAGS     = -g -O2 $(ERRFLAGS) $(EXTRA_CFLAGS)
 LDFLAGS    = -g -lcompression
 FRAMEWORKS = -framework Foundation -framework IOKit
 ARFLAGS    = r
@@ -64,6 +64,9 @@ LIBMEMCTL_arm64_SRCS = finder/kauth_cred_setsvuidgid.c \
 		       finder/pthread_callbacks.c \
 		       finder/vtables.c \
 		       finder/zone_element_size.c \
+		       jop/call_strategy_1.c \
+		       jop/call_strategy_2.c \
+		       jop/gadgets_static.c \
 		       disasm.c \
 		       kernel_call_aarch64.c \
 		       ksim.c \
@@ -75,6 +78,8 @@ LIBMEMCTL_arm64_HDRS = finder/kauth_cred_setsvuidgid.h \
 		       finder/pthread_callbacks.h \
 		       finder/vtables.h \
 		       finder/zone_element_size.h \
+		       jop/call_strategy.h \
+		       jop/gadgets_static.h \
 		       kernel_call_aarch64.h
 
 LIBMEMCTL_arm64_INCS = disasm.h \

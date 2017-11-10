@@ -554,8 +554,9 @@ fail:
 
 bool
 kernel_call_7(void *result, unsigned result_size,
-		kaddr_t func, unsigned arg_count, const kword_t args[]) {
-	if (arg_count > 7 || (arg_count > 0 && args[0] == 0) || result_size > sizeof(uint32_t)) {
+		kaddr_t func, unsigned arg_count, const struct kernel_call_argument args[]) {
+	if (arg_count > 7 || (arg_count > 0 && args[0].value == 0)
+			|| result_size > sizeof(uint32_t)) {
 		assert(func == 0);
 		return false;
 	}
@@ -568,7 +569,7 @@ kernel_call_7(void *result, unsigned result_size,
 	// Get exactly 7 arguments. We initialize args7[0] to 1 in case there are no arguments.
 	uint64_t args7[7] = { 1 };
 	for (size_t i = 0; i < arg_count; i++) {
-		args7[i] = args[i];
+		args7[i] = args[i].value;
 	}
 	// Copy the IOExternalTrap into the kernel.
 	IOExternalTrap trap = { args7[0], func, 0 };
@@ -589,10 +590,10 @@ kernel_call_7(void *result, unsigned result_size,
 
 bool
 kernel_call(void *result, unsigned result_size,
-		kaddr_t func, unsigned arg_count, const kword_t args[]) {
+		kaddr_t func, unsigned arg_count, const struct kernel_call_argument args[]) {
 	assert(result != NULL || func == 0 || result_size == 0);
 	assert(ispow2(result_size) && result_size <= sizeof(uint64_t));
-	assert(arg_count <= 8);
+	assert(arg_count <= 32);
 #if __x86_64__
 	if (kernel_call_syscall_x86_64(result, result_size, 0, arg_count, args)) {
 		return kernel_call_syscall_x86_64(result, result_size, func, arg_count, args);
@@ -611,6 +612,18 @@ kernel_call(void *result, unsigned result_size,
 		                                "perform the requested kernel function call");
 	}
 	return false;
+}
+
+bool
+kernel_call_x(void *result, unsigned result_size,
+		kaddr_t func, unsigned arg_count, const kword_t args[]) {
+	assert(arg_count <= 8);
+	struct kernel_call_argument xargs[8];
+	for (size_t i = 0; i < arg_count; i++) {
+		xargs[i].size  = sizeof(args[i]);
+		xargs[i].value = args[i];
+	}
+	return kernel_call(result, result_size, func, arg_count, xargs);
 }
 
 static void

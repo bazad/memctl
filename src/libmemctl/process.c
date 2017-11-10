@@ -108,7 +108,7 @@ fail_0:
 
 static bool
 current_proc_(kaddr_t *proc) {
-	bool success = kernel_call(proc, sizeof(*proc), _current_proc, 0, NULL);
+	bool success = kernel_call_x(proc, sizeof(*proc), _current_proc, 0, NULL);
 	if (!success) {
 		ERROR_CALL(_current_proc);
 	}
@@ -118,7 +118,7 @@ current_proc_(kaddr_t *proc) {
 static bool
 proc_rele_(kaddr_t proc) {
 	assert(proc != 0);
-	bool success = kernel_call(NULL, 0, _proc_rele, 1, &proc);
+	bool success = kernel_call_x(NULL, 0, _proc_rele, 1, &proc);
 	if (!success) {
 		ERROR_CALL(_proc_rele);
 	}
@@ -129,7 +129,7 @@ static bool
 proc_find_(kaddr_t *proc, pid_t pid, bool release) {
 	kword_t args[] = { pid };
 	kaddr_t proc0;
-	bool success = kernel_call(&proc0, sizeof(proc0), _proc_find, 1, args);
+	bool success = kernel_call_x(&proc0, sizeof(proc0), _proc_find, 1, args);
 	if (!success) {
 		ERROR_CALL(_proc_find);
 		return false;
@@ -215,7 +215,7 @@ proc_find_path_(kaddr_t *proc, const char *path, bool release) {
 static bool
 proc_lock_(kaddr_t proc) {
 	assert(proc != 0);
-	bool success = kernel_call(NULL, 0, _proc_lock, 1, &proc);
+	bool success = kernel_call_x(NULL, 0, _proc_lock, 1, &proc);
 	if (!success) {
 		ERROR_CALL(_proc_lock);
 	}
@@ -225,7 +225,7 @@ proc_lock_(kaddr_t proc) {
 static bool
 proc_unlock_(kaddr_t proc) {
 	assert(proc != 0);
-	bool success = kernel_call(NULL, 0, _proc_unlock, 1, &proc);
+	bool success = kernel_call_x(NULL, 0, _proc_unlock, 1, &proc);
 	if (!success) {
 		ERROR_CALL(_proc_unlock);
 	}
@@ -235,7 +235,7 @@ proc_unlock_(kaddr_t proc) {
 static bool
 proc_task_(kaddr_t *task, kaddr_t proc) {
 	assert(proc != 0);
-	bool success = kernel_call(task, sizeof(*task), _proc_task, 1, &proc);
+	bool success = kernel_call_x(task, sizeof(*task), _proc_task, 1, &proc);
 	if (!success) {
 		ERROR_CALL(_proc_task);
 	}
@@ -258,7 +258,7 @@ proc_task_offset_(kaddr_t *task, kaddr_t proc) {
 static bool
 proc_ucred_(kaddr_t *ucred, kaddr_t proc) {
 	assert(proc != 0);
-	bool success = kernel_call(ucred, sizeof(*ucred), _proc_ucred, 1, &proc);
+	bool success = kernel_call_x(ucred, sizeof(*ucred), _proc_ucred, 1, &proc);
 	if (!success) {
 		ERROR_CALL(_proc_ucred);
 	}
@@ -294,7 +294,7 @@ proc_set_ucred_offset_(kaddr_t proc, kaddr_t ucred) {
 static bool
 kauth_cred_proc_ref_(kaddr_t *cred, kaddr_t proc) {
 	assert(proc != 0);
-	bool success = kernel_call(cred, sizeof(*cred), _kauth_cred_proc_ref, 1, &proc);
+	bool success = kernel_call_x(cred, sizeof(*cred), _kauth_cred_proc_ref, 1, &proc);
 	if (!success) {
 		ERROR_CALL(_kauth_cred_proc_ref);
 	}
@@ -314,7 +314,7 @@ kauth_cred_unref_(kaddr_t cred) {
 	if (kio != KERNEL_IO_SUCCESS) {
 		goto fail_1;
 	}
-	success = kernel_call(NULL, 0, _kauth_cred_unref, 1, &pcred);
+	success = kernel_call_x(NULL, 0, _kauth_cred_unref, 1, &pcred);
 	if (!success) {
 		ERROR_CALL(_kauth_cred_unref);
 		goto fail_1;
@@ -330,7 +330,7 @@ static bool
 kauth_cred_setsvuidgid_(kaddr_t *newcred, kaddr_t cred, uid_t uid, gid_t gid) {
 	assert(cred != 0);
 	kword_t args[3] = { cred, 0, 0 };
-	bool success = kernel_call(newcred, sizeof(*newcred), _kauth_cred_setsvuidgid, 3, args);
+	bool success = kernel_call_x(newcred, sizeof(*newcred), _kauth_cred_setsvuidgid, 3, args);
 	if (!success) {
 		ERROR_CALL(_kauth_cred_setsvuidgid);
 	}
@@ -340,7 +340,7 @@ kauth_cred_setsvuidgid_(kaddr_t *newcred, kaddr_t cred, uid_t uid, gid_t gid) {
 static bool
 task_reference_(kaddr_t task) {
 	assert(task != 0);
-	bool success = kernel_call(NULL, 0, _task_reference, 1, &task);
+	bool success = kernel_call_x(NULL, 0, _task_reference, 1, &task);
 	if (!success) {
 		ERROR_CALL(_task_reference);
 	}
@@ -350,7 +350,7 @@ task_reference_(kaddr_t task) {
 static bool
 task_deallocate_(kaddr_t task) {
 	assert(task != 0);
-	bool success = kernel_call(NULL, 0, _task_deallocate, 1, &task);
+	bool success = kernel_call_x(NULL, 0, _task_deallocate, 1, &task);
 	if (!success) {
 		ERROR_CALL(_task_deallocate);
 	}
@@ -360,7 +360,7 @@ task_deallocate_(kaddr_t task) {
 static bool
 convert_task_to_port_(kaddr_t *ipc_port, kaddr_t task) {
 	assert(task != 0);
-	bool success = kernel_call(ipc_port, sizeof(*ipc_port), _convert_task_to_port, 1, &task);
+	bool success = kernel_call_x(ipc_port, sizeof(*ipc_port), _convert_task_to_port, 1, &task);
 	if (!success) {
 		ERROR_CALL(_convert_task_to_port);
 	}
@@ -370,7 +370,7 @@ convert_task_to_port_(kaddr_t *ipc_port, kaddr_t task) {
 static bool
 get_task_ipcspace_(kaddr_t *ipc_space, kaddr_t task) {
 	assert(task != 0);
-	bool success = kernel_call(ipc_space, sizeof(*ipc_space), _get_task_ipcspace, 1, &task);
+	bool success = kernel_call_x(ipc_space, sizeof(*ipc_space), _get_task_ipcspace, 1, &task);
 	if (!success) {
 		ERROR_CALL(_get_task_ipcspace);
 	}
@@ -381,7 +381,8 @@ static bool
 ipc_port_copyout_send_(mach_port_t *port_name, kaddr_t send_right, kaddr_t ipc_space) {
 	assert(send_right != 0 && ipc_space != 0);
 	kword_t args[] = { send_right, ipc_space };
-	bool success = kernel_call(port_name, sizeof(*port_name), _ipc_port_copyout_send, 2, args);
+	bool success = kernel_call_x(port_name, sizeof(*port_name), _ipc_port_copyout_send,
+			2, args);
 	if (!success) {
 		ERROR_CALL(_ipc_port_copyout_send);
 	}
@@ -428,7 +429,7 @@ proc_to_task_port_(mach_port_t *task_port, kaddr_t proc) {
 static bool
 port_name_to_task_(kaddr_t *task, mach_port_t task_port) {
 	kword_t args[] = { task_port };
-	bool success = kernel_call(task, sizeof(*task), _port_name_to_task, 1, args);
+	bool success = kernel_call_x(task, sizeof(*task), _port_name_to_task, 1, args);
 	if (!success) {
 		ERROR_CALL(_port_name_to_task);
 	}

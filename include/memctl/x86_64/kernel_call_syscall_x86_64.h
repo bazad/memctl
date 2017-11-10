@@ -4,8 +4,8 @@
  * kernel_call routines for x86-64. Implemented using a system call hook.
  */
 
+#include "memctl/kernel_call.h"
 #include "memctl/kernel_memory.h"
-#include "memctl/memctl_types.h"
 
 /*
  * To use this module in a core, specify implementations for kernel_read_text and
@@ -43,7 +43,7 @@ void kernel_call_deinit_syscall_x86_64(void);
  * 	Call a function in the kernel. See kernel_call.
  */
 bool kernel_call_syscall_x86_64(void *result, unsigned result_size,
-		kaddr_t func, unsigned arg_count, const kword_t args[]);
+		kaddr_t func, unsigned arg_count, const struct kernel_call_argument args[]);
 
 /*
  * syscall_kernel_call_x86_64
