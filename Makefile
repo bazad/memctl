@@ -66,6 +66,7 @@ LIBMEMCTL_arm64_SRCS = finder/kauth_cred_setsvuidgid.c \
 		       finder/zone_element_size.c \
 		       jop/call_strategy_1.c \
 		       jop/call_strategy_2.c \
+		       jop/call_strategy_3.c \
 		       jop/gadgets_static.c \
 		       disasm.c \
 		       kernel_call_aarch64.c \

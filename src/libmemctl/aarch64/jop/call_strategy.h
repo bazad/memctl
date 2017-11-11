@@ -22,16 +22,25 @@ struct jop_call_initial_state {
  *
  * Parameters:
  * 		func			The kernel function to call.
- * 		args			The arguments to the kernel function.
- * 		stack			The extra arguments beyond the first 8 passed on the stack.
+ * 		args			The arguments to the kernel function. The first 8 arguments
+ * 					are passed in registers, the remaining arguments are passed
+ * 					on the stack. The arguments have already been preprocessed
+ * 					by kernel_call_aarch64, so the implementation may assume
+ * 					that all arguments are 64-bit words.
  * 		kernel_payload		The address of the payload in the kernel.
  * 	out	payload			On return, the JOP payload. This will be copied into the
  * 					kernel at address jop_payload.
  * 	out	initial_state		On return, the state of the CPU registers to set at the
  * 					start of JOP execution.
  * 	out	result_address		On return, the address of the result value.
+ *
+ * Notes:
+ * 	The args array will be long enough to hold the 8 arguments passed in registers and however
+ * 	many arguments are supported by the implementation's stack limit. For example, if the
+ * 	jop_call_strategy specifies that stack_size is 48 bytes, this corresponds to 6 64-bit
+ * 	stack arguments, and hence the args array will be of length 14.
  */
-typedef void (*jop_call_build_fn)(uint64_t func, const uint64_t args[8], const uint64_t stack[8],
+typedef void (*jop_call_build_fn)(uint64_t func, const uint64_t args[],
 		kaddr_t kernel_payload, void *payload,
 		struct jop_call_initial_state *initial_state, uint64_t *result_address);
 
@@ -52,6 +61,7 @@ struct jop_call_strategy {
 // implementation and capabilities.
 extern struct jop_call_strategy jop_call_strategy_1;
 extern struct jop_call_strategy jop_call_strategy_2;
+extern struct jop_call_strategy jop_call_strategy_3;
 
 
 // Internal definitions.
