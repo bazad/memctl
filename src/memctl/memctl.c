@@ -355,9 +355,11 @@ find_metaclass(const char *classname, const char *bundle_id, kaddr_t *address) {
 	if (kr == KEXT_NOT_FOUND) {
 		const char *location = "";
 		const char *extra = "";
-		if (strcmp(bundle_id, KERNEL_ID) == 0) {
+		if (bundle_id == NULL) {
+			// Do nothing.
+		} else if (strcmp(bundle_id, KERNEL_ID) == 0) {
 			location = "in the kernel";
-		} else if (bundle_id != NULL) {
+		} else {
 			location = "in kernel extension ";
 			extra = bundle_id;
 		}

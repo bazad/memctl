@@ -932,7 +932,7 @@ parse_option(struct state *s) {
 	if (!(parse_fns[s->option->type])(s)) {
 		// If this is an unnamed option, clear the errors. We'll skip trying to match this
 		// option from now on, but continue parsing options on the next iteration.
-		if (s->option->option[0] == 0 && error_last()->type == usage_error
+		if (s->option->option[0] == 0 && error_last()->type == &usage_error
 				&& !s->keep_error) {
 			error_clear();
 			state_restore(s, &save);
@@ -964,7 +964,7 @@ parse_arguments(struct state *s) {
 		if (!(parse_fns[spec->type])(s)) {
 			// If we previously had a bad option and it also failed argument parsing,
 			// then print the bad option message.
-			if (s->bad_option != NULL && error_last()->type == usage_error) {
+			if (s->bad_option != NULL && error_last()->type == &usage_error) {
 				error_clear();
 				ERROR_COMMAND(s, "unrecognized option '%s'", s->arg);
 				return false;
@@ -972,7 +972,7 @@ parse_arguments(struct state *s) {
 			// If the issue was that no data was left and we've reached the optional
 			// arguments, clear the error and stop processing.
 			if (s->arg == NULL && spec->option == OPTIONAL &&
-					error_last()->type == usage_error) {
+					error_last()->type == &usage_error) {
 				error_clear();
 				break;
 			}

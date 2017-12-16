@@ -3,17 +3,12 @@
 
 #include "memctl/memctl_error.h"
 
-/*
- * Description:
- * 	Error codes for the memctl tool.
- */
-enum {
-	message_error               = 128,
-	usage_error                 = 129,
-	execve_error                = 130,
-	kext_not_found_error        = 131,
-	kext_symbol_not_found_error = 132,
-};
+
+extern struct error_type message_error;
+extern struct error_type usage_error;
+extern struct error_type execve_error;
+extern struct error_type kext_not_found_error;
+extern struct error_type kext_symbol_not_found_error;
 
 /*
  * error_message

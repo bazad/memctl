@@ -4,37 +4,33 @@
 #include "memctl/error.h"
 #include "memctl/memctl_types.h"
 
-enum {
-	open_error                       = 8,
-	io_error                         = 9,
-	interrupt_error                  = 10,
 
-	internal_error                   = 32,
-	initialization_error             = 33,
-	api_unavailable_error            = 34,
-	functionality_unavailable_error  = 35,
-	kernel_io_error                  = 36,
-	address_protection_error         = 37,
-	address_unmapped_error           = 38,
-	address_inaccessible_error       = 39,
-	macho_parse_error                = 43,
-	kernelcache_error                = 44,
+extern struct error_type out_of_memory_error;
+extern struct error_type open_error;
+extern struct error_type io_error;
+extern struct error_type interrupt_error;
 
-	core_error                       = 64,
-};
+extern struct error_type internal_error;
+extern struct error_type initialization_error;
+extern struct error_type api_unavailable_error;
+extern struct error_type functionality_unavailable_error;
+extern struct error_type kernel_io_error;
+extern struct error_type address_protection_error;
+extern struct error_type address_unmapped_error;
+extern struct error_type address_inaccessible_error;
+extern struct error_type macho_parse_error;
+extern struct error_type kernelcache_error;
 
 /*
  * memctl_warning
  */
 void memctl_warning(const char *format, ...);
 
+
 /*
  * out_of_memory_error
  */
-static inline void
-error_out_of_memory() {
-	error_push_out_of_memory();
-}
+void error_out_of_memory();
 
 /*
  * open_error
@@ -131,10 +127,5 @@ void error_address_inaccessible(kaddr_t address);
  * kernelcache_error
  */
 void error_kernelcache(const char *format, ...);
-
-/*
- * core_error
- */
-void error_core(const char *format, ...);
 
 #endif

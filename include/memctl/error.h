@@ -6,22 +6,15 @@
 #include <stdlib.h>
 
 /*
- * error_type_t
- *
- * Description:
- * 	An error type identifier.
- */
-typedef uint64_t error_type_t;
-
-/*
  * struct error
  *
  * Description:
  * 	An error object, which consists of a type code and associated data.
  */
 struct error {
-	error_type_t type;
-	void *       data;
+	const struct error_type * type;
+	void *                    data;
+	size_t                    size;
 };
 
 /*
@@ -33,18 +26,30 @@ struct error {
 typedef const struct error *error_handle;
 
 /*
+ * struct error_type
+ *
+ * Description:
+ * 	An error type object, encapsulating metainformation about a class of errors.
+ */
+struct error_type {
+	// A static string describing the error category.
+	const char *static_description;
+	// A snprintf-like function to format an error description into a buffer.
+	size_t (*format_description)(char *buffer, size_t size, error_handle error);
+	// A function to destroy any error-specific data.
+	void (*destroy_error_data)(void *data, size_t size);
+};
+
+/*
  * error_init
  *
  * Description:
  * 	Initialize the thread-local error system.
  *
- * Returns:
- * 	True if the error system was successfully initialized.
- *
  * Notes:
  * 	Calling this function at thread start is optional.
  */
-bool error_init(void);
+void error_init(void);
 
 /*
  * error_free
@@ -78,14 +83,14 @@ void error_stop(void);
 void error_start(void);
 
 /*
- * error_push_data
+ * error_push
  *
  * Description:
  * 	Push an error onto the error stack and return space to store any associated error data.
  *
  * Parameters:
- * 	type				The error type code
- * 	size				The size of any associated data
+ * 	type				The error_type struct representing the type of this error.
+ * 	size				The size of any associated data.
  * 	destroy				A function to be called when the associated data is no
  * 					longer needed to free any resources. Specify NULL if no
  * 					cleanup is needed.
@@ -93,11 +98,12 @@ void error_start(void);
  * Returns:
  * 	NULL				Out of memory
  * 	NULL				Errors have been stopped with error_stop
+ *
  * 	Otherwise, a pointer to a region of memory capable of storing size bytes is returned.
  * 	The memory is initialized to 0. This is the same value that would be obtained from
  * 	error_last()->data.
  */
-void *error_push_data(error_type_t type, size_t size, void (*destroy)(void *));
+void *error_push(const struct error_type *type, size_t size);
 
 /*
  * error_push_printf
@@ -106,31 +112,14 @@ void *error_push_data(error_type_t type, size_t size, void (*destroy)(void *));
  * 	Push an error onto the stack and store as its associated data a formatted message.
  *
  * Parameters:
- * 	type				The error type code
- * 	format				A printf-style format string
- * 	ap				The variadic arguments list
+ * 	type				The error_type struct representing the type of this error.
+ * 	format				A printf-style format string.
+ * 	ap				The variadic arguments list.
  *
  * Returns:
  * 	True if the error was pushed onto the stack.
  */
-bool error_push_printf(error_type_t type, const char *format, va_list ap);
-
-/*
- * error_push
- *
- * Description:
- * 	A convenience function to push an error type code with no associated data.
- *
- * Parameters:
- * 	type				The error type code
- *
- * Returns:
- * 	True if the error was pushed onto the stack.
- */
-static inline bool
-error_push(error_type_t type) {
-	return error_push_data(type, 0, NULL) != NULL;
-}
+bool error_push_printf(const struct error_type *type, const char *format, va_list ap);
 
 /*
  * error_pop
@@ -164,7 +153,7 @@ error_handle error_last(void);
  * 	the earliest error in the stack.
  *
  * Parameters:
- * 	index				The index of the error to retrieve
+ * 	index				The index of the error to retrieve.
  */
 error_handle error_at_index(size_t index);
 
@@ -183,26 +172,5 @@ size_t error_count(void);
  * 	Clear the error stack.
  */
 void error_clear(void);
-
-enum {
-	/*
-	 * out_of_memory_error
-	 *
-	 * Description:
-	 * 	The type code for an out-of-memory error.
-	 */
-	out_of_memory_error = 1,
-};
-
-/*
- * error_push_out_of_memory
- *
- * Description:
- * 	Push an out-of-memory error in the system domain onto the error stack.
- *
- * Returns:
- * 	True if the error was pushed onto the stack.
- */
-bool error_push_out_of_memory(void);
 
 #endif

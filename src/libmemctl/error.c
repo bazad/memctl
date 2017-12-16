@@ -8,18 +8,6 @@
 #define NO_DATA		((void *)-1)
 
 /*
- * struct header
- *
- * Description:
- * 	The data pointer of each error_handle has a header just before it in memory. The header
- * 	stores a function pointer that should be called to destroy the error data.
- */
-struct header {
-	void (*destroy)(void *);
-	/* ... data ... */
-};
-
-/*
  * struct error_stack
  *
  * Description:
@@ -46,35 +34,25 @@ _Thread_local static struct error_stack errors;
  * Description:
  * 	Reserve space for at least 3 items on the error stack.
  *
- * Returns:
- * 		true			Success
- * 		false			Out of memory
- *
  * Notes:
- * 	We maintain the invariant that the error stack always has space for at least 2 items on
+ * 	We maintain the invariant that the error stack always has space for at least 1 item on
  * 	it. Presumably, reserve is being called because a new item is about to be added, so we
- * 	reserve space for 3 items in order to maintain the invariant.
+ * 	reserve space for 2 items in order to maintain the invariant.
  *
  * 	If space cannot be allocated, no state is changed.
  */
-static bool
+static void
 reserve() {
-	assert(errors.count + 2 <= errors.capacity || errors.capacity == 0);
-	if (errors.count + 3 <= errors.capacity) {
-		return true;
+	assert(errors.count + 1 <= errors.capacity || errors.capacity == 0);
+	if (errors.count + 2 <= errors.capacity) {
+		return;
 	}
 	unsigned new_capacity = errors.capacity + 4;
-	if (new_capacity < errors.capacity) {
-		return false;
-	}
-	struct error *new_stack = realloc(errors.stack,
-			new_capacity * sizeof(*errors.stack));
-	if (new_stack == NULL) {
-		return false;
-	}
+	assert(new_capacity > errors.capacity);
+	struct error *new_stack = realloc(errors.stack, new_capacity * sizeof(*errors.stack));
+	assert(new_stack);
 	errors.stack = new_stack;
 	errors.capacity = new_capacity;
-	return true;
 }
 
 /*
@@ -85,9 +63,8 @@ reserve() {
  * 	free_data.
  *
  * Parameters:
- * 		size			The amount of space to reserve for the error data.
- * 		destroy			A function to be invoked when the error data is to be
- * 					freed.
+ * 	size				The amount of space to reserve for the error data.
+ *
  * Returns:
  * 	NULL				Out of memory or size too large
  * 	NO_DATA				size is 0
@@ -95,21 +72,14 @@ reserve() {
  * 					size.
  */
 static void *
-alloc_data(size_t size, void (*destroy)(void *)) {
+alloc_data(size_t size) {
 	if (size == 0) {
 		return NO_DATA;
 	}
 	if (size > MAX_DATA_SIZE) {
 		return NULL;
 	}
-	struct header *header = malloc(sizeof(*header) + size);
-	if (header == NULL) {
-		return NULL;
-	}
-	header->destroy = destroy;
-	void *extra = header + 1;
-	memset(extra, 0, size);
-	return extra;
+	return calloc(1, size);
 }
 
 /*
@@ -122,13 +92,13 @@ alloc_data(size_t size, void (*destroy)(void *)) {
  * 	data				The error data allocated with alloc_data.
  */
 static void
-free_data(void *data) {
-	if (data != NO_DATA) {
-		struct header *header = (struct header *)data - 1;
-		if (header->destroy != NULL) {
-			header->destroy(data);
+free_data(struct error *error) {
+	if (error->data != NO_DATA) {
+		if (error->type->destroy_error_data != NULL) {
+			error->type->destroy_error_data(error->data, error->size);
 		}
-		free(header);
+		free(error->data);
+		error->size = 0;
 	}
 }
 
@@ -136,18 +106,19 @@ free_data(void *data) {
  * push_internal
  *
  * Description:
- * 	Push an error onto the stack.
+ * 	Push an error onto the stack and return a pointer to the data.
  */
 static void *
-push_internal(error_type_t type, size_t size, void (*destroy)(void *)) {
+push_internal(const struct error_type *type, size_t size) {
 	assert(errors.count < errors.capacity);
-	void *data = alloc_data(size, destroy);
+	void *data = alloc_data(size);
 	if (data == NULL) {
 		return NULL;
 	}
 	struct error *error = &errors.stack[errors.count];
 	error->type = type;
 	error->data = data;
+	error->size = size;
 	++errors.count;
 	return data;
 }
@@ -161,36 +132,16 @@ push_internal(error_type_t type, size_t size, void (*destroy)(void *)) {
 static void
 pop_internal() {
 	--errors.count;
-	free_data((void *)errors.stack[errors.count].data);
+	free_data(&errors.stack[errors.count]);
 }
 
-/*
- * error_push_out_of_memory_internal
- *
- * Description:
- * 	Push an out-of-memory error onto the error stack.
- *
- * Returns:
- * 	true				The error was successfully pushed.
- * 	false				There was no space to push an error.
- */
-static bool
-error_push_out_of_memory_internal() {
-	assert(errors.count <= errors.capacity);
-	if (errors.count == errors.capacity) {
-		return false;
-	}
-	push_internal(out_of_memory_error, 0, NULL);
-	return true;
-}
-
-bool
+void
 error_init() {
 	errors.stack      = NULL;
 	errors.count      = 0;
 	errors.capacity   = 0;
 	errors.stop_count = 0;
-	return reserve();
+	reserve();
 }
 
 void
@@ -211,25 +162,19 @@ error_start() {
 }
 
 void *
-error_push_data(error_type_t type, size_t size, void (*destroy)(void *)) {
+error_push(const struct error_type *type, size_t size) {
 	if (errors.stop_count > 0) {
 		return NULL;
 	}
-	if (!reserve()) {
-		goto fail;
-	}
-	void *data = push_internal(type, size, destroy);
-	if (data == NULL) {
-		goto fail;
-	}
-	return data;
-fail:
-	error_push_out_of_memory_internal();
-	return NULL;
+	reserve();
+	return push_internal(type, size);
 }
 
 bool
-error_push_printf(error_type_t type, const char *format, va_list ap) {
+error_push_printf(const struct error_type *type, const char *format, va_list ap) {
+	if (errors.stop_count > 0) {
+		return false;
+	}
 	va_list ap2;
 	va_copy(ap2, ap);
 	int size = vsnprintf(NULL, 0, format, ap2);
@@ -237,8 +182,8 @@ error_push_printf(error_type_t type, const char *format, va_list ap) {
 	if (size < 0) {
 		return false;
 	}
-	++size;
-	char *buf = error_push_data(type, size, NULL);
+	size += 1;
+	char *buf = error_push(type, size);
 	if (buf == NULL) {
 		return false;
 	}
@@ -281,13 +226,4 @@ error_clear() {
 	while (errors.count > 0) {
 		pop_internal();
 	}
-}
-
-bool
-error_push_out_of_memory() {
-	if (errors.stop_count > 0) {
-		return false;
-	}
-	reserve();
-	return error_push_out_of_memory_internal();
 }
