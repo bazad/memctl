@@ -1,4 +1,4 @@
-## memctl
+# memctl
 
 <!-- Brandon Azad -->
 
@@ -19,7 +19,7 @@ written the following cores:
 * [memctl-kext-core]: A core for Macs that uses a custom kernel extension to access the kernel task
   port.
 * [memctl-physmem-core]: A core for macOS 10.12.1 that leverages the physmem vulnerability to get
-  the kernel task port.
+  the kernel task port. (This core is incompatible with the current version of memctl.)
 
 [memctl-tfp0-core]: https://github.com/bazad/memctl-tfp0-core
 [memctl-kext-core]: https://github.com/bazad/memctl-kext-core
@@ -30,7 +30,37 @@ up any allocated kernel resources and restore all important system data it modif
 Despite trying very hard to ensure that this goal is met, I cannot guarantee that using libmemctl
 will not crash or corrupt your system. Use it at your own risk.
 
-### Building memctl
+## The libmemctl library
+
+While the libmemctl library is primarily designed for use by memctl, it may be used on its own. It
+provides the following key features:
+
+* **kernel.h**:
+  Functions to load (and decompress if necessary) the kernel file from disk, find symbols in the
+  kernel/kext by name, and find byte sequences in the kernel/kext binaries. Some
+  (platform-specific) special symbol finders are available to find certain non-exported symbols.
+
+* **kernel_call.h**:
+  Functions to call kernel functions. The default implementation, `kernel_call_7`, can call kernel
+  functions with up to 7 arguments, with restrictions, and retrieve a 32-bit return value. More
+  generic, platform-specific implementations are also available. For example, an implementation is
+  available for some Arm64 platforms that can call a kernel function with up to 14 64-bit arguments
+  and retrieve a 64-bit return value.
+
+* **kernel_memory.h**:
+  Functions to manipulate kernel virtual and physical memory, including several safe functions
+  (that fail gracefully on invalid kernel addresses). Among other things, these functions can be
+  used to implement various types of full-memory scans, which is very useful for live analysis.
+
+* **kernel_slide.h**:
+  Given the kernel task port, find the kASLR slide.
+
+* **process.h**:
+  Wrappers for some of XNU's process and task manipulation functions.
+
+Other features are available in other headers.
+
+## Building memctl
 
 You will need a core in order to build memctl from source. Here is an example showing how to
 compile memctl for iOS using the memctl-tfp0-core.
@@ -43,7 +73,12 @@ compile memctl for iOS using the memctl-tfp0-core.
 	$ cd ..
 	$ make ARCH=arm64 SDK=iphoneos CORE_DIR=memctl-tfp0-core
 
-### Running memctl
+Note that since memctl is primarily a research tool, the libmemctl APIs might change without
+notice, and old cores that target specific vulnerabilities may not be updated. If memctl is not
+building properly with a particular core, check whether memctl and the core are on compatible
+versions.
+
+## Running memctl
 
 After successful compilation, the memctl binary is available at `bin/memctl`. Copy the binary to
 the target device. Running memctl with no arguments will drop into a REPL. You can type `?` to see
@@ -170,7 +205,7 @@ Once we know the class name, we can use the `cz` command to determine the class 
 In this case the class size is `0x70`, which means the `AppleMobileFileIntegrity` pointer at
 address `0xfffffff000d06ef0` is likely leftover heap garbage.
 
-### License
+## License
 
 memctl is released under the MIT license.
 

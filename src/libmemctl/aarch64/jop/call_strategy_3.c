@@ -280,7 +280,7 @@
  *  	MOV_X8_X10__BR_X11:
  *  			mov x8, x10
  *  			br x11
- *  		x8 = COMPLEX_CALL_FUNCTION_1
+ *  		x8 = GADGET_CALL_FUNCTION_1
  *  		pc = GADGET_POPULATE_1
  *
  *  	;; At this point, we have set the following registers:
