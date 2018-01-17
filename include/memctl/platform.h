@@ -35,4 +35,18 @@ extern struct platform platform;
  */
 void platform_init(void);
 
+/*
+ * macro PLATFORM_XNU_VERSION_GE
+ *
+ * Description:
+ * 	A helper macro to test whether the current XNU platform release version is at least the
+ * 	specified version number.
+ */
+#define PLATFORM_XNU_VERSION_GE(_major, _minor, _patch)		\
+	(platform.release.major > _major			\
+	 || (platform.release.major == _major &&		\
+	     (platform.release.minor > _minor			\
+	      || (platform.release.minor == _minor &&		\
+	          platform.release.patch >= _patch))))
+
 #endif

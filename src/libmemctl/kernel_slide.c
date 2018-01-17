@@ -9,6 +9,7 @@
 #include "memctl/kernel_memory.h"
 #include "memctl/memctl_error.h"
 #include "memctl/memctl_signal.h"
+#include "memctl/platform.h"
 #include "memctl/utility.h"
 
 #include <assert.h>
@@ -48,8 +49,8 @@ validate_kernel_slide() {
 
 static const uint64_t kernel_region_size_min = 0x0000000100000000;
 static const uint64_t kernel_region_size_max = 0x0000000104000000;
-static const uint64_t kernel_region_static_min = 0xfffffff000000000;
-static const uint64_t kernel_region_static_max = 0xfffffff27fffc000;
+static const uint64_t kernel_region_static_address  = 0xfffffff000000000;
+static const uint64_t kernel_region_static_size_min = 0x000000027fffc000;
 static const int kernel_region_protection    = 0;
 
 static const kword_t slide_increment = 0x200000;
@@ -91,8 +92,8 @@ find_kernel_region(kaddr_t *region_base, kaddr_t *region_end) {
 		if (info.protection == kernel_region_protection
 		    && (   (kernel_region_size_min <= size
 		            && size <= kernel_region_size_max)
-		        || (address == kernel_region_static_min
-		            && address + size == kernel_region_static_max))) {
+		        || (address == kernel_region_static_address
+		            && size >= kernel_region_static_size_min))) {
 			*region_base = address;
 			*region_end  = address + size;
 			return true;
@@ -234,7 +235,12 @@ next:
  */
 static bool
 kernel_slide_init_ios_unsafe_scan(kaddr_t region_base, kaddr_t region_end) {
-	memctl_warning("using unsafe memory scan to locate kernel base");
+	// Don't use this technique after iOS 10.2 (XNU 16.3.0).
+	platform_init();
+	if (PLATFORM_XNU_VERSION_GE(16, 3, 0)) {
+		return false;
+	}
+	memctl_warning("Using unsafe memory scan to locate kernel base; this may trigger a panic");
 	// Scan memory to find the kernel base.
 	kword_t min_slide = 0;
 	if (region_base > kernel.base) {
