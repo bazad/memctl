@@ -227,6 +227,138 @@ next:
 }
 
 /*
+ * find_kernelcache_pre_header_segments
+ *
+ * Description:
+ * 	Find the start and end addresses of the segments of the kernelcache that are mapped before
+ * 	the kernel header.
+ */
+static bool
+find_kernelcache_pre_header_segments(kaddr_t *preheader_start, kaddr_t *preheader_end) {
+	kaddr_t preheader_min = kernel.base;
+	kaddr_t preheader_max = 0;
+	const struct load_command *sc = NULL;
+	for (;;) {
+		sc = macho_next_segment(&kernel.macho, sc);
+		if (sc == NULL) {
+			break;
+		}
+		const struct segment_command_64 *segment = (const struct segment_command_64 *) sc;
+		// Skip zero-sized segments or segments that don't fall before the kernel base.
+		if (segment->vmsize == 0 || segment->vmaddr >= kernel.base) {
+			continue;
+		}
+		if (segment->vmaddr < preheader_min) {
+			preheader_min = segment->vmaddr;
+		}
+		kaddr_t vmend = segment->vmaddr + segment->vmsize;
+		if (vmend > preheader_max) {
+			preheader_max = vmend;
+		}
+	}
+	if (preheader_min == kernel.base) {
+		return false;
+	}
+	*preheader_start = preheader_min;
+	*preheader_end   = preheader_max;
+	return true;
+}
+
+/*
+ * kernel_slide_init_ios_heap_scan_2_unsafe
+ *
+ * Description:
+ * 	Find the kernel slide by scanning the contents of the heap to look for pointers to the
+ * 	__PRELINK sections.
+ *
+ * 	For each memory region returned by mach_vm_region_recurse(), we check whether the region
+ * 	looks like a heap region that is safe to examine. If so, we read the first word of each
+ * 	page in the region. If that word looks like a pointer into the kernel carveout, then it's
+ * 	possible that this word is a vtable pointer or other pointer to the kernel image. We take
+ * 	the minimum value of all of these pointers and hope that it points to memory in one of the
+ * 	__PRELINK sections, which lies before the kernel's Mach-O header in memory. Then, we check
+ * 	each possible kernel slide value, filtering out any proposed slide values that would cause
+ * 	the minimum kernel pointer found earlier to lie outside of the __PRELINK sections.
+ *
+ * 	This method of detecting the kernel slide is unsafe. It is possible that the heap changes
+ * 	while we are reading it (leading to a data access abort) or that the heap contains a word
+ * 	that looks like a valid pointer but isn't.
+ */
+static bool
+kernel_slide_init_ios_heap_scan_2_unsafe(kaddr_t kernel_region_base, kaddr_t kernel_region_end) {
+	// Make sure we have a __TEXT segment and some segments that fall before it.
+	kaddr_t preheader_start, preheader_end;
+	bool ok = find_kernelcache_pre_header_segments(&preheader_start, &preheader_end);
+	if (!ok) {
+		return false;
+	}
+	// Now try and find a pointer in the kernel heap to data in the kernel image that lies
+	// before the kernel's __TEXT segment. We'll take the smallest such pointer.
+	kaddr_t kernel_ptr = (kaddr_t)(-1);
+	mach_vm_address_t address = 0;
+	for (;;) {
+		// Get the next memory region.
+		mach_vm_size_t size = 0;
+		uint32_t depth = 2;
+		struct vm_region_submap_info_64 info;
+		mach_msg_type_number_t count = VM_REGION_SUBMAP_INFO_COUNT_64;
+		kern_return_t kr = mach_vm_region_recurse(kernel_task, &address, &size, &depth,
+			(vm_region_recurse_info_t)&info, &count);
+		if (kr != KERN_SUCCESS) {
+			break;
+		}
+		// Skip any region that is not on the heap, not in a submap, not readable and
+		// writable, or not fully mapped.
+		int prot = VM_PROT_READ | VM_PROT_WRITE;
+		if (info.user_tag != VM_KERN_MEMORY_ZONE
+		    || depth != 1
+		    || (info.protection & prot) != prot
+		    || info.pages_resident * page_size != size) {
+			goto next;
+		}
+		// Read the first word of this region. This is sometimes a pointer into the kernel
+		// carveout. If it is, it might be a vtable pointer. We are hoping that at least
+		// one IOKit class gets allocated like this, so that the min value of all pointers
+		// into the kernel carveout falls in the kernel image before the kernel's __TEXT
+		// segment.
+		for (size_t offset = 0; offset < size; offset += page_size) {
+			kword_t value = 0;
+			bool ok = read_word(address + offset, &value);
+			if (ok
+			    && kernel_region_base <= value
+			    && value < kernel_region_end
+			    && value < kernel_ptr) {
+				kernel_ptr = value;
+			}
+		}
+next:
+		address += size;
+	}
+	// If we didn't find any such pointer, abort.
+	if (kernel_ptr == (kaddr_t)(-1)) {
+		return false;
+	}
+	// Now try each possible slide value until we find one that works. We want to probe
+	// addresses from low to high, which means attempting kernel slides from low to high. Our
+	// constraint is that the test pointer must lie within our (slid) pre-__TEXT regions.
+	for (kword_t slide = 0; slide < max_slide; slide += slide_increment) {
+		// Check that our kernel pointer lies within the proposed pre-__TEXT region.
+		kword_t slid_preheader_start = preheader_start + slide;
+		kword_t slid_preheader_end   = preheader_end + slide;
+		if (kernel_ptr < slid_preheader_start || slid_preheader_end <= kernel_ptr) {
+			continue;
+		}
+		// This slide is consistent. Check whether it is correct.
+		kaddr_t base = kernel.base + slide;
+		assert(base >= kernel_region_base);
+		if (check_kernel_base(base)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
  * kernel_slide_init_ios_unsafe_scan
  *
  * Description:
@@ -236,7 +368,6 @@ next:
 static bool
 kernel_slide_init_ios_unsafe_scan(kaddr_t region_base, kaddr_t region_end) {
 	// Don't use this technique after iOS 10.2 (XNU 16.3.0).
-	platform_init();
 	if (PLATFORM_XNU_VERSION_GE(16, 3, 0)) {
 		return false;
 	}
@@ -268,12 +399,14 @@ kernel_slide_init_ios_unsafe_scan(kaddr_t region_base, kaddr_t region_end) {
  */
 static bool
 kernel_slide_init_ios() {
+	platform_init();
 	kaddr_t region_base, region_end;
 	if (!find_kernel_region(&region_base, &region_end)) {
 		error_internal("could not find kernel region");
 		return false;
 	}
-	bool success = kernel_slide_init_ios_heap_scan(region_base, region_end)
+	bool success = kernel_slide_init_ios_heap_scan_2_unsafe(region_base, region_end)
+		|| kernel_slide_init_ios_heap_scan(region_base, region_end)
 		|| kernel_slide_init_ios_unsafe_scan(region_base, region_end);
 	if (!success) {
 		error_internal("could not find kernel slide");

@@ -20,6 +20,11 @@ extern kword_t kernel_slide;
  * Dependencies:
  * 	kernel_task
  * 	kernel
+ *
+ * Notes:
+ * 	This function may employ one of a number of different methods of finding the kernel slide,
+ * 	depending on the platform and version. If a safe method is not available, unsafe methods
+ * 	will be used. Unsafe kernel slide detection methods may panic the system.
  */
 bool kernel_slide_init(void);
 
