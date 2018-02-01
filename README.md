@@ -11,7 +11,7 @@ memctl. The libmemctl library provides functions to read and write kernel memory
 functions, find kernel symbols, and manipulate processes and tasks. The command-line tool wraps
 this functionality into a debugger-like CLI so that it can be used on the device being analyzed.
 
-In order to work memctl needs a library called a core to access to the kernel task port. I've
+In order to work memctl needs a library called a core to gain access to the kernel task port. I've
 written the following cores:
 
 * [memctl-tfp0-core]: A core for jailbroken iOS devices that uses `task_for_pid(0)` and

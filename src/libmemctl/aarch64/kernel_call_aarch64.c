@@ -76,29 +76,16 @@ const struct jop_call_strategy *strategy;
  */
 static bool
 choose_strategy() {
-	// Build a mask of the available gadgets.
-	uint64_t available[ARRSIZE(strategy->gadgets)] = { 0 };
-	for (unsigned g = 0; g < STATIC_GADGET_COUNT; g++) {
-		unsigned block = g / (8 * sizeof(*strategy->gadgets));
-		unsigned bit   = g % (8 * sizeof(*strategy->gadgets));
-		if (static_gadgets[g].address != 0) {
-			available[block] |= 1 << bit;
-		} else {
-			memctl_warning("gadget '%s' is missing", static_gadgets[g].str);
-		}
-	}
 	// Test each strategy to see if all gadgets are present.
 	for (size_t i = 0; i < ARRSIZE(strategies); i++) {
-		strategy = strategies[i];
-		for (unsigned b = 0; b < ARRSIZE(strategy->gadgets); b++) {
-			if ((available[b] & strategy->gadgets[b]) != strategy->gadgets[b]) {
-				goto next;
-			}
+		const struct jop_call_strategy *s = strategies[i];
+		if (s->check_jop()) {
+			strategy = s;
+			return true;
 		}
-		return true;
-next:;
 	}
 	strategy = NULL;
+	// TODO: We should add a diagnostic here that attaches all of the missing gadgets.
 	error_functionality_unavailable("kernel_call_aarch64: no available JOP strategy "
 	                                "for the gadgets present in this kernel");
 	return false;

