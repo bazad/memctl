@@ -1,7 +1,7 @@
-#include "aarch64/kernel_call_aarch64.h"
+#include "arm64/kernel_call_arm64.h"
 /*
- * AArch64 Kernel Function Call Strategy
- * -------------------------------------
+ * Arm64 Kernel Function Call Strategy
+ * -----------------------------------
  *
  *  In order to call arbitrary kernel functions with 8 64-bit arguments and get the 64-bit return
  *  value in user space, we construct a Jump-Oriented Program to perform a single function call and
@@ -33,12 +33,12 @@
 #include "memctl/memctl_error.h"
 #include "memctl/utility.h"
 
-#include "aarch64/jop/call_strategy.h"
-#include "aarch64/jop/gadgets_static.h"
+#include "arm64/jop/call_strategy.h"
+#include "arm64/jop/gadgets_static.h"
 
 
 _Static_assert(sizeof(kword_t) == sizeof(uint64_t),
-               "unexpected kernel word size for kernel_call_aarch64");
+               "unexpected kernel word size for kernel_call_arm64");
 
 /*
  * jop_payload
@@ -86,13 +86,13 @@ choose_strategy() {
 	}
 	strategy = NULL;
 	// TODO: We should add a diagnostic here that attaches all of the missing gadgets.
-	error_functionality_unavailable("kernel_call_aarch64: no available JOP strategy "
+	error_functionality_unavailable("kernel_call_arm64: no available JOP strategy "
 	                                "for the gadgets present in this kernel");
 	return false;
 }
 
 bool
-kernel_call_init_aarch64() {
+kernel_call_init_arm64() {
 	if (jop_payload != 0) {
 		return true;
 	}
@@ -107,12 +107,12 @@ kernel_call_init_aarch64() {
 	}
 	return true;
 fail:
-	kernel_call_deinit_aarch64();
+	kernel_call_deinit_arm64();
 	return false;
 }
 
 void
-kernel_call_deinit_aarch64() {
+kernel_call_deinit_arm64() {
 	if (jop_payload != 0) {
 		kernel_deallocate(jop_payload, strategy->payload_size, false);
 		jop_payload = 0;
@@ -156,7 +156,7 @@ lay_out_arguments(uint64_t args64[32], size_t stack_size, unsigned arg_count,
 }
 
 bool
-kernel_call_aarch64(void *result, unsigned result_size,
+kernel_call_arm64(void *result, unsigned result_size,
 		kaddr_t func, unsigned arg_count, const struct kernel_call_argument args[]) {
 	assert(arg_count <= 32);
 	// Build the arguments.
@@ -164,7 +164,7 @@ kernel_call_aarch64(void *result, unsigned result_size,
 	size_t stack_size = (strategy == NULL ? 0 : strategy->stack_size);
 	bool args_ok = lay_out_arguments(args64, stack_size, arg_count, args);
 	// If the user is just asking if a specific call is supported, indicate that it is, as long
-	// as kernel_call_aarch64 has been initialized and the arguments all fit.
+	// as kernel_call_arm64 has been initialized and the arguments all fit.
 	if (func == 0) {
 		return (jop_payload != 0 && args_ok);
 	}

@@ -1,7 +1,7 @@
-#include "aarch64/finder/pmap_cache_attributes.h"
+#include "arm64/finder/pmap_cache_attributes.h"
 
 #include "memctl/memctl_error.h"
-#include "memctl/aarch64/ksim.h"
+#include "memctl/arm64/ksim.h"
 
 void
 kernel_find_pmap_cache_attributes(struct kext *kernel) {

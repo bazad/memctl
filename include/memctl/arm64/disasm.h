@@ -1,5 +1,5 @@
-#ifndef MEMCTL__AARCH64__DISASM_H_
-#define MEMCTL__AARCH64__DISASM_H_
+#ifndef MEMCTL__ARM64__DISASM_H_
+#define MEMCTL__ARM64__DISASM_H_
 
 // Source:
 //     ARM Architecture Reference Manual

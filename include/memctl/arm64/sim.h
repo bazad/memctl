@@ -1,7 +1,7 @@
-#ifndef MEMCTL__AARCH64__SIM_H_
-#define MEMCTL__AARCH64__SIM_H_
+#ifndef MEMCTL__ARM64__SIM_H_
+#define MEMCTL__ARM64__SIM_H_
 
-#include "memctl/aarch64/disasm.h"
+#include "memctl/arm64/disasm.h"
 
 #include <stdbool.h>
 #include <stdint.h>

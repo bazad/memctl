@@ -1,6 +1,6 @@
 /*
- * AArch64 Kernel Function Call Strategy 1
- * ---------------------------------------
+ * Arm64 Kernel Function Call Strategy 1
+ * -------------------------------------
  *
  *  The JOP payload is set up by writing the JOP stack (called JOP_STACK) and the value stack
  *  (called VALUE_STACK) into kernel memory. Then kernel_call_7 is used to initialize registers and
@@ -317,8 +317,8 @@
  *  cannot save any memory by packing the payload densely.
  */
 
-#include "aarch64/jop/call_strategy.h"
-#include "aarch64/jop/gadgets_static.h"
+#include "arm64/jop/call_strategy.h"
+#include "arm64/jop/gadgets_static.h"
 
 static bool
 check() {

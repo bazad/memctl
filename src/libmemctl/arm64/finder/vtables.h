@@ -1,5 +1,5 @@
-#ifndef MEMCTL__AARCH64__FINDER__VTABLES_H_
-#define MEMCTL__AARCH64__FINDER__VTABLES_H_
+#ifndef MEMCTL__ARM64__FINDER__VTABLES_H_
+#define MEMCTL__ARM64__FINDER__VTABLES_H_
 
 #include "memctl/kernel.h"
 

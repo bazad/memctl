@@ -1,6 +1,6 @@
 /*
- * AArch64 Kernel Function Call Strategy 3
- * ---------------------------------------
+ * Arm64 Kernel Function Call Strategy 3
+ * -------------------------------------
  *
  *  We want to be able to call kernel functions with more than just 8 arguments. The ARM64 ABI
  *  specifies that arguments beyond the 8th must be passed on the stack, which means that unlike
@@ -402,8 +402,8 @@
  *
  */
 
-#include "aarch64/jop/call_strategy.h"
-#include "aarch64/jop/gadgets_static.h"
+#include "arm64/jop/call_strategy.h"
+#include "arm64/jop/gadgets_static.h"
 
 #include <unistd.h> // for ssize_t
 

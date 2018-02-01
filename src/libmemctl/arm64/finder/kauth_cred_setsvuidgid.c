@@ -1,7 +1,7 @@
-#include "aarch64/finder/kauth_cred_setsvuidgid.h"
+#include "arm64/finder/kauth_cred_setsvuidgid.h"
 
 #include "memctl/memctl_error.h"
-#include "memctl/aarch64/ksim.h"
+#include "memctl/arm64/ksim.h"
 
 void
 kernel_find_kauth_cred_setsvuidgid(struct kext *kernel) {

@@ -3,11 +3,11 @@
 #include "memctl/memctl_error.h"
 
 #if __arm64__
-#include "aarch64/finder/kauth_cred_setsvuidgid.h"
-#include "aarch64/finder/pmap_cache_attributes.h"
-#include "aarch64/finder/pthread_callbacks.h"
-#include "aarch64/finder/vtables.h"
-#include "aarch64/finder/zone_element_size.h"
+#include "arm64/finder/kauth_cred_setsvuidgid.h"
+#include "arm64/finder/pmap_cache_attributes.h"
+#include "arm64/finder/pthread_callbacks.h"
+#include "arm64/finder/vtables.h"
+#include "arm64/finder/zone_element_size.h"
 #endif
 
 void

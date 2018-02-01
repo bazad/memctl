@@ -83,7 +83,7 @@
 #include <IOKit/IOKitLib.h>
 
 #if __arm64__
-#include "aarch64/kernel_call_aarch64.h"
+#include "arm64/kernel_call_arm64.h"
 #elif __x86_64__
 #include "memctl/x86_64/kernel_call_syscall_x86_64.h"
 #endif
@@ -603,8 +603,8 @@ kernel_call(void *result, unsigned result_size,
 		return kernel_call_7(result, result_size, func, arg_count, args);
 	}
 #if __arm64__
-	else if (kernel_call_aarch64(result, result_size, 0, arg_count, args)) {
-		return kernel_call_aarch64(result, result_size, func, arg_count, args);
+	else if (kernel_call_arm64(result, result_size, 0, arg_count, args)) {
+		return kernel_call_arm64(result, result_size, func, arg_count, args);
 	}
 #endif
 	if (func != 0) {
@@ -657,7 +657,7 @@ kernel_call_init() {
 		goto fail;
 	}
 #if __arm64__
-	if (!kernel_call_init_aarch64()) {
+	if (!kernel_call_init_arm64()) {
 		goto fail;
 	}
 #elif __x86_64__
@@ -674,7 +674,7 @@ fail:
 void
 kernel_call_deinit() {
 #if __arm64__
-	kernel_call_deinit_aarch64();
+	kernel_call_deinit_arm64();
 #elif __x86_64__
 	kernel_call_deinit_syscall_x86_64();
 #endif

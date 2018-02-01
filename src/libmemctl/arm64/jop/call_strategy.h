@@ -1,5 +1,5 @@
-#ifndef MEMCTL__AARCH64__JOP__CALL_STRATEGY_H_
-#define MEMCTL__AARCH64__JOP__CALL_STRATEGY_H_
+#ifndef MEMCTL__ARM64__JOP__CALL_STRATEGY_H_
+#define MEMCTL__ARM64__JOP__CALL_STRATEGY_H_
 
 #include "memctl/memctl_types.h"
 

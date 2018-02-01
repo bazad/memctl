@@ -1,13 +1,13 @@
 /*
- * AArch64 Kernel Function Call Strategy 2
- * ---------------------------------------
+ * Arm64 Kernel Function Call Strategy 2
+ * -------------------------------------
  *
  *  This JOP program is very similar to that documented in call_strategy_1.c. It is used on some
  *  other platforms when the gadgets in the other JOP payloads cannot be found.
  */
 
-#include "aarch64/jop/call_strategy.h"
-#include "aarch64/jop/gadgets_static.h"
+#include "arm64/jop/call_strategy.h"
+#include "arm64/jop/gadgets_static.h"
 
 static bool
 check() {

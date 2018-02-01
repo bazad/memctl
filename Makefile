@@ -55,9 +55,7 @@ LDFLAGS        += -ledit -lcurses
 MEMCTL_DEFINES += -DMEMCTL_REPL=1
 endif
 
-# libmemctl arm64/aarch64 sources.
-
-ARCH_arm64_DIR = aarch64
+# libmemctl arm64/AArch64 sources.
 
 LIBMEMCTL_arm64_SRCS = finder/kauth_cred_setsvuidgid.c \
 		       finder/pmap_cache_attributes.c \
@@ -69,7 +67,7 @@ LIBMEMCTL_arm64_SRCS = finder/kauth_cred_setsvuidgid.c \
 		       jop/call_strategy_3.c \
 		       jop/gadgets_static.c \
 		       disasm.c \
-		       kernel_call_aarch64.c \
+		       kernel_call_arm64.c \
 		       ksim.c \
 		       memory_region.c \
 		       sim.c
@@ -81,15 +79,13 @@ LIBMEMCTL_arm64_HDRS = finder/kauth_cred_setsvuidgid.h \
 		       finder/zone_element_size.h \
 		       jop/call_strategy.h \
 		       jop/gadgets_static.h \
-		       kernel_call_aarch64.h
+		       kernel_call_arm64.h
 
 LIBMEMCTL_arm64_INCS = disasm.h \
 		       ksim.h \
 		       sim.h
 
 # libmemctl x86_64 sources.
-
-ARCH_x86_64_DIR = x86_64
 
 LIBMEMCTL_x86_64_SRCS = kernel_call_syscall_asm.s \
 			kernel_call_syscall_x86_64.c \
@@ -101,9 +97,9 @@ LIBMEMCTL_x86_64_INCS = kernel_call_syscall_x86_64.h
 
 # libmemctl sources.
 
-LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_$(ARCH)_SRCS:%=$(ARCH_$(ARCH)_DIR)/%)
-LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_$(ARCH)_HDRS:%=$(ARCH_$(ARCH)_DIR)/%)
-LIBMEMCTL_ARCH_INCS = $(LIBMEMCTL_$(ARCH)_INCS:%=$(ARCH_$(ARCH)_DIR)/%)
+LIBMEMCTL_ARCH_SRCS = $(LIBMEMCTL_$(ARCH)_SRCS:%=$(ARCH)/%)
+LIBMEMCTL_ARCH_HDRS = $(LIBMEMCTL_$(ARCH)_HDRS:%=$(ARCH)/%)
+LIBMEMCTL_ARCH_INCS = $(LIBMEMCTL_$(ARCH)_INCS:%=$(ARCH)/%)
 
 LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 algorithm.c \
@@ -183,8 +179,8 @@ MEMCTL_LIB := $(LIB_DIR)/libmemctl.a
 
 MEMCTL_arm64_SRCS = disassemble.c
 
-MEMCTL_ARCH_SRCS = $(MEMCTL_$(ARCH)_SRCS:%=$(ARCH_$(ARCH)_DIR)/%)
-MEMCTL_ARCH_HDRS = $(MEMCTL_$(ARCH)_HDRS:%=$(ARCH_$(ARCH)_DIR)/%)
+MEMCTL_ARCH_SRCS = $(MEMCTL_$(ARCH)_SRCS:%=$(ARCH)/%)
+MEMCTL_ARCH_HDRS = $(MEMCTL_$(ARCH)_HDRS:%=$(ARCH)/%)
 
 MEMCTL_SRCS = $(MEMCTL_ARCH_SRCS) \
 	      cli.c \
@@ -220,9 +216,9 @@ MEMCTL_BIN := $(BIN_DIR)/memctl
 
 # Tests.
 
-aarch64_disasm_SRCS = $(SRC_DIR)/$(LIBMEMCTL_DIR)/aarch64/disasm.c \
+aarch64_disasm_SRCS = $(SRC_DIR)/$(LIBMEMCTL_DIR)/arm64/disasm.c \
 		      $(SRC_DIR)/$(LIBMEMCTL_DIR)/macho.c \
-		      $(SRC_DIR)/$(MEMCTL_DIR)/aarch64/disassemble.c \
+		      $(SRC_DIR)/$(MEMCTL_DIR)/arm64/disassemble.c \
 		      $(TEST_DIR)/aarch64_disasm/aarch64_disasm.c
 
 aarch64_disasm_CFLAGS = -I$(INC_DIR) \

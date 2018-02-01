@@ -1,4 +1,4 @@
-#include "aarch64/jop/gadgets_static.h"
+#include "arm64/jop/gadgets_static.h"
 
 #include "memctl/kernel.h"
 #include "memctl/kernel_slide.h"

@@ -1,6 +1,6 @@
 #include "disassemble.h"
 
-#include "memctl/aarch64/disasm.h"
+#include "memctl/arm64/disasm.h"
 #include "memctl/utility.h"
 
 #include <assert.h>

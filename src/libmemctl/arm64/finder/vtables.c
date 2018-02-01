@@ -1,4 +1,4 @@
-#include "aarch64/finder/vtables.h"
+#include "arm64/finder/vtables.h"
 
 /*
  * How we find vtables in the kernelcache
@@ -41,7 +41,7 @@
  *  	   vtable as a symbol, but right now we don't.)
  */
 
-#include "memctl/aarch64/ksim.h"
+#include "memctl/arm64/ksim.h"
 #include "memctl/class.h"
 
 #include "mangle.h"

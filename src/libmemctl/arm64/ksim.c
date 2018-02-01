@@ -1,4 +1,4 @@
-#include "memctl/aarch64/ksim.h"
+#include "memctl/arm64/ksim.h"
 
 #include "memctl/kernelcache.h"
 #include "memctl/macho.h"

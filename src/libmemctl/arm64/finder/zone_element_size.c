@@ -1,4 +1,4 @@
-#include "aarch64/finder/zone_element_size.h"
+#include "arm64/finder/zone_element_size.h"
 
 /*
  * Locating _zone_element_size
@@ -10,7 +10,7 @@
  */
 
 #include "memctl/memctl_error.h"
-#include "memctl/aarch64/ksim.h"
+#include "memctl/arm64/ksim.h"
 
 void
 kernel_find_zone_element_size(struct kext *kernel) {
