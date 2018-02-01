@@ -36,8 +36,8 @@ struct jop_call_initial_state {
  * 		args			The arguments to the kernel function. The first 8 arguments
  * 					are passed in registers, the remaining arguments are passed
  * 					on the stack. The arguments have already been preprocessed
- * 					by kernel_call_aarch64, so the implementation may assume
- * 					that all arguments are 64-bit words.
+ * 					by kernel_call_arm64, so the implementation may assume that
+ * 					all arguments are 64-bit words.
  * 		kernel_payload		The address of the payload in the kernel.
  * 	out	payload			On return, the JOP payload. This will be copied into the
  * 					kernel at address jop_payload.

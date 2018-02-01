@@ -30,7 +30,7 @@ void memctl_warning(const char *format, ...);
 /*
  * out_of_memory_error
  */
-void error_out_of_memory();
+void error_out_of_memory(void);
 
 /*
  * open_error

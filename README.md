@@ -44,8 +44,8 @@ provides the following key features:
   Functions to call kernel functions. The default implementation, `kernel_call_7`, can call kernel
   functions with up to 7 arguments, with restrictions, and retrieve a 32-bit return value. More
   generic, platform-specific implementations are also available. For example, an implementation is
-  available for some Arm64 platforms that can call a kernel function with up to 14 64-bit arguments
-  and retrieve a 64-bit return value.
+  available for some arm64 platforms that can call a kernel function with up to 14 64-bit arguments
+  and retrieve a 64-bit return value. (Only integer/pointer arguments are currently supported.)
 
 * **kernel_memory.h**:
   Functions to manipulate kernel virtual and physical memory, including several safe functions
@@ -59,6 +59,11 @@ provides the following key features:
   Wrappers for some of XNU's process and task manipulation functions.
 
 Other features are available in other headers.
+
+## Supported platforms
+
+Memctl has been tested on iOS 10.2 (iPhone 5s) and iOS 11.1.2 (iPhone 7). I'm still working on
+adding full support for iOS 11.1.2.
 
 ## Building memctl
 
