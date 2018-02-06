@@ -73,11 +73,14 @@ kernel_find_pthread_callbacks(struct kext *kernel) {
 		NOSYM(_pthread_kext_register);
 		return;
 	}
-	// Get the address of the pthread_callbacks structure.
+	// Get the address of the pthread_callbacks structure. We use a fake address as the first
+	// argument to pthread_kext_register, then emulate until there's a store to that address.
+	const kaddr_t STORE_ADDR = 0xffaaffaa00000000;
 	struct ksim sim;
 	ksim_init_sim(&sim, _pthread_kext_register);
+	ksim_setreg(&sim, AARCH64_X1, STORE_ADDR);
 	kaddr_t _pthread_callbacks = 0;
-	ksim_exec_until_store(&sim, NULL, AARCH64_X1, &_pthread_callbacks, 20);
+	ksim_exec_until_store(&sim, NULL, STORE_ADDR, &_pthread_callbacks, 20);
 	if (_pthread_callbacks == 0) {
 		NOSYM(_pthread_callbacks);
 		return;

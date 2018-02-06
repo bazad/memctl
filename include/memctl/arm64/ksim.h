@@ -325,20 +325,19 @@ bool ksim_exec_until_return(struct ksim *ksim, ksim_branch *branches, unsigned c
  * ksim_exec_until_store
  *
  * Description:
- * 	Run the simulator until a store (STR, STRB, or STRH instruction) with the specified
- * 	base register.
+ * 	Run the simulator until a store (STR, STRB, or STRH instruction) at the specified address.
  *
  * Parameters:
  * 		ksim			The ksim struct.
  * 		branches		The branching behavior. See ksim_exec_until.
- * 		base			The general-purpose base register.
+ * 		address			The address at which the store is expected to take place.
  * 	out	value			On return, the value stored, if it is known.
  * 		count			The maximum number of instructions to execute.
  *
  * Returns:
  * 	True if the store instruction was encountered.
  */
-bool ksim_exec_until_store(struct ksim *ksim, ksim_branch *branches, aarch64_gpreg base,
+bool ksim_exec_until_store(struct ksim *ksim, ksim_branch *branches, kaddr_t address,
 		kword_t *value, unsigned count);
 
 #endif

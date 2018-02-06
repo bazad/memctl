@@ -587,8 +587,8 @@ ksim_exec_until_return(struct ksim *ksim, ksim_branch *branches, unsigned count)
  * 	Callback context for ksim_exec_until_store.
  */
 struct ksim_exec_until_store_context {
-	aarch64_gpreg base;
-	kword_t *     value;
+	kaddr_t   address;
+	kword_t * value;
 };
 
 /*
@@ -603,16 +603,21 @@ ksim_exec_until_store_callback(void *context, struct ksim *ksim, kaddr_t pc, uin
 	struct ksim_exec_until_store_context *c = context;
 	struct aarch64_ins_ldr_im im;
 	struct aarch64_ins_ldr_r  r;
+	kaddr_t       store_address;
 	aarch64_gpreg value_reg;
 	size_t        value_size;
 	if (aarch64_decode_ldr_ui(ins, &im) || aarch64_decode_ldr_ix(ins, &im)) {
-		if (!im.load && im.Xn == c->base) {
+		if (!im.load
+				&& ksim_getreg(ksim, im.Xn, &store_address)
+				&& store_address == c->address) {
 			value_reg  = im.Rt;
 			value_size = im.size;
 			goto found;
 		}
 	} else if (aarch64_decode_ldr_r(ins, &r)) {
-		if (!r.load && r.Xn == c->base) {
+		if (!r.load
+				&& ksim_getreg(ksim, r.Xn, &store_address)
+				&& store_address == c->address) {
 			value_reg  = r.Rt;
 			value_size = r.size;
 			goto found;
@@ -631,8 +636,8 @@ found:
 }
 
 bool
-ksim_exec_until_store(struct ksim *ksim, ksim_branch *branches, aarch64_gpreg base, kword_t *value,
+ksim_exec_until_store(struct ksim *ksim, ksim_branch *branches, kaddr_t address, kword_t *value,
 		unsigned count) {
-	struct ksim_exec_until_store_context context = { base, value };
+	struct ksim_exec_until_store_context context = { address, value };
 	return ksim_exec_until(ksim, ksim_exec_until_store_callback, &context, branches, count);
 }

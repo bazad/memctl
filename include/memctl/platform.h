@@ -49,4 +49,14 @@ void platform_init(void);
 	      || (platform.release.minor == _minor &&		\
 	          platform.release.patch >= _patch))))
 
+/*
+ * macro PLATFORM_XNU_VERSION_LT
+ *
+ * Description:
+ * 	A helper macro to test whether the current XNU platform release version is less than the
+ * 	specified version number.
+ */
+#define PLATFORM_XNU_VERSION_LT(_major, _minor, _patch)		\
+	(!PLATFORM_XNU_VERSION_GE(_major, _minor, _patch))
+
 #endif

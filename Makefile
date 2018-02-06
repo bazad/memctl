@@ -9,6 +9,7 @@ CORE_LIB          ?= $(CORE_DIR)/libmemctl_core.a
 CORE_ENTITLEMENTS ?= $(CORE_DIR)/entitlements.plist
 
 REPL              ?= YES
+DIAGNOSTIC        ?= 0
 
 TEST_DETAIL       ?= 0
 
@@ -53,6 +54,10 @@ EXTERNAL_CFLAGS  = -I$(EXTERNAL_HDR_DIR)
 ifeq ($(REPL),YES)
 LDFLAGS        += -ledit -lcurses
 MEMCTL_DEFINES += -DMEMCTL_REPL=1
+endif
+
+ifneq ($(DIAGNOSTIC),0)
+LIBMEMCTL_DEFINES += -DMEMCTL_DIAGNOSTIC=$(DIAGNOSTIC)
 endif
 
 # libmemctl arm64/AArch64 sources.
@@ -106,6 +111,7 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 		 algorithm.c \
 		 class.c \
 		 core.c \
+		 diagnostic.c \
 		 error.c \
 		 kernel.c \
 		 kernel_call.c \
@@ -128,6 +134,7 @@ LIBMEMCTL_SRCS = $(LIBMEMCTL_ARCH_SRCS) \
 
 LIBMEMCTL_HDRS = $(LIBMEMCTL_ARCH_HDRS) \
 		 algorithm.h \
+		 diagnostic.h \
 		 mangle.h \
 		 memctl_common.h
 
@@ -263,7 +270,7 @@ $(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(SRC_DIR)/$(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBM
 
 $(OBJ_DIR)/$(LIBMEMCTL_DIR)/%.o: $(SRC_DIR)/$(LIBMEMCTL_DIR)/%.c $(LIBMEMCTL_INCS) $(LIBMEMCTL_HDRS)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) $(LIBMEMCTL_CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(LIBMEMCTL_CFLAGS) $(LIBMEMCTL_DEFINES) -c $< -o $@
 
 $(OBJ_DIR)/$(LIBMEMCTL_DIR)/%.o: $(SRC_DIR)/$(LIBMEMCTL_DIR)/%.s $(LIBMEMCTL_INCS) $(LIBMEMCTL_HDRS)
 	@mkdir -p $(@D)

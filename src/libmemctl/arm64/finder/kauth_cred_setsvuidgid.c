@@ -1,7 +1,9 @@
 #include "arm64/finder/kauth_cred_setsvuidgid.h"
 
-#include "memctl/memctl_error.h"
 #include "memctl/arm64/ksim.h"
+#include "memctl/memctl_error.h"
+#include "memctl/platform.h"
+
 
 void
 kernel_find_kauth_cred_setsvuidgid(struct kext *kernel) {
@@ -15,12 +17,14 @@ kernel_find_kauth_cred_setsvuidgid(struct kext *kernel) {
 		NOSTR(reference);
 		return;
 	}
-	// Find a "STP <Xt1>, <Xt2>, [SP, #<imm>]!" instruction that marks the beginning of this
-	// function.
+	// Find the instruction that marks the beginning of this function.
+	// - iOS 10:    STP   <Xt1>, <Xt2>, [SP, #<imm>]!
+	// - iOS 11:    SUB   <SP>, <SP>, #<imm>
+	bool ios11 = PLATFORM_XNU_VERSION_GE(17, 0, 0);
+	const uint32_t start_ins  = (ios11 ? 0xd10003ff : 0xa98003e0);
+	const uint32_t start_mask = (ios11 ? 0xff0003ff : 0xffc003e0);
 	struct ksim sim;
 	ksim_set_pc(&sim, strref_ins);
-	const uint32_t start_ins  = 0xa98003e0;
-	const uint32_t start_mask = 0xffc003e0;
 	kaddr_t _kauth_cred_setsvuidgid = 0;
 	ksim_scan_for(&sim, KSIM_BW, start_ins, start_mask, 0, &_kauth_cred_setsvuidgid, 50);
 	if (_kauth_cred_setsvuidgid == 0) {

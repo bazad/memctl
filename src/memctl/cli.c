@@ -682,7 +682,8 @@ static struct command commands[] = {
 		"zs", NULL, zs_handler,
 		"Get zalloc memory size",
 		"Call the kernel function zone_element_size to determine the allocation size of "
-		"the specified address.",
+		"the specified address."
+		"\nThis functionality may not be available on iOS 11 and later.",
 		ARGSPEC(1) {
 			{ ARGUMENT, "address", ARG_ADDRESS, "The virtual address" },
 		},

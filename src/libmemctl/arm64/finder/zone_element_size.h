@@ -8,6 +8,9 @@
  *
  * Description:
  * 	A special symbol finder for _kfree_addr and _zone_element_size.
+ *
+ * Notes:
+ * 	This function does not exist standalone on iOS 11.
  */
 void kernel_find_zone_element_size(struct kext *kernel);
 
