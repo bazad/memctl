@@ -451,7 +451,7 @@ HANDLER(vmd_handler) {
 }
 
 HANDLER(vmp_handler) {
-	const char *protection = ARG_GET_STRING(0, "protection");
+	const char *protection = ARG_GET_STRING(0, "prot");
 	kaddr_t address        = ARG_GET_ADDRESS(1, "address");
 	size_t length          = ARG_GET_UINT_OR(2, "length", 1);
 	int prot;
@@ -754,9 +754,9 @@ static struct command commands[] = {
 		"\nIf length is not specified, then it defaults to 1, meaning the new protection "
 		"will be set on only the one page containing the given address.",
 		ARGSPEC(3) {
-			{ ARGUMENT, "protection", ARG_STRING,  "The new virtual memory protection (e.g. 'r-x')" },
-			{ ARGUMENT, "address",    ARG_ADDRESS, "The address to protect"                         },
-			{ OPTIONAL, "length",     ARG_UINT,    "The length of the region"                       },
+			{ ARGUMENT, "prot",    ARG_STRING,  "The new virtual memory protection (e.g. 'r-x')" },
+			{ ARGUMENT, "address", ARG_ADDRESS, "The address to protect"                         },
+			{ OPTIONAL, "length",  ARG_UINT,    "The length of the region"                       },
 		},
 	}, {
 		"ks", NULL, ks_handler,
