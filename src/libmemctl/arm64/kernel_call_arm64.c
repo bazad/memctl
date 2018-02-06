@@ -35,6 +35,7 @@
 
 #include "arm64/jop/call_strategy.h"
 #include "arm64/jop/gadgets_static.h"
+#include "diagnostic.h"
 
 
 _Static_assert(sizeof(kword_t) == sizeof(uint64_t),
@@ -86,7 +87,14 @@ choose_strategy() {
 		}
 	}
 	strategy = NULL;
-	// TODO: We should add a diagnostic here that attaches all of the missing gadgets.
+	// Print diagnostics about which gadgets are missing.
+#if MEMCTL_DIAGNOSTIC_LEVEL(3)
+	for (size_t g = 0; g < STATIC_GADGET_COUNT; g++) {
+		if (static_gadgets[g].address == 0) {
+			memctl_diagnostic(3, "missing gadget: %s", static_gadgets[g].str);
+		}
+	}
+#endif
 	error_functionality_unavailable("kernel_call_arm64: no available JOP strategy "
 	                                "for the gadgets present in this kernel");
 	return false;

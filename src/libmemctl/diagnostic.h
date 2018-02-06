@@ -2,6 +2,14 @@
 #define MEMCTL__DIAGNOSTIC_H_
 
 /*
+ * macro MEMCTL_DIAGNOSTIC_LEVEL
+ *
+ * Description:
+ * 	Evaluates to true if MEMCTL_DIAGNOSTIC is at or above the specified level.
+ */
+#define MEMCTL_DIAGNOSTIC_LEVEL(_level)		(_level <= MEMCTL_DIAGNOSTIC)
+
+/*
  * memctl_diagnostic
  *
  * Description:
@@ -24,7 +32,7 @@
 
 #define memctl_diagnostic(_level, _format, ...)						\
 	do {										\
-		if (_level <= MEMCTL_DIAGNOSTIC) {					\
+		if (MEMCTL_DIAGNOSTIC_LEVEL(_level)) {					\
 			memctl_issue_diagnostic(__func__, _format, ##__VA_ARGS__);	\
 		}									\
 	} while (0)
