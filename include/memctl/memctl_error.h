@@ -21,10 +21,23 @@ extern struct error_type address_inaccessible_error;
 extern struct error_type macho_parse_error;
 extern struct error_type kernelcache_error;
 
+
 /*
  * memctl_warning
  */
 void memctl_warning(const char *format, ...);
+
+/*
+ * memctl_errors_convert_to_warnings
+ *
+ * Description:
+ * 	Consume the current error stack from first to last and print a warning for each error.
+ *
+ * 	This is useful across API boundaries when functionality is optional: If one system cannot
+ * 	load and generates errors, another system that optionally depends on the first can convert
+ * 	those errors into warnings and then continue.
+ */
+void memctl_errors_convert_to_warnings(void);
 
 
 /*

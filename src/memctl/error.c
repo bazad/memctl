@@ -200,23 +200,14 @@ static void
 print_error(error_handle error) {
 	char stack_buffer[512];
 	char *buffer = stack_buffer;
-	const char *error_str = error->type->static_description;
-	size_t size = error->type->format_description(NULL, 0, error);
-	if (size == 0) {
-		goto print;
-	}
+	size_t size = error_description(error, NULL, 0);
 	size += 1;
 	if (size > sizeof(stack_buffer)) {
 		buffer = malloc(size);
 		assert(buffer != NULL);
 	}
-	size = error->type->format_description(buffer, size, error);
-	if (size == 0) {
-		goto print;
-	}
-	error_str = buffer;
-print:
-	fprintf(stderr, "error: %s\n", error_str);
+	error_description(error, buffer, size);
+	fprintf(stderr, "error: %s\n", buffer);
 	if (buffer != stack_buffer) {
 		free(buffer);
 	}

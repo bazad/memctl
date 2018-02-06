@@ -6,6 +6,41 @@
 #include <stdio.h>
 #include <string.h>
 
+
+/*
+ * convert_error_to_warning
+ *
+ * Description:
+ * 	Convert the specified error handle into a warning.
+ */
+static void
+convert_error_to_warning(error_handle error) {
+	char stack_buffer[512];
+	char *buffer = stack_buffer;
+	size_t size = error_description(error, NULL, 0);
+	size += 1;
+	if (size > sizeof(stack_buffer)) {
+		buffer = malloc(size);
+		assert(buffer != NULL);
+	}
+	error_description(error, buffer, size);
+	memctl_warning("%s", buffer);
+	if (buffer != stack_buffer) {
+		free(buffer);
+	}
+}
+
+void
+memctl_errors_convert_to_warnings() {
+	size_t end = error_count();
+	for (size_t i = 0; i < end; i++) {
+		error_handle error = error_at_index(i);
+		convert_error_to_warning(error);
+	}
+	error_clear();
+}
+
+
 #if KERNEL_BITS == 32
 # define ADDR	"0x%08x"
 #else

@@ -227,3 +227,13 @@ error_clear() {
 		pop_internal();
 	}
 }
+
+size_t
+error_description(error_handle error, char *buffer, size_t size) {
+	size_t full_size = error->type->format_description(buffer, size, error);
+	if (full_size == 0) {
+		strncpy(buffer, error->type->static_description, (size == 0 ? 0 : size - 1));
+		full_size = strlen(error->type->static_description);
+	}
+	return full_size;
+}

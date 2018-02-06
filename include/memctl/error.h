@@ -173,4 +173,21 @@ size_t error_count(void);
  */
 void error_clear(void);
 
+/*
+ * error_description
+ *
+ * Description:
+ * 	Write a human-readable description of an error into a buffer.
+ *
+ * Parameters:
+ * 	error				The error object.
+ * 	buffer				The buffer in which to format the error message.
+ * 	size				The size of the buffer in bytes. This should include space
+ * 					for the null terminator.
+ *
+ * Returns:
+ * 	Returns the full length of the formatted error string if the buffer size were infinite.
+ */
+size_t error_description(error_handle error, char *buffer, size_t size);
+
 #endif

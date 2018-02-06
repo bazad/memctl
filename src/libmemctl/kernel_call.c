@@ -436,7 +436,8 @@ create_user_client() {
 	}
 	return true;
 fail:
-	// We don't need to clean up the connection, it will be taken care of in kernel_call_init.
+	// We don't need to clean up the connection, it will be taken care of in
+	// kernel_call_7_init.
 	return false;
 }
 
@@ -509,7 +510,7 @@ create_hooked_vtable() {
 fail_2:
 	free(vtable_copy);
 fail_1:
-	// Leave deallocating the new vtable to kernel_call_init.
+	// Leave deallocating the new vtable to kernel_call_7_init.
 	return false;
 }
 
@@ -524,7 +525,7 @@ fail_1:
  * 	hook.trap			The newly allocated IOExternalTrap.
  * 	hook.hooked			true
  */
-bool
+static bool
 patch_user_client() {
 	// Allocate the trap in the kernel.
 	bool success = kernel_allocate(&hook.trap, sizeof(IOExternalTrap));
@@ -548,7 +549,7 @@ patch_user_client() {
 	hook.hooked = true;
 	return true;
 fail:
-	// Leave deallocating the trap to kernel_call_init.
+	// Leave deallocating the trap to kernel_call_7_init.
 	return false;
 }
 
@@ -638,46 +639,15 @@ initialize_offsets() {
 #undef DEFAULT
 }
 
-bool
-kernel_call_init() {
-	if (hook.hooked) {
-		return true;
-	}
-	initialize_offsets();
-	if (!create_user_client()) {
-		error_internal("could not create a user client at a known address");
-		goto fail;
-	}
-	if (!create_hooked_vtable()) {
-		error_internal("could not create hooked vtable");
-		goto fail;
-	}
-	if (!patch_user_client()) {
-		error_internal("could not patch the user client");
-		goto fail;
-	}
-#if __arm64__
-	if (!kernel_call_init_arm64()) {
-		goto fail;
-	}
-#elif __x86_64__
-	if (!kernel_call_init_syscall_x86_64()) {
-		goto fail;
-	}
-#endif
-	return true;
-fail:
-	kernel_call_deinit();
-	return false;
-}
-
-void
-kernel_call_deinit() {
-#if __arm64__
-	kernel_call_deinit_arm64();
-#elif __x86_64__
-	kernel_call_deinit_syscall_x86_64();
-#endif
+/*
+ * kernel_call_7_deinit
+ *
+ * Description:
+ * 	Deinitialize the kernel_call_7 call mechanism. It is safe to call this function when the
+ * 	kernel_call_7 state was only partially initialized.
+ */
+static void
+kernel_call_7_deinit() {
 	if (hook.hooked) {
 		error_stop();
 		kernel_write_word(kernel_write_unsafe, hook.user_client, hook.vtable,
@@ -697,4 +667,66 @@ kernel_call_deinit() {
 		kernel_deallocate(hook.trap, sizeof(IOExternalTrap), false);
 		hook.trap = 0;
 	}
+}
+
+/*
+ * kernel_call_7_init
+ *
+ * Description:
+ * 	Initialize the kernel_call_7 call mechanism.
+ */
+static bool
+kernel_call_7_init() {
+	if (hook.hooked) {
+		return true;
+	}
+	initialize_offsets();
+	if (!create_user_client()) {
+		error_internal("could not create a user client at a known address");
+		goto fail;
+	}
+	if (!create_hooked_vtable()) {
+		error_internal("could not create hooked vtable");
+		goto fail;
+	}
+	if (!patch_user_client()) {
+		error_internal("could not patch the user client");
+		goto fail;
+	}
+	return true;
+fail:
+	kernel_call_7_deinit();
+	return false;
+}
+
+bool
+kernel_call_init() {
+	// We need kernel_call_7, since the others depend on it.
+	if (!kernel_call_7_init()) {
+		return false;
+	}
+	// If we don't manage to load these other kernel call mechanisms, we can still get by with
+	// some of libmemctl's functionality.
+#if __arm64__
+	if (!kernel_call_init_arm64()) {
+		memctl_errors_convert_to_warnings();
+		memctl_warning("some kernel call functionality may be unavailable");
+	}
+#elif __x86_64__
+	if (!kernel_call_init_syscall_x86_64()) {
+		memctl_errors_convert_to_warnings();
+		memctl_warning("some kernel call functionality may be unavailable");
+	}
+#endif
+	return true;
+}
+
+void
+kernel_call_deinit() {
+#if __arm64__
+	kernel_call_deinit_arm64();
+#elif __x86_64__
+	kernel_call_deinit_syscall_x86_64();
+#endif
+	kernel_call_7_deinit();
 }
