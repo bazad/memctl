@@ -63,7 +63,7 @@
  *  		]
  *  		x0 = REGION_POPULATE_VALUES
  *  		x1 = JOP_STACK_1
- *  		pc = GADGET_PROLOGUE_1
+ *  		pc = GADGET_PROLOGUE_2
  *
  *  	GADGET_PROLOGUE_2 (0xfffffff0066012a0):
  *  			;; Save registers x19-x28, save the frame (x29, x30), and make
@@ -94,7 +94,6 @@
  *  	;; 	x1 = JOP_STACK_1
  *  	;; 	x8 = JOP_DISPATCH
  *  	;; 	x19 = REGION_POPULATE_VALUES
- *  	;; 	x29 = FRAME
  *  	;; We will populate registers using GADGET_POPULATE_2. Since we're using this
  *  	;; gadget with JOP_DISPATCH, we first need to initialize x20 to JOP_STACK_2 and
  *  	;; x23 to REGION_POPULATE_VALUES.
