@@ -81,6 +81,7 @@ static bool parse_argv(struct state *s);
 static bool parse_symbol(struct state *s);
 static bool parse_address(struct state *s);
 static bool parse_range(struct state *s);
+static bool parse_word(struct state *s);
 
 static parse_fn parse_fns[] = {
 	parse_none,
@@ -93,6 +94,7 @@ static parse_fn parse_fns[] = {
 	parse_symbol,
 	parse_address,
 	parse_range,
+	parse_word,
 };
 
 #define ERROR_USAGE(fmt, ...)				\
@@ -416,7 +418,7 @@ parse_int_internal(struct state *s, struct argument *argument, enum argtype argt
 	uintmax_t address;
 	unsigned base = 10;
 	uintmax_t *intptr;
-	bool sign = false;
+	bool is_signed = false;
 	const char *typename = "integer";
 	if (argtype == ARG_ADDRESS) {
 		base = 16;
@@ -426,9 +428,9 @@ parse_int_internal(struct state *s, struct argument *argument, enum argtype argt
 		intptr = &argument->uint;
 	} else {
 		intptr = (uintmax_t *)&argument->sint;
-		sign = true;
+		is_signed = true;
 	}
-	enum strtoint_result sr = strtoint(s->arg, len, sign, base, intptr, &end);
+	enum strtoint_result sr = strtoint(s->arg, len, true, is_signed, base, intptr, &end);
 	if (sr == STRTOINT_OVERFLOW) {
 		ERROR_OPTION(s, "integer overflow: '%.*s'", len, s->arg);
 		return false;
@@ -469,6 +471,16 @@ parse_uint(struct state *s) {
 }
 
 static bool
+verify_width(struct state *s, size_t width) {
+	if (width == 0 || width > sizeof(kword_t) || !ispow2(width)) {
+		s->keep_error = true;
+		ERROR_OPTION(s, "invalid width %zu", width);
+		return false;
+	}
+	return true;
+}
+
+static bool
 parse_width(struct state *s) {
 	if (s->arg == NULL) {
 		ERROR_OPTION(s, "missing width");
@@ -478,9 +490,7 @@ parse_width(struct state *s) {
 		return false;
 	}
 	size_t width = s->argument->uint;
-	if (width == 0 || width > sizeof(kword_t) || !ispow2(width)) {
-		s->keep_error = true;
-		ERROR_OPTION(s, "invalid width %zu", width);
+	if (!verify_width(s, width)) {
 		return false;
 	}
 	s->argument->width = width;
@@ -726,6 +736,42 @@ fail_2:
 	ERROR_OPTION(s, "bad address range "KADDR_XFMT"-"KADDR_XFMT,
 			s->argument->range.start, s->argument->range.end);
 	return false;
+}
+
+static bool
+parse_word(struct state *s) {
+	if (s->arg == NULL) {
+		ERROR_OPTION(s, "missing word");
+		return false;
+	}
+	size_t len = -1;
+	const char *sep = strchr(s->arg, ':');
+	if (sep != NULL) {
+		len = sep - s->arg;
+	}
+	bool ok = parse_int_internal(s, s->argument, ARG_UINT, len);
+	if (!ok) {
+		return false;
+	}
+	kword_t word = s->argument->sint;
+	size_t width = sizeof(kword_t);
+	if (sep != NULL) {
+		assert(s->arg == sep);
+		s->arg++;
+		ok = parse_int_internal(s, s->argument, ARG_UINT, -1);
+		if (!ok) {
+			return false;
+		}
+		width = s->argument->uint;
+		ok = verify_width(s, width);
+		if (!ok) {
+			return false;
+		}
+	}
+	s->argument->word.value = word;
+	s->argument->word.width = width;
+	s->argument->type = ARG_WORD;
+	return true;
 }
 
 /*

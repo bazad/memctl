@@ -60,7 +60,7 @@ handle_base_prefix(const char **str0, const char *last, unsigned *base0) {
 }
 
 enum strtoint_result
-strtoint(const char *str, size_t len, bool sign, unsigned base,
+strtoint(const char *str, size_t len, bool sign, bool is_signed, unsigned base,
 		uintmax_t *value, const char **end) {
 	enum strtoint_result result = STRTOINT_OK;
 	const char *last = str + len;
@@ -100,7 +100,7 @@ nochars:
 loop_entry:;
 		uintmax_t new_value = value_ * base + d;
 		// Check for overflow.
-		if (sign) {
+		if (is_signed) {
 			// We need to test if new_value will be between INTMAX_MIN and INTMAX_MAX
 			// after any negation. If new_value is not negated, this is simple: we've
 			// overflowed if new_value > INTMAX_MAX. This condition is slightly

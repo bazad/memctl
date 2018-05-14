@@ -2,11 +2,11 @@
 
 # Compilation options.
 
-ARCH              ?= arm64
-SDK               ?= iphoneos
-CORE_DIR          ?= core
-CORE_LIB          ?= $(CORE_DIR)/libmemctl_core.a
-CORE_ENTITLEMENTS ?= $(CORE_DIR)/entitlements.plist
+ARCH         ?= arm64
+SDK          ?= iphoneos
+CORE_DIR     ?= core
+CORE_LIB     ?= $(CORE_DIR)/libmemctl_core.a
+ENTITLEMENTS ?= $(CORE_DIR)/entitlements.plist
 
 REPL              ?= YES
 DIAGNOSTIC        ?= 0
@@ -260,8 +260,10 @@ endef
 
 all: $(MEMCTL_BIN)
 
-ifneq ($(wildcard $(CORE_ENTITLEMENTS)),)
-CODESIGN_FLAGS = --entitlements "$(CORE_ENTITLEMENTS)"
+ifneq ($(ENTITLEMENTS),)
+ifneq ($(wildcard $(ENTITLEMENTS)),)
+CODESIGN_FLAGS = --entitlements "$(ENTITLEMENTS)"
+endif
 endif
 
 $(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(SRC_DIR)/$(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBMEMCTL_INCS)

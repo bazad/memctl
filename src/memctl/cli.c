@@ -57,6 +57,8 @@
 #define OPT_GET_ADDRESS_OR(n_, opt_, arg_, val_)	OPT_GET_OR_(n_, opt_, arg_, val_, ARG_ADDRESS, address)
 #define OPT_GET_RANGE_OR(n_, opt_, arg_, start_, end_)	\
 	OPT_GET_OR_(n_, opt_, arg_, ((struct argrange) { start_, end_, true, true }), ARG_RANGE, range)
+#define OPT_GET_WORD_OR(n_, opt_, arg_, width_, value_)	\
+	OPT_GET_OR_(n_, opt_, arg_, ((struct argword) { width_, value_ }), ARG_WORD, word)
 
 #define ARG_GET_INT(n_, arg_)				ARG_GET_(n_, arg_, ARG_INT, sint)
 #define ARG_GET_UINT(n_, arg_)				ARG_GET_(n_, arg_, ARG_UINT, uint)
@@ -67,6 +69,7 @@
 #define ARG_GET_SYMBOL(n_, arg_)			ARG_GET_(n_, arg_, ARG_SYMBOL, symbol)
 #define ARG_GET_ADDRESS(n_, arg_)			ARG_GET_(n_, arg_, ARG_ADDRESS, address)
 #define ARG_GET_RANGE(n_, arg_)				ARG_GET_(n_, arg_, ARG_RANGE, range)
+#define ARG_GET_WORD(n_, arg_)				ARG_GET_(n_, arg_, ARG_WORD, word)
 
 #define ARG_GET_INT_OR(n_, arg_, val_)			ARG_GET_OR_(n_, arg_, val_, ARG_INT, sint)
 #define ARG_GET_UINT_OR(n_, arg_, val_)			ARG_GET_OR_(n_, arg_, val_, ARG_UINT, uint)
@@ -78,6 +81,8 @@
 #define ARG_GET_ADDRESS_OR(n_, arg_, val_)		ARG_GET_OR_(n_, arg_, val_, ARG_ADDRESS, address)
 #define ARG_GET_RANGE_OR(n_, arg_, start_, end_)	\
 	ARG_GET_OR_(n_, arg_, ((struct argrange) { start_, end_, true, true }), ARG_RANGE, range)
+#define ARG_GET_WORD_OR(n_, arg_, width_, value_)	\
+	ARG_GET_OR_(n_, arg_, ((struct argword) { width_, value_ }), ARG_WORD, word)
 
 // Default values for argrange start and end values.
 kaddr_t range_default_virtual_start;
@@ -354,6 +359,25 @@ HANDLER(fc_handler) {
 		return false;
 	}
 	return fc_command(range.start, range.end, classname, bundle_id, access);
+}
+
+HANDLER(kc_handler) {
+	size_t width     = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
+	kaddr_t function = ARG_GET_ADDRESS(1, "function");
+	struct argword argwords[5];
+	argwords[0] = ARG_GET_WORD_OR(2, "arg1", 0, 0);
+	argwords[1] = ARG_GET_WORD_OR(3, "arg2", 0, 0);
+	argwords[2] = ARG_GET_WORD_OR(4, "arg3", 0, 0);
+	argwords[3] = ARG_GET_WORD_OR(5, "arg4", 0, 0);
+	argwords[4] = ARG_GET_WORD_OR(6, "arg5", 0, 0);
+	struct kernel_call_argument args[5];
+	size_t count = 0;
+	while (count < sizeof(argwords) / sizeof(argwords[0]) && argwords[count].width != 0) {
+		args[count].size = argwords[count].width;
+		args[count].value = argwords[count].value;
+		count++;
+	}
+	return kc_command(function, width, count, args);
 }
 
 HANDLER(lc_handler) {
@@ -638,6 +662,19 @@ static struct command commands[] = {
 			{ "x",      "access", ARG_WIDTH,  "The memory access width"                      },
 			{ ARGUMENT, "class",  ARG_STRING, "The C++ class name"                           },
 			{ OPTIONAL, "range",  ARG_RANGE,  "The address range to search"                  },
+		},
+	}, {
+		"kc", NULL, kc_handler,
+		"Call a kernel function",
+		"Call a kernel function with the specified arguments.",
+		ARGSPEC(7) {
+			{ "",       "width",    ARG_WIDTH,   "The width of the return value" },
+			{ ARGUMENT, "function", ARG_ADDRESS, "The address of the function to call" },
+			{ OPTIONAL, "arg1",     ARG_WORD,    "The first argument" },
+			{ OPTIONAL, "arg2",     ARG_WORD,    "The second argument" },
+			{ OPTIONAL, "arg3",     ARG_WORD,    "The third argument" },
+			{ OPTIONAL, "arg4",     ARG_WORD,    "The fourth argument" },
+			{ OPTIONAL, "arg5",     ARG_WORD,    "The fifth argument" },
 		},
 	}, {
 		"lc", NULL, lc_handler,

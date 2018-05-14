@@ -38,6 +38,7 @@ typedef enum argtype {
 	ARG_SYMBOL,
 	ARG_ADDRESS,
 	ARG_RANGE,
+	ARG_WORD,
 } argtype;
 
 /*
@@ -77,6 +78,10 @@ struct argument {
 			bool    default_start;
 			bool    default_end;
 		} range;
+		struct argword {
+			size_t width;
+			kword_t value;
+		} word;
 	};
 };
 

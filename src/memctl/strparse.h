@@ -63,9 +63,11 @@ enum strtoint_result {
  * Parameters:
  * 		str			The string to parse.
  * 		len			The maximum length of the string.
- * 		sign			Whether the integer to parse is signed or unsigned. If sign
- * 					is true, then the string representation of the integer may
- * 					optionally start with a "+" or "-" to indicate the sign.
+ * 		sign			If sign is true, then the string representation of the
+ * 					integer may optionally start with a "+" or "-" to indicate
+ * 					the sign.
+ * 		is_signed		Whether the integer to parse is signed or unsigned. This
+ * 					affects overflow detection.
  * 		base			The base to parse the integer, if no base prefix is
  * 					present in the string.
  * 	out	value			On return, the integer value that was parsed.
@@ -87,8 +89,8 @@ enum strtoint_result {
  * 	will actually return the value 2, not 0xB10, since the leading "0b" will be recognized as
  * 	the base specifier.
  */
-enum strtoint_result strtoint(const char *str, size_t len, bool sign, unsigned base,
-		uintmax_t *value, const char **end);
+enum strtoint_result strtoint(const char *str, size_t len, bool sign, bool is_signed,
+		unsigned base, uintmax_t *value, const char **end);
 
 /*
  * enum strtodata_result

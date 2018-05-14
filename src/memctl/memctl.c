@@ -16,6 +16,7 @@
 #include "memctl/platform.h"
 #include "memctl/privilege_escalation.h"
 #include "memctl/process.h"
+#include "memctl/utility.h"
 
 #include <stdio.h>
 
@@ -538,6 +539,20 @@ fc_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle
 	}
 	return memctl_find(start, end, address, sizeof(address), false, true, access,
 			sizeof(address));
+}
+
+bool
+kc_command(kaddr_t function, size_t width, size_t argument_count,
+		struct kernel_call_argument *arguments) {
+	if (!initialize(KERNEL_CALL)) {
+		return false;
+	}
+	kword_t result;
+	bool ok = kernel_call(&result, width, function, argument_count, arguments);
+	if (ok) {
+		printf("0x%jx\n", (uintmax_t)result);
+	}
+	return ok;
 }
 
 bool

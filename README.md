@@ -62,8 +62,8 @@ Other features are available in other headers.
 
 ## Supported platforms
 
-Memctl has been tested on iOS 10.2 (iPhone 5s) and iOS 11.1.2 (iPhone 7). I'm still working on
-adding full support for iOS 11.1.2.
+Memctl has been tested on iOS 10.2 (iPhone 5s) and iOS 11.1.2 (iPhone 7). If you need support for
+another (recent) iOS version and device, let me know.
 
 ## Building memctl
 
@@ -91,38 +91,40 @@ a general list of commands, and type a specific command name followed by `?` to 
 for that command. Hit Ctrl-D or type `quit` to exit the REPL.
 
 	$ memctl
-	memctl> ?
-	i                                    Print system information
-	r <address> [length]                 Read and print formatted memory
-	rb <address> <length>                Print raw binary data from memory
-	rs <address> [length]                Read a string from memory
-	w <address> <value>                  Write an integer to memory
-	wd <address> <data>                  Write arbitrary data to memory
-	ws <address> <string>                Write a string to memory
-	f <value> [range]                    Find an integer in memory
-	fpr <pid>                            Find the proc struct for a process
-	fc <class> [range]                   Find instances of a C++ class
-	lc <address>                         Look up the class of a C++ object
-	cm <class>                           Get the C++ metaclass pointer
-	cz <class>                           Get the size of a C++ class
-	kp <address>                         Translate virtual to physical address
-	kpm <range>                          Print virtual to physical address map
-	zs <address>                         Get zalloc memory size
-	pca <address>                        Show physical cache attributes
-	vt <class>                           Find the vtable of a C++ class
-	vtl <address>                        Look up the class name for a vtable
-	vm <address>                         Show virtual memory information
-	vmm [range]                          Show virtual memory information for range
-	vma <size>                           Allocate virtual memory
-	vmd <address> [size]                 Deallocate virtual memory
-	vmp <protection> <address> [length]  Set virtual memory protection
-	ks [address]                         Kernel slide
-	a <symbol>                           Find the address of a symbol
-	ap [address]                         Address permutation
-	s <address>                          Find the symbol for an address
-	kcd <file>                           Decompress a kernelcache
-	root                                 Exec a root shell
-	quit                                 Exit the REPL
+	i                                                 Print system information
+	r <address> [length]                              Read and print formatted memory
+	rb <address> <length>                             Print raw binary data from memory
+	ri <address> <length>                             Disassemble kernel memory
+	rif <function>                                    Disassemble a function
+	rs <address> [length]                             Read a string from memory
+	w <address> <value>                               Write an integer to memory
+	wd <address> <data>                               Write arbitrary data to memory
+	ws <address> <string>                             Write a string to memory
+	f <value> [range]                                 Find an integer in memory
+	fpr <pid>                                         Find the proc struct for a process
+	fc <class> [range]                                Find instances of a C++ class
+	kc <function> [arg1] [arg2] [arg3] [arg4] [arg5]  Call a kernel function
+	lc <address>                                      Look up the class of a C++ object
+	cm <class>                                        Get the C++ metaclass pointer
+	cz <class>                                        Get the size of a C++ class
+	kp <address>                                      Translate virtual to physical address
+	kpm <range>                                       Print virtual to physical address map
+	zs <address>                                      Get zalloc memory size
+	pca <address>                                     Show physical cache attributes
+	vt <class>                                        Find the vtable of a C++ class
+	vtl <address>                                     Look up the class name for a vtable
+	vm <address>                                      Show virtual memory information
+	vmm [range]                                       Show virtual memory information for range
+	vma <size>                                        Allocate virtual memory
+	vmd <address> [size]                              Deallocate virtual memory
+	vmp <prot> <address> [length]                     Set virtual memory protection
+	ks [address]                                      Kernel slide
+	a <symbol>                                        Find the address of a symbol
+	ap [address]                                      Address permutation
+	s <address>                                       Find the symbol for an address
+	kcd [file]                                        Decompress a kernelcache
+	root                                              Exec a root shell
+	quit                                              Exit the REPL
 	memctl> r?
 	
 	r[width] [-d] [-f] [-p] [-x access] <address> [length]
@@ -209,6 +211,18 @@ Once we know the class name, we can use the `cz` command to determine the class 
 
 In this case the class size is `0x70`, which means the `AppleMobileFileIntegrity` pointer at
 address `0xfffffff000d06ef0` is likely leftover heap garbage.
+
+The memctl tool can also be used to call kernel functions directly from the command line, although
+there are currently significant limitations. (In particular, due to a limitation of the command
+parser, only 5 arguments are currently supported.) Kernel functions can be called using the `kc`
+command:
+
+	memctl> kc _current_task
+	0xffffffe004ce3188
+	memctl> kc __ZN18IOMemoryDescriptor16withAddressRangeEyyjP4task 0x104000000 0x4000 0x110003 0xffffffe004ce3188
+	0xffffffe004d75500
+	memctl> lc 0xffffffe004d75500
+	IOGeneralMemoryDescriptor
 
 ## License
 

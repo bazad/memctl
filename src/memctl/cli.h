@@ -4,6 +4,8 @@
 #include "command.h"
 #include "disassemble.h"
 
+#include "memctl/kernel_call.h"
+
 bool default_action(void);
 
 bool i_command(void);
@@ -25,6 +27,8 @@ bool f_command(kaddr_t start, kaddr_t end, kword_t value, size_t width, bool phy
 bool fpr_command(pid_t pid);
 bool fc_command(kaddr_t start, kaddr_t end, const char *classname, const char *bundle_id,
 		size_t access);
+bool kc_command(kaddr_t function, size_t width, size_t argument_count,
+		struct kernel_call_argument *arguments);
 bool lc_command(kaddr_t address);
 bool cm_command(const char *classname, const char *bundle_id);
 bool cz_command(const char *classname, const char *bundle_id);
