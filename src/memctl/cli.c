@@ -12,17 +12,17 @@
 #include <string.h>
 
 #define HANDLER(name)							\
-	static bool name(const struct argument *arguments)
+	static bool name(const struct argument *_arguments)
 
 #define OPT_GET_OR_(n_, opt_, arg_, val_, type_, field_)		\
-	({ const struct argument *a = &arguments[n_];			\
+	({ const struct argument *a = &_arguments[n_];			\
 	   assert(strcmp(a->option, opt_) == 0);			\
 	   assert(strcmp(a->argument, arg_) == 0);			\
 	   assert(a->type == type_ || a->type == ARG_NONE);		\
 	   (a->present ? a->field_ : val_); })
 
 #define ARG_GET_(n_, arg_, type_, field_)				\
-	({ const struct argument *a = &arguments[n_];			\
+	({ const struct argument *a = &_arguments[n_];			\
 	   assert(a->present);						\
 	   assert(a->option == ARGUMENT || a->option == OPTIONAL);	\
 	   assert(strcmp(a->argument, arg_) == 0);			\
@@ -30,19 +30,19 @@
 	   a->field_; })
 
 #define ARG_GET_OR_(n_, arg_, val_, type_, field_)			\
-	({ const struct argument *a = &arguments[n_];			\
+	({ const struct argument *a = &_arguments[n_];			\
 	   assert(a->option == ARGUMENT || a->option == OPTIONAL);	\
 	   assert(strcmp(a->argument, arg_) == 0);			\
 	   assert(a->type == type_ || a->type == ARG_NONE);		\
 	   (a->present ? a->field_ : val_); })
 
 #define OPT_PRESENT(n_, opt_)						\
-	({ const struct argument *a = &arguments[n_];			\
+	({ const struct argument *a = &_arguments[n_];			\
 	   assert(strcmp(a->option, opt_) == 0);			\
 	   a->present; })
 
 #define ARG_PRESENT(n_, arg_)						\
-	({ const struct argument *a = &arguments[n_];			\
+	({ const struct argument *a = &_arguments[n_];			\
 	   assert(a->option == OPTIONAL);				\
 	   assert(strcmp(a->argument, arg_) == 0);			\
 	   a->present; })
@@ -70,6 +70,7 @@
 #define ARG_GET_ADDRESS(n_, arg_)			ARG_GET_(n_, arg_, ARG_ADDRESS, address)
 #define ARG_GET_RANGE(n_, arg_)				ARG_GET_(n_, arg_, ARG_RANGE, range)
 #define ARG_GET_WORD(n_, arg_)				ARG_GET_(n_, arg_, ARG_WORD, word)
+#define ARG_GET_WORDS(n_, arg_)				ARG_GET_(n_, arg_, ARG_WORDS, words)
 
 #define ARG_GET_INT_OR(n_, arg_, val_)			ARG_GET_OR_(n_, arg_, val_, ARG_INT, sint)
 #define ARG_GET_UINT_OR(n_, arg_, val_)			ARG_GET_OR_(n_, arg_, val_, ARG_UINT, uint)
@@ -222,6 +223,35 @@ parse_protection(const char *command, const char *protection, int *prot) {
 	return false;
 }
 
+/*
+ * KERNEL_CALL_ARGUMENT_MAX
+ *
+ * Description:
+ * 	The maximum number of kernel call arguments we will support.
+ */
+#define KERNEL_CALL_ARGUMENT_MAX 32
+
+/*
+ * process_kernel_call_arguments
+ *
+ * Description:
+ * 	Process an array of words into kernel call arguments.
+ */
+static bool
+process_kernel_call_arguments(const char *command, struct argwords *args,
+		struct kernel_call_argument *arguments) {
+	if (args->count > KERNEL_CALL_ARGUMENT_MAX) {
+		error_usage(command, NULL, "kernel function calling supports at most %u arguments",
+				KERNEL_CALL_ARGUMENT_MAX);
+		return false;
+	}
+	for (size_t i = 0; i < args->count; i++) {
+		arguments[i].size  = args->words[i].width;
+		arguments[i].value = args->words[i].value;
+	}
+	return true;
+}
+
 HANDLER(i_handler) {
 	return i_command();
 }
@@ -362,22 +392,29 @@ HANDLER(fc_handler) {
 }
 
 HANDLER(kc_handler) {
-	size_t width     = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
-	kaddr_t function = ARG_GET_ADDRESS(1, "function");
-	struct argword argwords[5];
-	argwords[0] = ARG_GET_WORD_OR(2, "arg1", 0, 0);
-	argwords[1] = ARG_GET_WORD_OR(3, "arg2", 0, 0);
-	argwords[2] = ARG_GET_WORD_OR(4, "arg3", 0, 0);
-	argwords[3] = ARG_GET_WORD_OR(5, "arg4", 0, 0);
-	argwords[4] = ARG_GET_WORD_OR(6, "arg5", 0, 0);
-	struct kernel_call_argument args[5];
-	size_t count = 0;
-	while (count < sizeof(argwords) / sizeof(argwords[0]) && argwords[count].width != 0) {
-		args[count].size = argwords[count].width;
-		args[count].value = argwords[count].value;
-		count++;
+	size_t width         = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
+	kaddr_t function     = ARG_GET_ADDRESS(1, "function");
+	struct argwords args = ARG_GET_WORDS(2, "args...");
+	struct kernel_call_argument arguments[KERNEL_CALL_ARGUMENT_MAX];
+	if (!process_kernel_call_arguments("kc", &args, arguments)) {
+		return false;
 	}
-	return kc_command(function, width, count, args);
+	return kc_command(function, width, args.count, arguments);
+}
+
+HANDLER(kcv_handler) {
+	size_t width         = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
+	size_t vmethod_index = ARG_GET_UINT(1, "vindex");
+	struct argwords args = ARG_GET_WORDS(2, "args...");
+	struct kernel_call_argument arguments[KERNEL_CALL_ARGUMENT_MAX];
+	if (args.count < 1 || args.words[0].width != sizeof(kaddr_t)) {
+		error_usage("kcv", NULL, "need a C++ object to perform a virtual method call");
+		return false;
+	}
+	if (!process_kernel_call_arguments("kcv", &args, arguments)) {
+		return false;
+	}
+	return kcv_command(width, vmethod_index, args.count, arguments);
 }
 
 HANDLER(lc_handler) {
@@ -667,14 +704,19 @@ static struct command commands[] = {
 		"kc", NULL, kc_handler,
 		"Call a kernel function",
 		"Call a kernel function with the specified arguments.",
-		ARGSPEC(7) {
+		ARGSPEC(3) {
 			{ "",       "width",    ARG_WIDTH,   "The width of the return value" },
 			{ ARGUMENT, "function", ARG_ADDRESS, "The address of the function to call" },
-			{ OPTIONAL, "arg1",     ARG_WORD,    "The first argument" },
-			{ OPTIONAL, "arg2",     ARG_WORD,    "The second argument" },
-			{ OPTIONAL, "arg3",     ARG_WORD,    "The third argument" },
-			{ OPTIONAL, "arg4",     ARG_WORD,    "The fourth argument" },
-			{ OPTIONAL, "arg5",     ARG_WORD,    "The fifth argument" },
+			{ ARGUMENT, "args...",  ARG_WORDS,   "The arguments to the function" },
+		},
+	}, {
+		"kcv", "kc", kcv_handler,
+		"Call a kernel virtual method",
+		"Call a virtual method by index on a C++ object in the kernel.",
+		ARGSPEC(3) {
+			{ "",       "width",    ARG_WIDTH,   "The width of the return value" },
+			{ ARGUMENT, "vindex",   ARG_UINT,    "The index of the virtual method" },
+			{ ARGUMENT, "args...",  ARG_WORDS,   "The arguments to the function" },
 		},
 	}, {
 		"lc", NULL, lc_handler,

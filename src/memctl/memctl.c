@@ -372,7 +372,6 @@ find_metaclass(const char *classname, const char *bundle_id, kaddr_t *address) {
 	return true;
 }
 
-
 bool
 default_action(void) {
 #if MEMCTL_REPL
@@ -553,6 +552,33 @@ kc_command(kaddr_t function, size_t width, size_t argument_count,
 		printf("0x%jx\n", (uintmax_t)result);
 	}
 	return ok;
+}
+
+bool
+kcv_command(size_t width, size_t vmethod_index, size_t argument_count,
+		struct kernel_call_argument *arguments) {
+	assert(argument_count >= 1);
+	// First get the vtable.
+	kaddr_t vtable;
+	size_t size = sizeof(vtable);
+	bool ok = read_kernel(arguments[0].value, &size, &vtable, 0, 0);
+	if (!ok) {
+		error_message("could not read virtual method table from object "KADDR_XFMT,
+				arguments[0].value);
+		return false;
+	}
+	// Next get the virtual method.
+	kaddr_t vmethod;
+	size = sizeof(vmethod);
+	kaddr_t vmethod_ptr = vtable + vmethod_index * sizeof(kaddr_t);
+	ok = read_kernel(vmethod_ptr, &size, &vmethod, 0, 0);
+	if (!ok) {
+		error_message("could not read virtual method %zu from vtable "KADDR_XFMT,
+				vmethod_index, vtable);
+		return false;
+	}
+	// Finally perform the call.
+	return kc_command(vmethod, width, argument_count, arguments);
 }
 
 bool

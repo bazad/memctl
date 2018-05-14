@@ -29,6 +29,8 @@ bool fc_command(kaddr_t start, kaddr_t end, const char *classname, const char *b
 		size_t access);
 bool kc_command(kaddr_t function, size_t width, size_t argument_count,
 		struct kernel_call_argument *arguments);
+bool kcv_command(size_t width, size_t vmethod_index, size_t argument_count,
+		struct kernel_call_argument *arguments);
 bool lc_command(kaddr_t address);
 bool cm_command(const char *classname, const char *bundle_id);
 bool cz_command(const char *classname, const char *bundle_id);

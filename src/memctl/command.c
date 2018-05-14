@@ -82,6 +82,7 @@ static bool parse_symbol(struct state *s);
 static bool parse_address(struct state *s);
 static bool parse_range(struct state *s);
 static bool parse_word(struct state *s);
+static bool parse_words(struct state *s);
 
 static parse_fn parse_fns[] = {
 	parse_none,
@@ -95,6 +96,7 @@ static parse_fn parse_fns[] = {
 	parse_address,
 	parse_range,
 	parse_word,
+	parse_words,
 };
 
 #define ERROR_USAGE(fmt, ...)				\
@@ -739,11 +741,7 @@ fail_2:
 }
 
 static bool
-parse_word(struct state *s) {
-	if (s->arg == NULL) {
-		ERROR_OPTION(s, "missing word");
-		return false;
-	}
+parse_word_internal(struct state *s) {
 	size_t len = -1;
 	const char *sep = strchr(s->arg, ':');
 	if (sep != NULL) {
@@ -774,6 +772,46 @@ parse_word(struct state *s) {
 	return true;
 }
 
+static bool
+parse_word(struct state *s) {
+	if (s->arg == NULL) {
+		ERROR_OPTION(s, "missing word");
+		return false;
+	}
+	return parse_word_internal(s);
+}
+
+static bool
+parse_words(struct state *s) {
+	// TODO: This is a hack to get around implementing repeated arguments, which is somewhat
+	// messy to implement under the design of this parser.
+	assert(s->option == NULL);
+	struct argword *words = NULL;
+	size_t count = 0;
+	while (s->arg != NULL) {
+		if (!parse_word_internal(s)) {
+			return false;
+		}
+		struct argword *new_words = realloc(words, (count + 1) * sizeof(*words));
+		if (new_words == NULL) {
+			error_out_of_memory();
+			free(words);
+			return false;
+		}
+		words = new_words;
+		words[count] = s->argument->word;
+		count++;
+		advance(s);
+	}
+	s->argument->words.count = count;
+	s->argument->words.words = words;
+	s->argument->type = ARG_WORDS;
+	s->argv += s->argc;
+	s->argc  = 0;
+	s->arg   = NULL;
+	return true;
+}
+
 /*
  * cleanup_argument
  *
@@ -788,6 +826,9 @@ cleanup_argument(struct argument *argument) {
 			break;
 		case ARG_SYMBOL:
 			free_symbol(argument);
+			break;
+		case ARG_WORDS:
+			free(argument->words.words);
 			break;
 		default:
 			break;

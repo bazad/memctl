@@ -39,6 +39,7 @@ typedef enum argtype {
 	ARG_ADDRESS,
 	ARG_RANGE,
 	ARG_WORD,
+	ARG_WORDS,
 } argtype;
 
 /*
@@ -82,6 +83,10 @@ struct argument {
 			size_t width;
 			kword_t value;
 		} word;
+		struct argwords {
+			size_t count;
+			struct argword *words;
+		} words;
 	};
 };
 
