@@ -58,6 +58,7 @@ static kaddr_t jop_payload;
 const struct jop_call_strategy *strategies[] = {
 	&jop_call_strategy_5,
 	&jop_call_strategy_3,
+	&jop_call_strategy_6,
 	&jop_call_strategy_1,
 	&jop_call_strategy_2,
 };

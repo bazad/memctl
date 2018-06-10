@@ -7,6 +7,7 @@ SDK          ?= iphoneos
 CORE_DIR     ?= core
 CORE_LIB     ?= $(CORE_DIR)/libmemctl_core.a
 ENTITLEMENTS ?= $(CORE_DIR)/entitlements.plist
+SIGNING_ID   ?=
 
 REPL              ?= YES
 DIAGNOSTIC        ?= 0
@@ -60,6 +61,18 @@ ifneq ($(DIAGNOSTIC),0)
 LIBMEMCTL_DEFINES += -DMEMCTL_DIAGNOSTIC=$(DIAGNOSTIC)
 endif
 
+ifneq ($(ENTITLEMENTS),)
+ifneq ($(wildcard $(ENTITLEMENTS)),)
+CODESIGN_FLAGS = --entitlements "$(ENTITLEMENTS)"
+endif
+endif
+
+ifeq ($(SIGNING_ID),)
+CODESIGN_COMMAND = @true
+else
+CODESIGN_COMMAND = $(CODESIGN) $(CODESIGN_FLAGS) -s $(SIGNING_ID)
+endif
+
 # libmemctl arm64/AArch64 sources.
 
 LIBMEMCTL_arm64_SRCS = finder/kauth_cred_setsvuidgid.c \
@@ -71,6 +84,7 @@ LIBMEMCTL_arm64_SRCS = finder/kauth_cred_setsvuidgid.c \
 		       jop/call_strategy_2.c \
 		       jop/call_strategy_3.c \
 		       jop/call_strategy_5.c \
+		       jop/call_strategy_6.c \
 		       jop/gadgets_static.c \
 		       disasm.c \
 		       kernel_call_arm64.c \
@@ -247,7 +261,6 @@ $$(OBJ_DIR)/$(1)/%.o: $$(TEST_DIR)/$(1)/%.c $$(LIBMEMCTL_INCS)
 $$(BIN_DIR)/$(1): $$($(1)_OBJS)
 	@mkdir -p $$(@D)
 	$$(CC) $$(LDFLAGS) $$(FRAMEWORKS) $$^ -o $$@
-	$$(CODESIGN) $$(CODESIGN_FLAGS) -s - $$@
 
 test_$(1): $$(BIN_DIR)/$(1)
 	$$(TEST_DIR)/$(1)/test.sh "$$(BIN_DIR)/$(1)" "$$(TEST_DIR)/$(1)" $$(TEST_DETAIL)
@@ -259,12 +272,6 @@ endef
 .PHONY: all clean test
 
 all: $(MEMCTL_BIN)
-
-ifneq ($(ENTITLEMENTS),)
-ifneq ($(wildcard $(ENTITLEMENTS)),)
-CODESIGN_FLAGS = --entitlements "$(ENTITLEMENTS)"
-endif
-endif
 
 $(OBJ_DIR)/$(MEMCTL_DIR)/%.o: $(SRC_DIR)/$(MEMCTL_DIR)/%.c $(MEMCTL_HDRS) $(LIBMEMCTL_INCS)
 	@mkdir -p $(@D)
@@ -285,7 +292,7 @@ $(OBJ_DIR)/$(EXTERNAL_SRC_DIR)/%.o: $(EXTERNAL_SRC_DIR)/%.c
 $(MEMCTL_BIN): $(MEMCTL_LIB) $(CORE_LIB) $(MEMCTL_OBJS)
 	@mkdir -p $(@D)
 	$(CC) $(LDFLAGS) $(FRAMEWORKS) $(MEMCTL_OBJS) "$(CORE_LIB)" -force_load $(MEMCTL_LIB) -o $@
-	$(CODESIGN) $(CODESIGN_FLAGS) -s - $@
+	$(CODESIGN_COMMAND) $@
 
 $(MEMCTL_LIB): $(LIBMEMCTL_OBJS)
 	@mkdir -p $(@D)

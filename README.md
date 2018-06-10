@@ -62,8 +62,11 @@ Other features are available in other headers.
 
 ## Supported platforms
 
-Memctl has been tested on iOS 10.2 (iPhone 5s) and iOS 11.1.2 (iPhone 7). If you need support for
-another (recent) iOS version and device, let me know.
+Memctl has been tested on iOS 10.2 (iPhone 5s), iOS 11.1.2 (iPhone 7), and iOS 11.3.1 (iPhone 8).
+If you need support for another (recent) iOS version and device, let me know.
+
+Unfortunately, memctl only supports calling kernel functions with up to 9 arguments on iOS 11.3.1.
+This could be improved, but is not a top priority for me right now.
 
 ## Building memctl
 
@@ -82,6 +85,10 @@ Note that since memctl is primarily a research tool, the libmemctl APIs might ch
 notice, and old cores that target specific vulnerabilities may not be updated. If memctl is not
 building properly with a particular core, check whether memctl and the core are on compatible
 versions.
+
+Memctl will usually need to be signed in order to run. The make variables `ENTITLEMENTS` and
+`SIGNING_ID` can be used to sign using the `codesign` utility. If that is not general enough for
+your use case, the `CODESIGN_COMMAND` variable can specify a custom codesigning command.
 
 ## Running memctl
 
