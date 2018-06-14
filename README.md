@@ -62,8 +62,8 @@ Other features are available in other headers.
 
 ## Supported platforms
 
-Memctl has been tested on iOS 10.2 (iPhone 5s), iOS 11.1.2 (iPhone 7), and iOS 11.3.1 (iPhone 8).
-If you need support for another (recent) iOS version and device, let me know.
+Memctl has been tested on iOS 10.2 (iPhone 5s), iOS 11.1.2 (iPhone 7), and iOS 11.3.1 (iPhone 5s
+and iPhone 8). If you need support for another (recent) iOS version and device, let me know.
 
 Unfortunately, memctl only supports calling kernel functions with up to 9 arguments on iOS 11.3.1.
 This could be improved, but is not a top priority for me right now.
