@@ -76,6 +76,7 @@ extern struct jop_call_strategy jop_call_strategy_3;
 // jop_call_strategy_4 was developed for Saigon.
 extern struct jop_call_strategy jop_call_strategy_5;
 extern struct jop_call_strategy jop_call_strategy_6;
+extern struct jop_call_strategy jop_call_strategy_7;
 
 // Internal definitions.
 
