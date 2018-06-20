@@ -156,12 +156,22 @@ struct static_gadget static_gadgets[] = {
 	GADGET("mov x19, x3 ; br x8",           0xaa0303f3, 0xd61f0100),
 	// MOV_X20_X6__BLR_X8
 	GADGET("mov x20, x6 ; blr x8",          0xaa0603f4, 0xd63f0100),
+	// MOV_X21_X4__BR_X8
+	GADGET("mov x21, x4 ; br x8",           0xaa0403f5, 0xd61f0100),
 	// MOV_X21_X4__BLR_X8
 	GADGET("mov x21, x4 ; blr x8",          0xaa0403f5, 0xd63f0100),
 	// MOV_X22_X12__BLR_X8
 	GADGET("mov x22, x12 ; blr x8",         0xaa0c03f6, 0xd63f0100),
+	// MOV_X21_X12__BR_X8
+	GADGET("mov x21, x12 ; br x8",          0xaa0c03f5, 0xd61f0100),
+	// MOV_X22_X21__BR_X8
+	GADGET("mov x22, x21 ; br x8",          0xaa1503f6, 0xd61f0100),
 	// MOV_X23_X5__BR_X8
 	GADGET("mov x23, x5 ; br x8",           0xaa0503f7, 0xd61f0100),
+	// MOV_X21_X5__BR_X8
+	GADGET("mov x21, x5 ; br x8",           0xaa0503f5, 0xd61f0100),
+	// MOV_X23_X21__BR_X8
+	GADGET("mov x23, x21 ; br x8",          0xaa1503f7, 0xd61f0100),
 	// MOV_X24_X7__BLR_X8
 	GADGET("mov x24, x7 ; blr x8",          0xaa0703f8, 0xd63f0100),
 	// MOV_X8_X9__BR_X10
