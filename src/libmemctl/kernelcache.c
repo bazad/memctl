@@ -345,20 +345,10 @@ kernelcache_init_uncompressed(struct kernelcache *kc, const void *data, size_t s
 	kc->size         = size;
 	kc->kernel.mh    = NULL;
 	kc->prelink_info = NULL;
+	kc->text         = NULL;
+	kc->prelink_text = NULL;
 	bool success = kernelcache_get_kernel(&kc->kernel, data, size);
 	if (!success) {
-		goto fail;
-	}
-	kr = kernelcache_parse_prelink_info(&kc->kernel, &kc->prelink_info);
-	if (kr != KEXT_SUCCESS) {
-		goto fail;
-	}
-	kr = kernelcache_find_text(&kc->kernel, &kc->text);
-	if (kr != KEXT_SUCCESS) {
-		goto fail;
-	}
-	kr = kernelcache_find_prelink_text(&kc->kernel, &kc->prelink_text);
-	if (kr != KEXT_SUCCESS) {
 		goto fail;
 	}
 	return KEXT_SUCCESS;
@@ -391,7 +381,7 @@ kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prel
 		return KEXT_ERROR;
 	}
 	const void *prelink_xml = (const void *)((uintptr_t)kernel->mh + sc->fileoff);
-	// TODO: IOCFUnserialize expects the buffer to be NULL-terminated. We don't do this
+	// TODO: IOCFUnserialize expects the buffer to be null-terminated. We don't do this
 	// explicitly. However, there appears to be some zero padding after the text anyway, so it
 	// works in practice.
 	CFStringRef error = NULL;
@@ -408,6 +398,23 @@ kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prel
 		return KEXT_ERROR;
 	}
 	*prelink_info = info;
+	return KEXT_SUCCESS;
+}
+
+kext_result
+kernelcache_process(struct kernelcache *kc) {
+	kext_result kr = kernelcache_parse_prelink_info(&kc->kernel, &kc->prelink_info);
+	if (kr != KEXT_SUCCESS) {
+		return kr;
+	}
+	kr = kernelcache_find_text(&kc->kernel, &kc->text);
+	if (kr != KEXT_SUCCESS) {
+		return kr;
+	}
+	kr = kernelcache_find_prelink_text(&kc->kernel, &kc->prelink_text);
+	if (kr != KEXT_SUCCESS) {
+		return kr;
+	}
 	return KEXT_SUCCESS;
 }
 

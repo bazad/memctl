@@ -20,6 +20,7 @@ struct kernelcache {
 	const void *data;
 	size_t size;
 	struct macho kernel;
+	// The following fields are only populated after a call to kernelcache_process().
 	CFDictionaryRef prelink_info;
 	const struct segment_command_64 *text;
 	const struct segment_command_64 *prelink_text;
@@ -63,6 +64,9 @@ kext_result kernelcache_init_file(struct kernelcache *kc, const char *file);
  *
  * Notes:
  * 	Call kernelcache_deinit to free any resources allocated to the kernelcache object.
+ *
+ * 	As with all the kernelcache_init* functions, only the fields data, size, and kernel are
+ * 	initialized. In order to initialize the other fields, call kernelcache_process().
  *
  * 	kernelcache_init does not assume ownership of the data; it is safe to modify the data after
  * 	this function returns.
@@ -117,6 +121,28 @@ void kernelcache_deinit(struct kernelcache *kc);
  */
 kext_result kernelcache_parse_prelink_info(const struct macho *kernel,
 		CFDictionaryRef *prelink_info);
+
+/*
+ * kernelcache_process
+ *
+ * Description:
+ * 	Process the kernelcache and populate the extra fields in the kernelcache struct. This
+ * 	processing includes identifying commonly used segments and parsing the __PRELINK_INFO
+ * 	segment (see kernelcache_parse_prelink_info).
+ *
+ * Parameters:
+ * 		kc			The kernelcache struct.
+ *
+ * Returns:
+ * 	KEXT_SUCCESS			Success.
+ * 	KEXT_ERROR			Out of memory, invalid kernelcache, or parse failure.
+ *
+ * Notes:
+ * 	On failure, any fields that could not be initialized are NULL.
+ *
+ * 	Do not call this function multiple times without deinitializing the kernelcache first.
+ */
+kext_result kernelcache_process(struct kernelcache *kc);
 
 /*
  * kernelcache_kext_for_each

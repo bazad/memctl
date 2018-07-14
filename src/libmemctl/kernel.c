@@ -515,6 +515,12 @@ kernel_init_kernelcache(const char *kernelcache_path) {
 		assert(kr == KEXT_ERROR);
 		return false;
 	}
+	kr = kernelcache_process(&kernelcache);
+	if (kr != KEXT_SUCCESS) {
+		assert(kr == KEXT_ERROR);
+		kernelcache_deinit(&kernelcache);
+		return false;
+	}
 	kernel.macho = kernelcache.kernel;
 	kernel.base = kernelcache.text->vmaddr + kernel_slide;
 	return true;
