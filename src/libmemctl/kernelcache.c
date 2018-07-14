@@ -228,6 +228,17 @@ missing_segment(const char *segname) {
 }
 
 /*
+ * missing_section
+ *
+ * Description:
+ * 	Generate an error for a missing section in the kernelcache.
+ */
+static void
+missing_section(const char *segname, const char *sectname) {
+	error_kernelcache("could not find %s.%s section", segname, sectname);
+}
+
+/*
  * kernelcache_find_text
  *
  * Description:
@@ -374,13 +385,20 @@ kernelcache_deinit(struct kernelcache *kc) {
 
 kext_result
 kernelcache_parse_prelink_info(const struct macho *kernel, CFDictionaryRef *prelink_info) {
-	const struct segment_command_64 *sc = (const struct segment_command_64 *)
-		macho_find_segment(kernel, kPrelinkInfoSegment);
-	if (sc == NULL) {
+	// First get __PRELINK_INFO.
+	const struct load_command *segment = macho_find_segment(kernel, kPrelinkInfoSegment);
+	if (segment == NULL) {
 		missing_segment(kPrelinkInfoSegment);
 		return KEXT_ERROR;
 	}
-	const void *prelink_xml = (const void *)((uintptr_t)kernel->mh + sc->fileoff);
+	// Get __PRELINK_INFO.__info.
+	const struct section_64 *section = macho_find_section(kernel, segment, kPrelinkInfoSection);
+	if (section == NULL) {
+		missing_section(kPrelinkInfoSegment, kPrelinkInfoSection);
+		return KEXT_ERROR;
+	}
+	assert(section->offset < kernel->size);
+	const void *prelink_xml = (const void *)((uintptr_t)kernel->mh + section->offset);
 	// TODO: IOCFUnserialize expects the buffer to be null-terminated. We don't do this
 	// explicitly. However, there appears to be some zero padding after the text anyway, so it
 	// works in practice.
