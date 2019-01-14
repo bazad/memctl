@@ -86,6 +86,7 @@ LIBMEMCTL_arm64_SRCS = finder/kauth_cred_setsvuidgid.c \
 		       jop/call_strategy_5.c \
 		       jop/call_strategy_6.c \
 		       jop/call_strategy_7.c \
+		       jop/call_strategy_8.c \
 		       jop/gadgets_static.c \
 		       disasm.c \
 		       kernel_call_arm64.c \

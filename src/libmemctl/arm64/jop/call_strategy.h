@@ -77,6 +77,7 @@ extern struct jop_call_strategy jop_call_strategy_3;
 extern struct jop_call_strategy jop_call_strategy_5;
 extern struct jop_call_strategy jop_call_strategy_6;
 extern struct jop_call_strategy jop_call_strategy_7;
+extern struct jop_call_strategy jop_call_strategy_8;
 
 // Internal definitions.
 
