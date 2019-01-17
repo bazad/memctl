@@ -16,7 +16,7 @@ kernel_find_pmap_cache_attributes(struct kext *kernel) {
 	struct ksim sim;
 	ksim_set_pc(&sim, _bzero_phys);
 	kaddr_t _pmap_cache_attributes = 0;
-	ksim_scan_for_call(&sim, KSIM_FW, 0, NULL, &_pmap_cache_attributes, 24);
+	ksim_scan_for_call(&sim, KSIM_FW, 0, NULL, &_pmap_cache_attributes, 32);
 	if (_pmap_cache_attributes == 0) {
 		NOSYM(_pmap_cache_attributes);
 		return;

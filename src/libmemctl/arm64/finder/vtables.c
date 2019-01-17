@@ -319,6 +319,17 @@ simulate_getMetaClass(struct state *state, kaddr_t method) {
 	return ksim_reg(&ksim, AARCH64_X0);
 }
 
+/*
+ * looks_like_kernel_text_address
+ *
+ * Description:
+ * 	Returns true if the given address looks like it could be a kernel text address.
+ */
+static bool
+looks_like_kernel_text_address(kaddr_t address) {
+	return ((address >> 32) == 0xfffffff0);
+}
+
 #define NMETHODS           12
 #define GETMETACLASS_INDEX 7
 
@@ -328,7 +339,7 @@ simulate_getMetaClass(struct state *state, kaddr_t method) {
  * Description:
  * 	Search through the __DATA_CONST.__const section for possible virtual method tables. For
  * 	each possible vtable, disassemble the getMetaClass method to see if it returns an
- * 	OSMetaClass instance found earlier. If it does, add symbols sfor the vtable and the
+ * 	OSMetaClass instance found earlier. If it does, add symbols for the vtable and the
  * 	OSMetaClass instance.
  */
 static void
@@ -345,7 +356,7 @@ search_for_vtables(struct state *state, struct kext *kext) {
 		}
 		// Make sure that the NMETHODS entries after VTABLE_OFFSET are nonempty.
 		for (size_t i = VTABLE_OFFSET; i < VTABLE_OFFSET + NMETHODS; i++) {
-			if (v[i] == 0) {
+			if (!looks_like_kernel_text_address(v[i])) {
 				goto next;
 			}
 		}
