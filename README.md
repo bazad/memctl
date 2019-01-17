@@ -70,6 +70,9 @@ Memctl has been tested on the following platforms:
 | 11.1.2 | iPhone 7 |
 | 11.2.5 | iPhone 8 |
 | 11.3.1 | iPhone 5s, iPhone 8 |
+| 11.3.1 | iPhone 5s, iPhone 8 |
+| 12.0 | iPhone8 |
+| iOS 12.1 | iPhone 7 Plus |
 
 If you need support for another (recent) iOS version and device, let me know.
 
@@ -106,6 +109,7 @@ a general list of commands, and type a specific command name followed by `?` to 
 for that command. Hit Ctrl-D or type `quit` to exit the REPL.
 
 	$ memctl
+	memctl> ?
 	i                              Print system information
 	r <address> [length]           Read and print formatted memory
 	rb <address> <length>          Print raw binary data from memory
