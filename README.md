@@ -72,7 +72,7 @@ Memctl has been tested on the following platforms:
 | 11.3.1 | iPhone 5s, iPhone 8 |
 | 11.3.1 | iPhone 5s, iPhone 8 |
 | 12.0 | iPhone8 |
-| iOS 12.1 | iPhone 7 Plus |
+| 12.1 | iPhone 7 Plus |
 
 If you need support for another (recent) iOS version and device, let me know.
 
@@ -110,41 +110,41 @@ for that command. Hit Ctrl-D or type `quit` to exit the REPL.
 
 	$ memctl
 	memctl> ?
-	i                              Print system information
-	r <address> [length]           Read and print formatted memory
-	rb <address> <length>          Print raw binary data from memory
-	ri <address> <length>          Disassemble kernel memory
-	rif <function>                 Disassemble a function
-	rs <address> [length]          Read a string from memory
-	w <address> <value>            Write an integer to memory
-	wd <address> <data>            Write arbitrary data to memory
-	ws <address> <string>          Write a string to memory
-	f <value> [range]              Find an integer in memory
-	fpr <pid>                      Find the proc struct for a process
-	fc <class> [range]             Find instances of a C++ class
-	kc <function> <args...>        Call a kernel function
-	kcv <vindex> <args...>         Call a kernel virtual method
-	lc <address>                   Look up the class of a C++ object
-	cm <class>                     Get the C++ metaclass pointer
-	cz <class>                     Get the size of a C++ class
-	kp <address>                   Translate virtual to physical address
-	kpm <range>                    Print virtual to physical address map
-	zs <address>                   Get zalloc memory size
-	pca <address>                  Show physical cache attributes
-	vt <class>                     Find the vtable of a C++ class
-	vtl <address>                  Look up the class name for a vtable
-	vm <address>                   Show virtual memory information
-	vmm [range]                    Show virtual memory information for range
-	vma <size>                     Allocate virtual memory
-	vmd <address> [size]           Deallocate virtual memory
-	vmp <prot> <address> [length]  Set virtual memory protection
-	ks [address]                   Kernel slide
-	a <symbol>                     Find the address of a symbol
-	ap [address]                   Address permutation
-	s <address>                    Find the symbol for an address
-	kcd [file]                     Decompress a kernelcache
-	root                           Exec a root shell
-	quit                           Exit the REPL
+	i                                Print system information
+	r <address> [length]             Read and print formatted memory
+	rb <address> <length>            Print raw binary data from memory
+	ri <address> <length>            Disassemble kernel memory
+	rif <function>                   Disassemble a function
+	rs <address> [length]            Read a string from memory
+	w <address> <value>              Write an integer to memory
+	wd <address> <data>              Write arbitrary data to memory
+	ws <address> <string>            Write a string to memory
+	f <value> [range]                Find an integer in memory
+	fpr <pid>                        Find the proc struct for a process
+	fc <class> [range]               Find instances of a C++ class
+	kc <function> <args...>          Call a kernel function
+	kcv <vindex> <object> <args...>  Call a kernel virtual method
+	lc <address>                     Look up the class of a C++ object
+	cm <class>                       Get the C++ metaclass pointer
+	cz <class>                       Get the size of a C++ class
+	kp <address>                     Translate virtual to physical address
+	kpm <range>                      Print virtual to physical address map
+	zs <address>                     Get zalloc memory size
+	pca <address>                    Show physical cache attributes
+	vt <class>                       Find the vtable of a C++ class
+	vtl <address>                    Look up the class name for a vtable
+	vm <address>                     Show virtual memory information
+	vmm [range]                      Show virtual memory information for range
+	vma <size>                       Allocate virtual memory
+	vmd <address> [size]             Deallocate virtual memory
+	vmp <prot> <address> [length]    Set virtual memory protection
+	ks [address]                     Kernel slide
+	a <symbol>                       Find the address of a symbol
+	ap [address]                     Address permutation
+	s <address>                      Find the symbol for an address
+	kcd [file]                       Decompress a kernelcache
+	root                             Exec a root shell
+	quit                             Exit the REPL
 	memctl> r?
 	
 	r[width] [-d] [-f] [-p] [-x access] <address> [length]

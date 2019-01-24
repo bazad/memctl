@@ -232,6 +232,28 @@ parse_protection(const char *command, const char *protection, int *prot) {
 #define KERNEL_CALL_ARGUMENT_MAX 32
 
 /*
+ * collect_kernel_call_arguments
+ *
+ * Description:
+ * 	A convenience function to collect arguments from the CLI API into a kernel_call_argument
+ * 	array.
+ */
+static void
+collect_kernel_call_arguments(bool is_method, kaddr_t object, struct argwords *args,
+		struct kernel_call_argument *arguments) {
+	size_t i = 0;
+	if (is_method) {
+		arguments[i].size  = sizeof(object);
+		arguments[i].value = object;
+		i++;
+	}
+	for (size_t j = 0; j < args->count; i++, j++) {
+		arguments[i].size  = args->words[j].width;
+		arguments[i].value = args->words[j].value;
+	}
+}
+
+/*
  * process_kernel_call_arguments
  *
  * Description:
@@ -245,10 +267,25 @@ process_kernel_call_arguments(const char *command, struct argwords *args,
 				KERNEL_CALL_ARGUMENT_MAX);
 		return false;
 	}
-	for (size_t i = 0; i < args->count; i++) {
-		arguments[i].size  = args->words[i].width;
-		arguments[i].value = args->words[i].value;
+	collect_kernel_call_arguments(false, 0, args, arguments);
+	return true;
+}
+
+/*
+ * process_kernel_virtual_call_arguments
+ *
+ * Description:
+ * 	Process an array of words into kernel call arguments for a virtual method call.
+ */
+static bool
+process_kernel_virtual_call_arguments(const char *command, struct argwords *args,
+		kaddr_t object, struct kernel_call_argument *arguments) {
+	if (args->count > (KERNEL_CALL_ARGUMENT_MAX - 1)) {
+		error_usage(command, NULL, "kernel virtual function calling supports at most "
+				"%u arguments", (KERNEL_CALL_ARGUMENT_MAX - 1));
+		return false;
 	}
+	collect_kernel_call_arguments(true, object, args, arguments);
 	return true;
 }
 
@@ -405,16 +442,13 @@ HANDLER(kc_handler) {
 HANDLER(kcv_handler) {
 	size_t width         = OPT_GET_WIDTH_OR(0, "", "width", sizeof(kword_t));
 	size_t vmethod_index = ARG_GET_UINT(1, "vindex");
-	struct argwords args = ARG_GET_WORDS(2, "args...");
+	kaddr_t object       = ARG_GET_ADDRESS(2, "object");
+	struct argwords args = ARG_GET_WORDS(3, "args...");
 	struct kernel_call_argument arguments[KERNEL_CALL_ARGUMENT_MAX];
-	if (args.count < 1 || args.words[0].width != sizeof(kaddr_t)) {
-		error_usage("kcv", NULL, "need a C++ object to perform a virtual method call");
+	if (!process_kernel_virtual_call_arguments("kcv", &args, object, arguments)) {
 		return false;
 	}
-	if (!process_kernel_call_arguments("kcv", &args, arguments)) {
-		return false;
-	}
-	return kcv_command(width, vmethod_index, args.count, arguments);
+	return kcv_command(width, vmethod_index, (args.count + 1), arguments);
 }
 
 HANDLER(lc_handler) {
@@ -705,18 +739,19 @@ static struct command commands[] = {
 		"Call a kernel function",
 		"Call a kernel function with the specified arguments.",
 		ARGSPEC(3) {
-			{ "",       "width",    ARG_WIDTH,   "The width of the return value" },
+			{ "",       "width",    ARG_WIDTH,   "The width of the return value"       },
 			{ ARGUMENT, "function", ARG_ADDRESS, "The address of the function to call" },
-			{ ARGUMENT, "args...",  ARG_WORDS,   "The arguments to the function" },
+			{ ARGUMENT, "args...",  ARG_WORDS,   "The arguments to the function"       },
 		},
 	}, {
 		"kcv", "kc", kcv_handler,
 		"Call a kernel virtual method",
 		"Call a virtual method by index on a C++ object in the kernel.",
-		ARGSPEC(3) {
-			{ "",       "width",    ARG_WIDTH,   "The width of the return value" },
-			{ ARGUMENT, "vindex",   ARG_UINT,    "The index of the virtual method" },
-			{ ARGUMENT, "args...",  ARG_WORDS,   "The arguments to the function" },
+		ARGSPEC(4) {
+			{ "",       "width",   ARG_WIDTH,   "The width of the return value"   },
+			{ ARGUMENT, "vindex",  ARG_UINT,    "The index of the virtual method" },
+			{ ARGUMENT, "object",  ARG_ADDRESS, "The address of the C++ object"   },
+			{ ARGUMENT, "args...", ARG_WORDS,   "The arguments to the method"     },
 		},
 	}, {
 		"lc", NULL, lc_handler,
