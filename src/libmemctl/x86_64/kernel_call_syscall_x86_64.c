@@ -6,6 +6,8 @@
 #include "memctl/kernel_slide.h"
 #include "memctl/utility.h"
 
+#include "diagnostic.h"
+
 kernel_read_fn  kernel_read_text;
 kernel_write_fn kernel_write_text;
 
@@ -244,9 +246,35 @@ kernel_write_text_default(kaddr_t kaddr, size_t *size, const void *data, size_t 
 	bool success = kernel_virtual_to_physical(kaddr, &paddr);
 	if (!success) {
 		error_internal("could not convert 0x%llx to physical address", kaddr);
-		return false;
+		return KERNEL_IO_ERROR;
 	}
-	return physical_write_unsafe(paddr, size, data, access_width, next);
+	kernel_io_result ior = physical_write_unsafe(paddr, size, data, access_width, next);
+	if (ior != KERNEL_IO_SUCCESS) {
+		return ior;
+	}
+#if MEMCTL_DIAGNOSTIC_LEVEL(1)
+	size_t cmp_size = *size;
+	void *cmp_data = malloc(cmp_size);
+	ior = kernel_read_text(kaddr, &cmp_size, cmp_data, access_width, 0);
+	if (ior != KERNEL_IO_SUCCESS) {
+		free(cmp_data);
+		error_internal("could not read 0x%llx to check", kaddr);
+		return ior;
+	}
+	bool match = memcmp(cmp_data, data, cmp_size) == 0;
+	if (!match) {
+		error_internal("wrote data, but actual results differ!");
+		for (size_t i = 0; i < cmp_size / 8; i++) {
+			uint64_t wrote = ((uint64_t *)data)[i];
+			uint64_t actual = ((uint64_t *)cmp_data)[i];
+			memctl_diagnostic(1, "(memory) %016llx %c= %016llx (wrote)\n",
+					actual, (wrote == actual ? '=' : '!'), wrote);
+		}
+		ior = KERNEL_IO_ERROR;
+	}
+	free(cmp_data);
+#endif // MEMCTL_DIAGNOSTIC_LEVEL(1)
+	return ior;
 }
 
 /*

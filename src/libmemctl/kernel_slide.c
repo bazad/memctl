@@ -457,9 +457,38 @@ kernel_slide_init_macos() {
 
 #endif
 
+/*
+ * kernel_slide_init_task_dyld_info
+ *
+ * Description:
+ * 	Initialize the kernel slide using information stashed in the kernel task port's
+ * 	task_info(TASK_DYLD_INFO).
+ */
+static bool
+kernel_slide_init_task_dyld_info() {
+	struct task_dyld_info info;
+	mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;
+	kern_return_t kr = task_info(kernel_task,
+			TASK_DYLD_INFO, (task_info_t) &info, &count);
+	if (kr != KERN_SUCCESS) {
+		return false;
+	}
+	// Right now we'll only check all_image_info_size for the kernel slide.
+	uint64_t slide = info.all_image_info_size;
+	if (slide != 0 && is_kernel_slide(slide)) {
+		kernel_slide = slide;
+		return true;
+	}
+	return false;
+}
+
 bool
 kernel_slide_init() {
 	if (kernel_slide != 0) {
+		return true;
+	}
+	bool ok = kernel_slide_init_task_dyld_info();
+	if (ok) {
 		return true;
 	}
 #if KERNELCACHE
